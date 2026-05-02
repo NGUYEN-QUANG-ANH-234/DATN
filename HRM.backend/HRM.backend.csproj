@@ -1,0 +1,93 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="AutoMapper.Extensions.Microsoft.DependencyInjection" Version="12.0.1" />
+		<PackageReference Include="BCrypt.Net-Next" Version="4.1.0" />
+		<PackageReference Include="Bogus" Version="35.6.5" />
+		<PackageReference Include="DotNetEnv" Version="3.1.1" />
+		<PackageReference Include="Google.Apis.Auth" Version="1.73.0" />
+		<PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.0" />
+		<PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" Version="8.0.0" />
+		<PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.0" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.0">
+			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+			<PrivateAssets>all</PrivateAssets>
+		</PackageReference>
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Proxies" Version="8.0.0" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.0">
+			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+			<PrivateAssets>all</PrivateAssets>
+		</PackageReference>
+		<PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="9.0.5" />
+		<PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.17.0" />
+		<PackageReference Include="Otp.NET" Version="1.4.1" />
+		<PackageReference Include="Pomelo.EntityFrameworkCore.MySql" Version="8.0.2" />
+		<PackageReference Include="Serilog.AspNetCore" Version="8.0.3" />
+		<PackageReference Include="Serilog.Settings.Configuration" Version="8.0.4" />
+		<PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
+		<PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+		<PackageReference Include="Swashbuckle.AspNetCore" Version="7.2.0" />
+		<PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.0.0" />
+		<PackageReference Include="System.Linq.Dynamic.Core" Version="1.7.1" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<None Update=".env">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update=".gitignore">
+			<CopyToOutputDirectory>Never</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="src\HRM.API\Controllers\EmployeeProfile\" />
+    <Folder Include="src\HRM.API\Controllers\Organization\" />
+    <Folder Include="src\HRM.API\Controllers\PayrollAllowances\" />
+    <Folder Include="src\HRM.API\Controllers\Recruitment\" />
+    <Folder Include="src\HRM.API\Controllers\RequestHandover\" />
+    <Folder Include="src\HRM.API\Controllers\TasksTraining\" />
+    <Folder Include="src\HRM.API\Controllers\TimeAttendance\" />
+    <Folder Include="src\HRM.Application\DTOs\EmployeeProfile\" />
+    <Folder Include="src\HRM.Application\DTOs\Organization\" />
+    <Folder Include="src\HRM.Application\DTOs\PayrollAllowances\" />
+    <Folder Include="src\HRM.Application\DTOs\Recruitment\" />
+    <Folder Include="src\HRM.Application\DTOs\RequestHandover\" />
+    <Folder Include="src\HRM.Application\DTOs\TasksTraining\" />
+    <Folder Include="src\HRM.Application\DTOs\TimeAttendance\" />
+    <Folder Include="src\HRM.Application\Interfaces\EmployeeProfile\" />
+    <Folder Include="src\HRM.Application\Interfaces\Organization\" />
+    <Folder Include="src\HRM.Application\Interfaces\PayrollAllowances\" />
+    <Folder Include="src\HRM.Application\Interfaces\Recruitment\" />
+    <Folder Include="src\HRM.Application\Interfaces\RequestHandover\" />
+    <Folder Include="src\HRM.Application\Interfaces\TasksTraining\" />
+    <Folder Include="src\HRM.Application\Interfaces\TimeAttendance\" />
+    <Folder Include="src\HRM.Application\Mappings\" />
+    <Folder Include="src\HRM.Application\Services\EmployeeProfile\" />
+    <Folder Include="src\HRM.Application\Services\Organization\" />
+    <Folder Include="src\HRM.Application\Services\PayrollAllowances\" />
+    <Folder Include="src\HRM.Application\Services\Recruitment\" />
+    <Folder Include="src\HRM.Application\Services\RequestHandover\" />
+    <Folder Include="src\HRM.Application\Services\TasksTraining\" />
+    <Folder Include="src\HRM.Application\Services\TimeAttendance\" />
+    <Folder Include="src\HRM.Application\UseCases\EmployeeProfile\" />
+    <Folder Include="src\HRM.Application\UseCases\Organization\" />
+    <Folder Include="src\HRM.Application\UseCases\PayrollAllowances\" />
+    <Folder Include="src\HRM.Application\UseCases\Recruitment\" />
+    <Folder Include="src\HRM.Application\UseCases\RequestHandover\" />
+    <Folder Include="src\HRM.Application\UseCases\TasksTraining\" />
+    <Folder Include="src\HRM.Application\UseCases\TimeAttendance\" />
+    <Folder Include="src\HRM.Application\Validators\" />
+    <Folder Include="src\HRM.Core\DomainServices\" />
+    <Folder Include="src\HRM.Infrastructure\Persistence\Repositories\PayrollAllowances\" />
+    <Folder Include="src\HRM.Infrastructure\Persistence\Repositories\TasksTraining\" />
+    <Folder Include="tests\" />
+  </ItemGroup>
+
+</Project>
