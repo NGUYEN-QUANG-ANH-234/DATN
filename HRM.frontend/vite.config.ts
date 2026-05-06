@@ -1,21 +1,20 @@
-// vite.config.ts
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import mkcert from "vite-plugin-mkcert"; // 1. Import mkcert
 
 export default defineConfig({
-  plugins: [react()],
-  // server: {
-  //   headers: {
-  //     // Cho phép cửa sổ popup gửi tin nhắn (postMessage) về trang chính
-  //     "Cross-Origin-Opener-Policy": "same-origin-allow-popups",
-  //     "Cross-Origin-Embedder-Policy": "unsafe-none",
-  //   },
-
-  // },
+  plugins: [
+    react(),
+    mkcert(), // Plugin này sẽ tự động lo tạo và cấu hình key/cert ngầm
+  ],
   server: {
-    // Đảm bảo host và port được định nghĩa rõ ràng
+    headers: {
+      // BẮT BUỘC dùng dòng này cho Google OAuth
+      "Cross-Origin-Opener-Policy": "same-origin-allow-popups",
+      "Cross-Origin-Embedder-Policy": "unsafe-none",
+    },
+    // Đã xóa https: true ở đây để hết lỗi TypeScript
     host: "localhost",
     port: 5173,
-    // https: true, // Bật HTTPS
   },
 });

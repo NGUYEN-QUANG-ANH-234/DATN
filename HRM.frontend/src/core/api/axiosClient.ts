@@ -20,6 +20,11 @@ const axiosClient = axios.create({
 axiosClient.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem("accessToken");
+    console.log(
+      `[Request] Gọi API: ${config.url}`,
+      "Token đang gửi:",
+      token ? "CÓ" : "KHÔNG CÓ",
+    );
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -33,6 +38,12 @@ axiosClient.interceptors.request.use(
 axiosClient.interceptors.response.use(
   (response) => response.data,
   async (error: AxiosError) => {
+    console.error(
+      `[Lỗi API] ${error.config?.url} - Status:`,
+      error.response?.status,
+    );
+    console.error(`[Chi tiết lỗi từ Backend]:`, error.response?.data); // QUAN TRỌNG NHẤT
+
     // Ép kiểu config về CustomAxiosRequestConfig
     const originalRequest = error.config as CustomAxiosRequestConfig;
 
@@ -44,12 +55,13 @@ axiosClient.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
+        console.log("[Interceptor] Bắt đầu gọi Refresh Token...");
         const refreshToken = localStorage.getItem("refreshToken");
         const accessToken = localStorage.getItem("accessToken");
 
         // Gọi API refresh token
         const res = await axios.post<TokenResponse>(
-          "https://localhost:7003/api/auth/refresh",
+          "https://localhost:7003/api/v1/auth/refresh",
           {
             accessToken,
             refreshToken,
@@ -57,6 +69,8 @@ axiosClient.interceptors.response.use(
         );
 
         const data = res.data;
+        console.log("[Interceptor] Kết quả Refresh:", data);
+
         const newAccessToken = data.accessToken || data.AccessToken;
 
         if (newAccessToken) {
@@ -66,7 +80,17 @@ axiosClient.interceptors.response.use(
           }
           return axiosClient(originalRequest);
         }
-      } catch (refreshError) {
+      } catch (refreshError: unknown) {
+        const errorMessage =
+          refreshError instanceof AxiosError
+            ? refreshError.response?.data || refreshError.message
+            : refreshError instanceof Error
+              ? refreshError.message
+              : String(refreshError);
+        console.error(
+          "[Interceptor] Refresh THẤT BẠI. Bị đẩy ra ngoài vì:",
+          errorMessage,
+        );
         // Nếu refresh token cũng hết hạn hoặc lỗi -> Xóa token và bắt đăng nhập lại
         localStorage.clear();
         window.location.href = "/";
