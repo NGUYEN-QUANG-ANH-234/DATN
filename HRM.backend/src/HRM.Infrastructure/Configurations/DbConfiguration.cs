@@ -26,11 +26,25 @@ public static class DbConfiguration
 
         services.AddDbContext<MyDbContext>(options =>
             options.UseMySql(connString, ServerVersion.AutoDetect(connString),
-                mySqlOptions => { mySqlOptions.EnableRetryOnFailure(); })
-                   .LogTo(message => Log.Information(message), new[] { DbLoggerCategory.Database.Command.Name }, LogLevel.Information)
-                   .UseLoggerFactory(MyDbContext.MyLoggerFactory)
-                   .EnableDetailedErrors()
-                   .UseLazyLoadingProxies());
+        mySqlOptions => { mySqlOptions.EnableRetryOnFailure(); })
+
+           // 1. Thay Serilog bằng Console.WriteLine để in ngay lập tức không qua bộ đệm
+           .LogTo(message =>
+           {
+               // Đổi màu để dễ nhìn thấy thảm họa "cuộn" màn hình
+               Console.ForegroundColor = ConsoleColor.Yellow;
+               Console.WriteLine(message);
+               Console.ResetColor();
+           },
+               new[] { DbLoggerCategory.Database.Command.Name },
+               LogLevel.Information)
+
+           // 2. Bật Sensitive Data Logging để thấy đích danh ID nào đang bị lặp vô tận
+           .EnableSensitiveDataLogging()
+
+            //.UseLoggerFactory(MyDbContext.MyLoggerFactory) // Tạm thời comment dòng này lại
+           .EnableDetailedErrors());
+           //.UseLazyLoadingProxies()); // Thủ phạm gây lặp đang nằm ở đây
 
 
         return services;

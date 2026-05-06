@@ -24,6 +24,7 @@ namespace HRM.backend.src.HRM.Infrastructure.Configurations
             services.AddScoped<IAccountRepository, AccountRepository>(); 
             services.AddScoped<IAuditLogRepository, AuditLogRepository>(); 
             services.AddScoped<IConfigurationRepository, ConfigurationRepository>();
+            services.AddScoped<IMfaRecoveryCodeRepository, MfaRecoveryCodeRepository>();
 
             // Đừng quên những dòng này ở Program.cs hoặc file Config tương ứng
             services.AddScoped<IJwtService, JwtService>();

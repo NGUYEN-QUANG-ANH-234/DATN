@@ -5,9 +5,12 @@ public static class MiddlewareExtensions
 {
     public static void UseCustomPipeline(this WebApplication app)
     {
+        app.UseCors("AllowFrontend");
+
         app.Use((context, next) =>
         {
-            context.Response.Headers.Append("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
+            //context.Response.Headers.Append("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
+            context.Response.Headers["Cross-Origin-Opener-Policy"] = "same-origin-allow-popups";
             return next();
         });
 
@@ -17,8 +20,7 @@ public static class MiddlewareExtensions
         {
             app.UseDevTools();
         }
-
-        app.UseCors("AllowFrontend");
+        
         app.UseHttpsRedirection();
         app.UseMiddleware<PerformanceMiddleware>();
 

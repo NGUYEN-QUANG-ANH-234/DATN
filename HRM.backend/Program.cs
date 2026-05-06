@@ -1,8 +1,8 @@
 using HRM.backend.src.HRM.API.Extensions;
 using HRM.backend.src.HRM.Infrastructure.Configurations;
-using HRM.backend.src.HRM.Infrastructure.Persistence;
 using Serilog;
 using System.Text;
+using System.IdentityModel.Tokens.Jwt;
 
 namespace HRM.backend;
 
@@ -25,7 +25,7 @@ public class Program
 
             var app = builder.Build();
 
-            // Thêm đoạn này để kích hoạt Seed dữ liệu
+            //Thêm đoạn này để kích hoạt Seed dữ liệu
             //using (var scope = app.Services.CreateScope())
             //{
             //    var services = scope.ServiceProvider;
@@ -53,6 +53,8 @@ public class Program
     {
         DotNetEnv.Env.Load();
         Console.OutputEncoding = Encoding.UTF8;
+
+        JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
     }
 
     private static void ConfigureServices(WebApplicationBuilder builder)
@@ -76,12 +78,9 @@ public class Program
         Console.WriteLine("=================================================");
         Console.WriteLine("LỖI CHI TIẾT TÌM THẤY:");
 
-        // Sửa ex.Message thành ex.ToString() để xem toàn bộ StackTrace
         Console.WriteLine(ex.ToString());
 
         Console.WriteLine("=================================================");
-
-        // XÓA HOẶC COMMENT dòng này để không làm treo tiến trình Migration
-         Console.ReadKey();
+        Console.ReadKey();
     }
 }

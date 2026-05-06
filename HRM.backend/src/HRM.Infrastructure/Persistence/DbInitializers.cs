@@ -27,11 +27,13 @@ public static class DbInitializer
         // ======================================================
         var roles = new List<Role>
         {
-            new Role { RoleName = "Director", Description = "Ban giám đốc" },
-            new Role { RoleName = "Admin", Description = "Quản trị hệ thống" },
-            new Role { RoleName = "HR", Description = "Nhân sự" },
-            new Role { RoleName = "Manager", Description = "Quản lý phòng ban" },
-            new Role { RoleName = "Employee", Description = "Nhân viên chính thức" },
+            new Role { Id = 1, RoleName = "Director", Description = "Ban giám đốc" },
+            new Role { Id = 2, RoleName = "Admin", Description = "Quản trị hệ thống" },
+            new Role { Id = 3, RoleName = "HR", Description = "Nhân sự" },
+            new Role { Id = 4, RoleName = "Manager", Description = "Quản lý phòng ban" },
+            new Role { Id = 5, RoleName = "Employee", Description = "Nhân viên chính thức" },
+            new Role { Id = 6, RoleName = "Intern", Description = "Thực tập sinh" },
+            new Role { Id = 7, RoleName = "Candidate", Description = "Ứng viên" }
         };
         context.Roles.AddRange(roles);
         await context.SaveChangesAsync();
@@ -167,7 +169,7 @@ public static class DbInitializer
                     // 105.843381 → Longitude(kinh độ)
                     //GpsLocation = "21.004118,105.843381", // Tọa độ HUST
                     GpsLat = 21.004118M,
-                    GpsLong = 105.843381M,                    
+                    GpsLong = 105.843381M,
                     Status = AttendanceStatus.Valid
                 });
             }

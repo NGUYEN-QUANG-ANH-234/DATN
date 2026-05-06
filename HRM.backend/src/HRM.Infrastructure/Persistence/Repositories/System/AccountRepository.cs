@@ -41,7 +41,7 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.System
                 {
                     Email = email,
                     OAuthId = oauthId,
-                    RoleId = 7, // Giả định ID 7 là Employee cơ bản
+                    RoleId = 7,
                     Status = AccountStatus.Active,
                     CreatedAt = DateTime.UtcNow
                 };

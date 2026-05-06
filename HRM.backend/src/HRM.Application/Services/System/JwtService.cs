@@ -8,13 +8,33 @@ using HRM.backend.src.HRM.Application.Interfaces.Services;
 
 namespace HRM.backend.src.HRM.Application.Services.System
 {
-    public class JwtService : IJwtService // Nhớ sửa interface thành IJwtService
+    public class JwtService : IJwtService
     {
         private readonly IConfiguration _config;
 
         public JwtService(IConfiguration config)
         {
             _config = config;
+        }
+
+        // Bổ sung hàm Helper để lấy và kiểm tra SecretKey an toàn
+        private string GetSecretKey()
+        {
+            var secretKey = _config["JwtSettings:SecretKey"];
+
+            // Nếu key trong appsettings.json trống hoặc quá ngắn ("abcde"), tự động lấy từ .env
+            if (string.IsNullOrEmpty(secretKey) || secretKey.Length < 16)
+            {
+                secretKey = Environment.GetEnvironmentVariable("SECRET_KEY");
+            }
+
+            // Chặn đứng lỗi StackOverflow / Crash hệ thống bằng Exception rõ ràng
+            if (string.IsNullOrEmpty(secretKey) || secretKey.Length < 16)
+            {
+                throw new InvalidOperationException("LỖI NGHIÊM TRỌNG: SecretKey bị thiếu hoặc quá ngắn (< 16 ký tự). JWT HMAC-SHA256 yêu cầu độ dài an toàn!");
+            }
+
+            return secretKey;
         }
 
         public string GenerateAccessToken(Account account)
@@ -26,7 +46,6 @@ namespace HRM.backend.src.HRM.Application.Services.System
                 new Claim("RoleId", account.RoleId.ToString())
             };
 
-            // Token chính thức sống 1 giờ (hoặc lấy từ config)
             return CreateToken(claims, _config.GetValue<int>("JwtSettings:AccessTokenExpirationMinutes", 60));
         }
 
@@ -45,16 +64,18 @@ namespace HRM.backend.src.HRM.Application.Services.System
                 ValidateAudience = false,
                 ValidateIssuer = false,
                 ValidateIssuerSigningKey = true,
-                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["JwtSettings:SecretKey"]!)),
-                ValidateLifetime = false // Bỏ qua check hạn để lấy thông tin từ token cũ
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(GetSecretKey())), // Dùng hàm GetSecretKey
+                ValidateLifetime = false
             };
 
             var tokenHandler = new JwtSecurityTokenHandler();
             var principal = tokenHandler.ValidateToken(token, tokenValidationParameters, out SecurityToken securityToken);
-            var jwtSecurityToken = securityToken as JwtSecurityToken;
 
-            if (jwtSecurityToken == null || !jwtSecurityToken.Header.Alg.Equals(SecurityAlgorithms.HmacSha256, StringComparison.InvariantCultureIgnoreCase))
+            if (securityToken is not JwtSecurityToken jwtSecurityToken ||
+                !jwtSecurityToken.Header.Alg.Equals(SecurityAlgorithms.HmacSha256, StringComparison.InvariantCultureIgnoreCase))
+            {
                 throw new SecurityTokenException("Token không hợp lệ.");
+            }
 
             return principal;
         }
@@ -64,10 +85,9 @@ namespace HRM.backend.src.HRM.Application.Services.System
             var claims = new[]
             {
                 new Claim(JwtRegisteredClaimNames.Sub, account.Id.ToString()),
-                new Claim("IsPreAuth", "true") // Đánh dấu đây là token tạm
+                new Claim("IsPreAuth", "true")
             };
 
-            // Token tạm thời chờ nhập MFA chỉ sống trong 5 phút
             return CreateToken(claims, 5);
         }
 
@@ -80,10 +100,9 @@ namespace HRM.backend.src.HRM.Application.Services.System
             return int.Parse(userIdString);
         }
 
-        // --- Hàm Helper dùng chung ---
         private string CreateToken(IEnumerable<Claim> claims, int expirationMinutes)
         {
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["JwtSettings:SecretKey"]!));
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(GetSecretKey())); // Dùng hàm GetSecretKey
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
             var token = new JwtSecurityToken(

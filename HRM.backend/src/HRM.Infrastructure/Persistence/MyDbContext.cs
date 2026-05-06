@@ -1,13 +1,14 @@
-﻿using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
-using HRM.backend.src.HRM.Core.Entities.System;
+﻿using HRM.backend.src.HRM.Core.Entities.EmployeeProfile;
 using HRM.backend.src.HRM.Core.Entities.Organization;
-using HRM.backend.src.HRM.Core.Entities.Recruitment;
-using HRM.backend.src.HRM.Core.Entities.EmployeeProfile;
-using HRM.backend.src.HRM.Core.Entities.TimeAttendance;
-using HRM.backend.src.HRM.Core.Entities.TasksTraining;
 using HRM.backend.src.HRM.Core.Entities.PayrollAllowances;
+using HRM.backend.src.HRM.Core.Entities.Recruitment;
 using HRM.backend.src.HRM.Core.Entities.RequestHandover;
+using HRM.backend.src.HRM.Core.Entities.System;
+using HRM.backend.src.HRM.Core.Entities.TasksTraining;
+using HRM.backend.src.HRM.Core.Entities.TimeAttendance;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using Microsoft.Extensions.Logging;
 using System.Reflection.Emit;
 
 namespace HRM.backend.src.HRM.Infrastructure.Persistence
@@ -16,17 +17,29 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
     {
         public MyDbContext(DbContextOptions<MyDbContext> options) : base(options) { }
 
-        public static readonly ILoggerFactory MyLoggerFactory = LoggerFactory.Create(builder =>
-        {
-            builder.AddFilter(DbLoggerCategory.Query.Name, LogLevel.Information)
-                   .SetMinimumLevel(LogLevel.Warning)
-                   .AddConsole();
-        });
+        //public static readonly ILoggerFactory MyLoggerFactory = LoggerFactory.Create(builder =>
+        //{
+        //    builder.AddFilter(DbLoggerCategory.Query.Name, LogLevel.Information)
+        //           .SetMinimumLevel(LogLevel.Warning)
+        //           .AddConsole();
+        //});
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
             base.OnConfiguring(optionsBuilder);
-            optionsBuilder.UseLoggerFactory(MyLoggerFactory);
+            //optionsBuilder.UseLoggerFactory(MyLoggerFactory);
+
+            // 1. Ghi log thẳng ra Console cực nhanh, an toàn, không lo xung đột Serilog
+            optionsBuilder.LogTo(
+                Console.WriteLine,
+                new[] { DbLoggerCategory.Database.Command.Name },
+                LogLevel.Information);
+
+            // 2. VŨ KHÍ TỐI THƯỢNG: Hiển thị giá trị thật của tham số
+            optionsBuilder.EnableSensitiveDataLogging();
+
+            // 3. Hiển thị thông tin lỗi chi tiết đến từng cột/bảng
+            optionsBuilder.EnableDetailedErrors();
         }
 
         // ==========================================
@@ -40,7 +53,7 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
         public DbSet<Account> Accounts { get; set; }
         public DbSet<Configuration> Configurations { get; set; }
         public DbSet<AuditLog> AuditLogs { get; set; }
-
+        public DbSet<MfaRecoveryCode> MfaRecoveryCodes { get; set; }
         // 2. Organization
         public DbSet<Department> Departments { get; set; }
         public DbSet<Position> Positions { get; set; }
@@ -119,6 +132,12 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
                 .HasOne(a => a.Role).WithMany(r => r.Accounts)
                 .HasForeignKey(a => a.RoleId).OnDelete(DeleteBehavior.Restrict);
 
+            modelBuilder.Entity<MfaRecoveryCode>()
+                .HasOne<Account>()
+                .WithMany()
+                .HasForeignKey(m => m.AccountId)
+                .OnDelete(DeleteBehavior.Cascade); // Xóa Account -> Xóa luôn Recovery Codes
+
             // --- ORGANIZATION & EMPLOYEE ---
             modelBuilder.Entity<Department>()
                 .HasOne(d => d.ParentDepartment).WithMany(d => d.SubDepartments)
@@ -172,13 +191,21 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
                 .HasIndex(e => e.CandidateId)
                 .IsUnique();
 
-            // Tự động chuyển đổi Enum thành String khi lưu vào DB (Khớp với kiểu ENUM trong SQL)
+            // Tự động chuyển đổi Enum thành String khi lưu vào DB
             foreach (var entityType in modelBuilder.Model.GetEntityTypes())
             {
                 foreach (var property in entityType.GetProperties())
                 {
-                    if (property.ClrType.IsEnum)
+                    // Lấy kiểu dữ liệu gốc (xử lý cả trường hợp Enum?)
+                    var type = Nullable.GetUnderlyingType(property.ClrType) ?? property.ClrType;
+
+                    if (type.IsEnum)
                     {
+                        // Tạo Converter phù hợp với kiểu Enum cụ thể đó
+                        var converterType = typeof(EnumToStringConverter<>).MakeGenericType(type);
+                        var converter = (ValueConverter)Activator.CreateInstance(converterType)!;
+
+                        property.SetValueConverter(converter);
                         property.SetColumnType("VARCHAR(50)");
                     }
                 }
@@ -188,6 +215,7 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
             .SelectMany(t => t.GetProperties())
             .Where(p => p.ClrType == typeof(decimal) || p.ClrType == typeof(decimal?)))
                 {
+
                     property.SetColumnType("DECIMAL(15,2)");
                 }
             }

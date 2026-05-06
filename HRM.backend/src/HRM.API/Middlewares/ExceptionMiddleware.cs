@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿using Serilog;
+using System.Net;
 using System.Text.Json;
 
 namespace HRM.backend.src.HRM.API.Middlewares
@@ -23,7 +24,8 @@ namespace HRM.backend.src.HRM.API.Middlewares
             catch (Exception ex)
             {
                 // 1. Log lỗi để kiểm tra trong cửa sổ Output hoặc file Log
-                _logger.LogError(ex, "An unhandled exception occurred.");
+                // ĐÚNG & AN TOÀN TUYỆT ĐỐI:
+                _logger.LogError("Lỗi tại request: {Path}. Chi tiết: {Message}", context.Request.Path, ex.InnerException?.Message ?? ex.Message);
 
                 // 2. Cấu hình Response (Phải làm trước khi ghi Body)
                 context.Response.ContentType = "application/json";
