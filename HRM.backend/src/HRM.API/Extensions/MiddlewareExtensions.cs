@@ -27,6 +27,8 @@ public static class MiddlewareExtensions
         app.UseAuthentication();
         app.UseAuthorization();
 
+        app.UseMiddleware<RoleBlockerMiddleware>();
+
         app.MapControllers();
     }
 

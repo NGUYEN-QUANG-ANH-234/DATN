@@ -3,7 +3,7 @@
     // ==========================================
     // MODULE 1: System
     // ==========================================
-    public enum AccountStatus { Active, Inactive }
+    public enum AccountStatus { Active, Inactive, Locked, Suspended }
 
     // ==========================================
     // MODULE 2 & 3: Organization & Recruitment

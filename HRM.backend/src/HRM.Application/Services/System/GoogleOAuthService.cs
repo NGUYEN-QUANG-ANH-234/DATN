@@ -29,8 +29,9 @@ namespace HRM.backend.src.HRM.Application.Services.System
 
         public async Task<GoogleProfile> ExchangeCodeForProfileAsync(string authCode)
         {
-            var clientId = GetConfigValue("GoogleSettings:ClientId", "GOOGLE_CLIENT_ID");
-            var clientSecret = GetConfigValue("GoogleSettings:ClientSecret", "GOOGLE_CLIENT_SECRET");
+            // Đọc thẳng qua IConfiguration (Đã tự map từ .env nhờ GoogleSettings__ClientId)
+            var clientId = _config["GoogleSettings:ClientId"];
+            var clientSecret = _config["GoogleSettings:ClientSecret"];
 
             if (string.IsNullOrEmpty(clientId) || string.IsNullOrEmpty(clientSecret))
             {
@@ -84,9 +85,10 @@ namespace HRM.backend.src.HRM.Application.Services.System
             // --- BƯỚC 3: TRẢ VỀ THÔNG TIN ---
             return new GoogleProfile
             {
-                Id = payload.Subject, // Subject (sub) chính là định danh duy nhất (OAuthId) của Google
+                Id = payload.Subject,
                 Email = payload.Email,
-                Name = payload.Name
+                FullName = payload.Name,      // Lấy Tên
+                PictureUrl = payload.Picture  // THÊM: Lấy URL Ảnh đại diện từ Google
             };
         }
     }

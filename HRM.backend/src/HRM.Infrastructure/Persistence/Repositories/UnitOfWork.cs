@@ -1,4 +1,5 @@
 ﻿using HRM.backend.src.HRM.Core.Interfaces.Repositories;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 
 namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories
@@ -13,17 +14,17 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories
             _context = context;
         }
 
-        public async Task<int> CommitAsync()
+        public async Task<int> CommitAsync(CancellationToken ct = default)
         {
             return await _context.SaveChangesAsync();
         }
 
-        public async Task BeginTransactionAsync()
+        public async Task BeginTransactionAsync(CancellationToken ct = default)
         {
             _transaction = await _context.Database.BeginTransactionAsync();
         }
 
-        public async Task CommitTransactionAsync()
+        public async Task CommitTransactionAsync(CancellationToken ct = default)
         {
             if (_transaction != null)
             {
@@ -33,7 +34,7 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories
             }
         }
 
-        public async Task RollbackTransactionAsync()
+        public async Task RollbackTransactionAsync(CancellationToken ct = default)
         {
             if (_transaction != null)
             {
@@ -43,7 +44,32 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories
             }
         }
 
-        public void Dispose()
+        public async Task ExecuteTransactionAsync(Func<Task> action, CancellationToken ct = default)
+        {
+            // Lấy chiến lược thực thi hiện tại của MySQL (có hỗ trợ Retry)
+            var strategy = _context.Database.CreateExecutionStrategy();
+
+            await strategy.ExecuteAsync(async () =>
+            {
+                // Khởi tạo Transaction bên trong Strategy
+                await using var transaction = await _context.Database.BeginTransactionAsync(ct);
+                try
+                {
+                    // Chạy khối lệnh UseCase truyền vào
+                    await action();
+
+                    // Commit nếu không có lỗi
+                    await transaction.CommitAsync(ct);
+                }
+                catch
+                {
+                    await transaction.RollbackAsync(ct);
+                    throw;
+                }
+            });
+        }
+
+        public void Dispose(CancellationToken ct = default)
         {
             _context.Dispose();
             GC.SuppressFinalize(this);

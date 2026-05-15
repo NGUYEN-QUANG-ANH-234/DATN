@@ -2,9 +2,11 @@
 using HRM.backend.src.HRM.Application.Interfaces.Services;
 using HRM.backend.src.HRM.Application.Interfaces.System.Services;
 using HRM.backend.src.HRM.Core.Entities.System;
+using HRM.backend.src.HRM.Core.Enums;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.System;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.System.HRM.backend.src.HRM.Infrastructure.Repositories.Interfaces.System;
+using static Google.Apis.Requests.BatchRequest;
 
 namespace HRM.backend.src.HRM.Application.Interfaces.System.UseCases
 {
@@ -18,6 +20,7 @@ namespace HRM.backend.src.HRM.Application.Interfaces.System.UseCases
         private readonly IJwtService _jwtService;
         private readonly IAppCache _appCache;
         private readonly IMfaRecoveryCodeRepository _mfaRecoveryCodeRepo;
+        private readonly ILockService _lockService;
 
         public IdentityUseCase(
             IAccountRepository accountRepo,
@@ -27,7 +30,9 @@ namespace HRM.backend.src.HRM.Application.Interfaces.System.UseCases
             IGoogleOAuthService googleOAuthService,
             IJwtService jwtService,
             IAppCache appCache,
-            IMfaRecoveryCodeRepository mfaRecoveryCodeRepo)
+            IMfaRecoveryCodeRepository mfaRecoveryCodeRepo,
+            ILockService lockService
+            )
         {
             _accountRepo = accountRepo;
             _auditLogRepo = auditLogRepo;
@@ -37,58 +42,127 @@ namespace HRM.backend.src.HRM.Application.Interfaces.System.UseCases
             _jwtService = jwtService;
             _appCache = appCache;
             _mfaRecoveryCodeRepo = mfaRecoveryCodeRepo;
+            _lockService = lockService;
         }
 
-        public async Task<AuthResponseDto> ProcessOAuthLoginAsync(string authCode)
+        public async Task<AuthResponseDto> LoginWithPasswordAsync(LoginDto dto, CancellationToken ct)
         {
-            Console.WriteLine(">>> [BƯỚC 1]: Bắt đầu chạy vào hàm xử lý đăng nhập.");
-
-            var googleProfile = await _googleOAuthService.ExchangeCodeForProfileAsync(authCode);
-            Console.WriteLine($">>> [BƯỚC 2]: Đã gọi xong Google API. Email lấy được: {googleProfile.Email}");
-
-            var user = await _accountRepo.FindOrUpsertUserAsync(googleProfile.Email, googleProfile.Name, googleProfile.Id);
-
-            // Nếu là user mới (Id = 0), phải lưu ngay xuống DB để MySQL cấp phát ID thật
-            if (user.Id == 0)
+            // Khóa luồng theo Email để chống brute-force hoặc race condition khi thao tác với Token
+            return await _lockService.GetWithLockAsync($"login_pwd_{dto.Email}", async (innerCt) =>
             {
-                await _unitOfWork.CommitAsync();
-            }
+                // 1. Tìm kiếm người dùng bằng Email
+                // LƯU Ý: Đảm bảo bạn đã có hàm GetByEmailAsync(email) trong AccountRepository
+                var user = await _accountRepo.GetByEmailAsync(dto.Email, innerCt);
 
-            Console.WriteLine($">>> [BƯỚC 3]: Đã tìm/tạo xong User trong Database. ID là: {user.Id}");
-
-            if (!user.IsMfaEnabled)
-            {
-                Console.WriteLine(">>> [BƯỚC 4]: MFA đang tắt. Bắt đầu tạo JWT Token...");
-                var accessToken = _jwtService.GenerateAccessToken(user);
-                var refreshToken = _jwtService.GenerateRefreshToken();
-
-                user.RefreshToken = refreshToken;
-                user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
-
-                Console.WriteLine(">>> [BƯỚC 5]: Tạo JWT xong. Bắt đầu ghi log Audit...");
-                await _auditLogRepo.LogAuditActionAsync("LOGIN_SUCCESS_NO_MFA", user.Id, "accounts");
-
-                Console.WriteLine(">>> [BƯỚC 6]: Bắt đầu lưu cập nhật Token & Log xuống Database (CommitAsync)...");
-                await _unitOfWork.CommitAsync();
-
-                Console.WriteLine(">>> [BƯỚC 7]: LƯU THÀNH CÔNG! Đang đóng gói dữ liệu trả về Frontend.");
-                return new AuthResponseDto
+                // 2. Kiểm tra tài khoản tồn tại và có mật khẩu (tránh lỗi với tài khoản chỉ login bằng Google)
+                if (user == null || string.IsNullOrEmpty(user.PasswordHash))
                 {
-                    Status = "SUCCESS",
-                    Token = accessToken,
-                    RefreshToken = refreshToken,
-                    Expiration = DateTime.UtcNow.AddHours(1)
-                };
-            }
-            else
+                    throw new UnauthorizedAccessException("Tài khoản hoặc mật khẩu không chính xác.");
+                }
+
+                // 3. Kiểm tra trạng thái tài khoản
+                if (user.Status != AccountStatus.Active)
+                {
+                    throw new UnauthorizedAccessException("Tài khoản của bạn đã bị khóa.");
+                }
+
+                // 4. Đối chiếu mật khẩu bằng BCrypt
+                bool isPasswordValid = BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash);
+                if (!isPasswordValid)
+                {
+                    await _auditLogRepo.LogSystemEventAsync("LOGIN_FAILED_PWD", user.Id, "accounts", "Sai mật khẩu");
+                    await _unitOfWork.CommitAsync(innerCt);
+                    throw new UnauthorizedAccessException("Tài khoản hoặc mật khẩu không chính xác.");
+                }
+
+                // 5. Xử lý cấp Token (Logic hoàn toàn giống ProcessOAuthLoginAsync)
+                if (!user.IsMfaEnabled)
+                {
+                    // Trạng thái chưa bật MFA: Cấp thẳng Access Token
+                    var accessToken = _jwtService.GenerateAccessToken(user, innerCt);
+                    var refreshToken = _jwtService.GenerateRefreshToken(innerCt);
+
+                    user.RefreshToken = refreshToken;
+                    user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
+
+                    await _auditLogRepo.LogSystemEventAsync("LOGIN_SUCCESS_PWD", user.Id, "accounts", "Đăng nhập thành công");
+                    await _unitOfWork.CommitAsync(innerCt);
+
+                    return new AuthResponseDto
+                    {
+                        Status = "SUCCESS",
+                        Token = accessToken,
+                        RefreshToken = refreshToken,
+                        Expiration = DateTime.UtcNow.AddHours(1),
+                        IsMfaEnabled = user.IsMfaEnabled
+                    };
+                }
+                else
+                {
+                    // Trạng thái đã bật MFA: Cấp Token Tạm và yêu cầu OTP
+                    var tempToken = _jwtService.GeneratePreAuthToken(user, innerCt);
+
+                    await _auditLogRepo.LogSystemEventAsync("LOGIN_MFA_CHALLENGE", user.Id, "accounts", "Yêu cầu xác thực OTP");
+                    await _unitOfWork.CommitAsync(innerCt);
+
+                    return new AuthResponseDto
+                    {
+                        Status = "MFA_REQUIRED",
+                        Token = tempToken,
+                        IsMfaEnabled = user.IsMfaEnabled
+                    };
+                }
+            }, TimeSpan.FromSeconds(10), ct);
+        }
+
+        public async Task<AuthResponseDto> ProcessOAuthLoginAsync(string authCode, CancellationToken ct)
+        {
+            var googleProfile = await _googleOAuthService.ExchangeCodeForProfileAsync(authCode);
+
+            //Khóa theo Email để đảm bảo tiến trình Upsert không bị đụng độ
+            return await _lockService.GetWithLockAsync($"login_{googleProfile.Email}", async (innerCt) =>
             {
-                // Tương tự cho nhánh MFA
-                Console.WriteLine(">>> [BƯỚC 4B]: Hệ thống yêu cầu MFA...");
-                var tempToken = _jwtService.GeneratePreAuthToken(user);
-                await _auditLogRepo.LogAuditActionAsync("LOGIN_MFA_CHALLENGE", user.Id, "accounts");
-                await _unitOfWork.CommitAsync();
-                return new AuthResponseDto { Status = "MFA_REQUIRED", Token = tempToken, IsMfaEnabled = user.IsMfaEnabled };
-            }
+                var user = await _accountRepo.FindOrUpsertUserAsync(
+                    googleProfile.Email,
+                    googleProfile.FullName,    // Sửa: Gọi đúng FullName
+                    googleProfile.PictureUrl,  // Thêm: Truyền URL ảnh từ Google
+                    googleProfile.Id,
+                    innerCt
+                );
+
+                if (user.Id == 0)
+                {
+                    await _unitOfWork.CommitAsync(innerCt);
+                }
+
+                if (!user.IsMfaEnabled)
+                {
+                    var accessToken = _jwtService.GenerateAccessToken(user, innerCt);
+                    var refreshToken = _jwtService.GenerateRefreshToken(innerCt);
+
+                    user.RefreshToken = refreshToken;
+                    user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
+
+                    await _auditLogRepo.LogSystemEventAsync("LOGIN_SUCCESS_NO_MFA", user.Id, "accounts", "Đăng nhập bằng Google thành công");
+                    await _unitOfWork.CommitAsync(innerCt);
+
+                    return new AuthResponseDto
+                    {
+                        Status = "SUCCESS",
+                        Token = accessToken,
+                        RefreshToken = refreshToken,
+                        Expiration = DateTime.UtcNow.AddHours(1)
+                    };
+                }
+                else
+                {
+                    var tempToken = _jwtService.GeneratePreAuthToken(user, innerCt);
+                    await _auditLogRepo.LogSystemEventAsync("LOGIN_MFA_CHALLENGE", user.Id, "accounts", "Yêu cầu xác thực OTP (Google)");
+                    await _unitOfWork.CommitAsync(innerCt);
+
+                    return new AuthResponseDto { Status = "MFA_REQUIRED", Token = tempToken, IsMfaEnabled = user.IsMfaEnabled };
+                }
+            });
         }
 
         public async Task LogoutAsync(int userId)
@@ -102,99 +176,93 @@ namespace HRM.backend.src.HRM.Application.Interfaces.System.UseCases
                 user.RefreshTokenExpiryTime = DateTime.MinValue;
 
                 // Ghi log Audit
-                await _auditLogRepo.LogAuditActionAsync("LOGOUT_SUCCESS", userId, "accounts");
+                await _auditLogRepo.LogSystemEventAsync("LOGOUT_SUCCESS", userId, "accounts", "Người dùng đăng xuất");
 
                 // Lưu thay đổi
                 await _unitOfWork.CommitAsync();
             }
         }
 
-        public async Task<AuthResponseDto> VerifyMfaLoginAsync(string otpCode, string tempToken)
+        public async Task<AuthResponseDto> VerifyMfaLoginAsync(string otpCode, string tempToken, CancellationToken ct)
         {
             var userId = _jwtService.ExtractUserIdFromToken(tempToken);
-            var user = await _accountRepo.GetByIdAsync(userId);
 
-            if (user == null || string.IsNullOrEmpty(user.MfaSecretKey))
-                throw new Exception("Dữ liệu xác thực không hợp lệ.");
-
-            bool isOtpValid = _mfaService.VerifyOTP(otpCode, user.MfaSecretKey);
-
-            if (!isOtpValid)
+            return await _lockService.GetWithLockAsync($"login_{userId}", async (innerCt) =>
             {
-                await _auditLogRepo.LogAuditActionAsync("LOGIN_MFA_FAILED", user.Id, "accounts");
-                await _unitOfWork.CommitAsync();
-                return new AuthResponseDto { Status = "FAILED" };
-            }
+                var user = await _accountRepo.GetByIdAsync(userId, innerCt);
 
-            var accessToken = _jwtService.GenerateAccessToken(user);
-            var refreshToken = _jwtService.GenerateRefreshToken();
+                if (user == null || string.IsNullOrEmpty(user.MfaSecretKey))
+                    throw new Exception("Dữ liệu xác thực không hợp lệ.");
 
-            user.RefreshToken = refreshToken;
-            user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);            
+                bool isOtpValid = _mfaService.VerifyOTP(otpCode, user.MfaSecretKey);
 
-            await _auditLogRepo.LogAuditActionAsync("LOGIN_MFA_SUCCESS", user.Id, "accounts");
-            await _unitOfWork.CommitAsync();
+                if (!isOtpValid)
+                {
+                    await _auditLogRepo.LogSystemEventAsync("LOGIN_MFA_FAILED", user.Id, "accounts", "Nhập sai mã OTP");
+                    await _unitOfWork.CommitAsync(innerCt);
+                    return new AuthResponseDto { Status = "FAILED" };
+                }
 
-            return new AuthResponseDto
-            {
-                Status = "SUCCESS",
-                Token = accessToken,
-                RefreshToken = refreshToken,
-                Expiration = DateTime.UtcNow.AddHours(1),
-                IsMfaEnabled = user.IsMfaEnabled,
-            };
+                var accessToken = _jwtService.GenerateAccessToken(user, innerCt);
+                var refreshToken = _jwtService.GenerateRefreshToken(innerCt);
+
+                user.RefreshToken = refreshToken;
+                user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
+
+                await _auditLogRepo.LogSystemEventAsync("LOGIN_MFA_SUCCESS", user.Id, "accounts", "Xác thực OTP thành công");
+                await _unitOfWork.CommitAsync(innerCt);
+
+                return new AuthResponseDto
+                {
+                    Status = "SUCCESS",
+                    Token = accessToken,
+                    RefreshToken = refreshToken,
+                    Expiration = DateTime.UtcNow.AddHours(1),
+                    IsMfaEnabled = user.IsMfaEnabled,
+                };
+            }, TimeSpan.FromSeconds(10), ct);
         }
 
-        public async Task<AuthResponseDto> VerifyRecoveryCodeLoginAsync(string recoveryCode, string tempToken)
+        public async Task<AuthResponseDto> VerifyRecoveryCodeLoginAsync(string recoveryCode, string tempToken, CancellationToken ct)
         {
-            // 1. Lấy userId từ token tạm
             var userId = _jwtService.ExtractUserIdFromToken(tempToken);
-            var user = await _accountRepo.GetByIdAsync(userId);
 
-            if (user == null)
-                throw new Exception("Dữ liệu xác thực không hợp lệ.");
-
-            // 2. Tìm mã khôi phục hợp lệ (chưa dùng và khớp mã Hash)
-            var validCode = await _mfaRecoveryCodeRepo.GetUnusedCodeAsync(userId, recoveryCode);
-
-            if (validCode == null)
+            //// Khóa theo UserID để 1 user chỉ được xử lý 1 request Recovery tại một thời điểm
+            return await _lockService.GetWithLockAsync($"recovery_{userId}", async (innerCt) =>
             {
-                await _auditLogRepo.LogAuditActionAsync("LOGIN_RECOVERY_FAILED", user.Id, "accounts");
-                await _unitOfWork.CommitAsync();
-                return new AuthResponseDto { Status = "FAILED" };
-            }
+                var user = await _accountRepo.GetByIdAsync(userId, innerCt);
+                if (user == null) throw new Exception("Dữ liệu xác thực không hợp lệ.");
 
-            // 3. XÓA mã khôi phục thay vì chỉ đánh dấu
-            _mfaRecoveryCodeRepo.Remove(validCode); // Thay bằng hàm xóa tương ứng trong Repo của bạn (VD: Remove)
+                var validCode = await _mfaRecoveryCodeRepo.GetUnusedCodeAsync(userId, recoveryCode);
+                if (validCode == null)
+                {
+                    await _auditLogRepo.LogSystemEventAsync("LOGIN_RECOVERY_FAILED", user.Id, "accounts", "Nhập sai mã khôi phục");
+                    await _unitOfWork.CommitAsync(innerCt);
+                    return new AuthResponseDto { Status = "FAILED" };
+                }
 
-            // VÔ HIỆU HÓA MFA (Đưa về trạng thái chưa thiết lập)
-            user.MfaSecretKey = null;
+                _mfaRecoveryCodeRepo.Remove(validCode);
+                user.MfaSecretKey = null;
+                user.IsMfaEnabled = false;
+                await _mfaRecoveryCodeRepo.DeleteAllUserCodesAsync(user.Id, innerCt);
 
-            // Cập nhật trạng thái thiết lập MFA tại bảng accounts với trường IsMfaEnabled 
-            user.IsMfaEnabled = false;
+                var accessToken = _jwtService.GenerateAccessToken(user, innerCt);
+                var refreshToken = _jwtService.GenerateRefreshToken(innerCt);
+                user.RefreshToken = refreshToken;
+                user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
 
-            // Xóa nốt các mã khôi phục còn lại của user này cho an toàn tuyệt đối
-            await _mfaRecoveryCodeRepo.DeleteAllUserCodesAsync(user.Id);            
+                await _auditLogRepo.LogSystemEventAsync("LOGIN_RECOVERY_SUCCESS", user.Id, "accounts", "Khôi phục tài khoản thành công");
+                await _unitOfWork.CommitAsync(innerCt);
 
-            // 4. Tạo token chính thức cho người dùng
-            var accessToken = _jwtService.GenerateAccessToken(user);
-            var refreshToken = _jwtService.GenerateRefreshToken();
-
-            user.RefreshToken = refreshToken;
-            user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
-
-            // 5. Lưu Log và Commit DB
-            await _auditLogRepo.LogAuditActionAsync("LOGIN_RECOVERY_SUCCESS", user.Id, "accounts");
-            await _unitOfWork.CommitAsync();
-
-            return new AuthResponseDto
-            {
-                Status = "SUCCESS",
-                Token = accessToken,
-                RefreshToken = refreshToken,
-                Expiration = DateTime.UtcNow.AddHours(1),
-                IsMfaEnabled = user.IsMfaEnabled,
-            };
+                return new AuthResponseDto
+                {
+                    Status = "SUCCESS",
+                    Token = accessToken,
+                    RefreshToken = refreshToken,
+                    Expiration = DateTime.UtcNow.AddHours(1),
+                    IsMfaEnabled = user.IsMfaEnabled
+                };
+            });
         }
 
         public async Task<MfaSetupResponseDto> InitiateMfaSetupAsync(int userId, string email)
@@ -213,7 +281,7 @@ namespace HRM.backend.src.HRM.Application.Interfaces.System.UseCases
             return new MfaSetupResponseDto { QrCodeUri = qrCodeUri, SecretKey = secretKey };
         }
 
-        public async Task<List<string>> ConfirmMfaSetupAsync(int userId, string otpCode)
+        public async Task<List<string>> ConfirmMfaSetupAsync(int userId, string otpCode, CancellationToken ct)
         {
             var cacheKey = $"mfa_setup_{userId}";
             var cachedSecret = await _appCache.GetAsync<string>(cacheKey);
@@ -224,67 +292,69 @@ namespace HRM.backend.src.HRM.Application.Interfaces.System.UseCases
             if (!_mfaService.VerifyOTP(otpCode, cachedSecret))
                 throw new Exception("Mã OTP không chính xác.");
 
-            // Cập nhật Database
-            var user = await _accountRepo.GetByIdAsync(userId);
-            user!.MfaSecretKey = cachedSecret;
-            user.IsMfaEnabled = true;
-
-            // Sinh mã khôi phục
-            var plainRecoveryCodes = new List<string>();
-            var recoveryEntities = new List<MfaRecoveryCode>();
-
-            for (int i = 0; i < 8; i++)
+            return await _lockService.GetWithLockAsync($"confirm_mfa_{userId}", async (innerCt) =>
             {
-                var code = Guid.NewGuid().ToString("N").Substring(0, 8).ToUpper();
-                var formattedCode = $"{code.Substring(0, 4)}-{code.Substring(4, 4)}";
+                // Cập nhật Database
+                var user = await _accountRepo.GetByIdAsync(userId, innerCt);
+                user!.MfaSecretKey = cachedSecret;
+                user.IsMfaEnabled = true;
 
-                plainRecoveryCodes.Add(formattedCode);
-                recoveryEntities.Add(new MfaRecoveryCode
+                // Sinh mã khôi phục
+                var plainRecoveryCodes = new List<string>();
+                var recoveryEntities = new List<MfaRecoveryCode>();
+
+                for (int i = 0; i < 8; i++)
                 {
-                    AccountId = userId,
-                    CodeHash = BCrypt.Net.BCrypt.HashPassword(formattedCode)
-                });
-            }
+                    var code = Guid.NewGuid().ToString("N").Substring(0, 8).ToUpper();
+                    var formattedCode = $"{code.Substring(0, 4)}-{code.Substring(4, 4)}";
 
-            await _mfaRecoveryCodeRepo.AddBulkAsync(recoveryEntities);
-            await _unitOfWork.CommitAsync();
-            await _appCache.RemoveAsync(cacheKey);
+                    plainRecoveryCodes.Add(formattedCode);
+                    recoveryEntities.Add(new MfaRecoveryCode
+                    {
+                        AccountId = userId,
+                        CodeHash = BCrypt.Net.BCrypt.HashPassword(formattedCode)
+                    });
+                }
 
-            return plainRecoveryCodes;
+                await _mfaRecoveryCodeRepo.AddBulkAsync(recoveryEntities, innerCt);
+                await _unitOfWork.CommitAsync(innerCt);
+                await _appCache.RemoveAsync(cacheKey, innerCt);
+
+                return plainRecoveryCodes;
+            }, TimeSpan.FromSeconds(10), ct);            
         }
 
-        public async Task<AuthResponseDto> RefreshTokenAsync(string expiredToken, string refreshToken)
+        public async Task<AuthResponseDto> RefreshTokenAsync(string expiredToken, string refreshToken, CancellationToken ct)
         {
-            // 1. Lấy UserId từ token cũ (Lưu ý: Hàm này trong JwtService phải cho phép đọc token đã hết hạn)
             var userId = _jwtService.ExtractUserIdFromToken(expiredToken);
 
-            var user = await _accountRepo.GetByIdAsync(userId);
-
-            // 2. Kiểm tra tính hợp lệ của Refresh Token
-            if (user == null || user.RefreshToken != refreshToken || user.RefreshTokenExpiryTime <= DateTime.UtcNow)
+            // Khóa luồng cấp lại Token của User này
+            return await _lockService.GetWithLockAsync($"refresh_{userId}", async (innerCt) =>
             {
-                throw new Exception("Refresh token không hợp lệ hoặc đã hết hạn.");
-            }
+                var user = await _accountRepo.GetByIdAsync(userId, innerCt);
 
-            // 3. Tạo cặp Token mới
-            var newAccessToken = _jwtService.GenerateAccessToken(user);
-            var newRefreshToken = _jwtService.GenerateRefreshToken();
+                if (user == null || user.RefreshToken != refreshToken || user.RefreshTokenExpiryTime <= DateTime.UtcNow)
+                    throw new Exception("Refresh token không hợp lệ hoặc đã hết hạn.");
 
-            // 4. Cập nhật Database
-            user.RefreshToken = newRefreshToken;
-            user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
+                var newAccessToken = _jwtService.GenerateAccessToken(user, innerCt);
+                var newRefreshToken = _jwtService.GenerateRefreshToken(innerCt);
 
-            await _auditLogRepo.LogAuditActionAsync("TOKEN_REFRESH_SUCCESS", user.Id, "accounts");
-            await _unitOfWork.CommitAsync();
+                user.RefreshToken = newRefreshToken;
+                user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
 
-            return new AuthResponseDto
-            {
-                Status = "SUCCESS",
-                Token = newAccessToken,
-                RefreshToken = newRefreshToken,
-                Expiration = DateTime.UtcNow.AddHours(1),
-                IsMfaEnabled = user.IsMfaEnabled
-            };
+                await _auditLogRepo.LogSystemEventAsync("TOKEN_REFRESH_SUCCESS", user.Id, "accounts", "Cấp lại Access Token mới");
+                await _unitOfWork.CommitAsync(innerCt);
+
+                return new AuthResponseDto
+                {
+                    Status = "SUCCESS",
+                    Token = newAccessToken,
+                    RefreshToken = newRefreshToken,
+                    Expiration = DateTime.UtcNow.AddHours(1),
+                    IsMfaEnabled = user.IsMfaEnabled
+                };
+            });
         }
+
     }
 }

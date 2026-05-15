@@ -10,19 +10,24 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Microsoft.Extensions.Logging;
 using System.Reflection.Emit;
+using System.Security.Claims;
+using System.Text.Json;
 
 namespace HRM.backend.src.HRM.Infrastructure.Persistence
 {
     public class MyDbContext : DbContext
     {
-        public MyDbContext(DbContextOptions<MyDbContext> options) : base(options) { }
+        private readonly IHttpContextAccessor? _httpContextAccessor;
+        private readonly string[] SENSITIVE_FIELDS = {
+            "PasswordHash", "RefreshToken", "MfaSecretKey", "MfaRecoveryCodes",
+            "BaseSalary", "BonusAmount", "NetPay" // Thêm các cột tài chính nếu cần giấu IT
+        };
 
-        //public static readonly ILoggerFactory MyLoggerFactory = LoggerFactory.Create(builder =>
-        //{
-        //    builder.AddFilter(DbLoggerCategory.Query.Name, LogLevel.Information)
-        //           .SetMinimumLevel(LogLevel.Warning)
-        //           .AddConsole();
-        //});
+        // Cập nhật constructor (Cho phép Nullable IHttpContextAccessor để tránh lỗi lúc chạy Migration)
+        public MyDbContext(DbContextOptions<MyDbContext> options, IHttpContextAccessor? httpContextAccessor = null) : base(options)
+        {
+            _httpContextAccessor = httpContextAccessor;
+        }
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
@@ -54,6 +59,7 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
         public DbSet<Configuration> Configurations { get; set; }
         public DbSet<AuditLog> AuditLogs { get; set; }
         public DbSet<MfaRecoveryCode> MfaRecoveryCodes { get; set; }
+        public DbSet<SourceCatalog> SourceCatalogs { get; set; }
         // 2. Organization
         public DbSet<Department> Departments { get; set; }
         public DbSet<Position> Positions { get; set; }
@@ -214,10 +220,90 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
             foreach (var property in modelBuilder.Model.GetEntityTypes()
             .SelectMany(t => t.GetProperties())
             .Where(p => p.ClrType == typeof(decimal) || p.ClrType == typeof(decimal?)))
-                {
+            {
 
-                    property.SetColumnType("DECIMAL(15,2)");
+                property.SetColumnType("DECIMAL(15,2)");
+            }
+        }
+        
+
+        public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+        {
+            var userIdClaim = _httpContextAccessor?.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier);
+            int? currentUserId = int.TryParse(userIdClaim, out int id) ? id : null;
+
+            // Bắt các bản ghi bị thay đổi (Bỏ qua bảng AuditLog và MfaRecoveryCode)
+            var modifiedEntries = ChangeTracker.Entries()
+                .Where(e => e.Entity is not AuditLog && e.Entity is not MfaRecoveryCode &&
+                           (e.State == EntityState.Added || e.State == EntityState.Modified || e.State == EntityState.Deleted))
+                .ToList();
+
+            var auditEntries = new List<AuditLog>();
+
+            foreach (var entry in modifiedEntries)
+            {
+                var auditLog = new AuditLog
+                {
+                    TableName = entry.Metadata.GetTableName() ?? entry.Entity.GetType().Name,
+                    AccountId = currentUserId,
+                    ActionType = entry.State.ToString(),
+                    Timestamp = DateTime.UtcNow
+                };
+
+                var oldValues = new Dictionary<string, object?>();
+                var newValues = new Dictionary<string, object?>();
+                var affectedColumns = new List<string>();
+
+                foreach (var property in entry.Properties)
+                {
+                    if (property.IsTemporary) continue;
+
+                    string propertyName = property.Metadata.Name;
+
+                    // BẢO MẬT: Bỏ qua không ghi log các trường nhạy cảm
+                    if (SENSITIVE_FIELDS.Contains(propertyName)) continue;
+
+                    switch (entry.State)
+                    {
+                        case EntityState.Added:
+                            newValues[propertyName] = property.CurrentValue;
+                            affectedColumns.Add(propertyName);
+                            break;
+
+                        case EntityState.Deleted:
+                            oldValues[propertyName] = property.OriginalValue;
+                            affectedColumns.Add(propertyName);
+                            break;
+
+                        case EntityState.Modified:
+                            // TỐI ƯU: Chỉ ghi nhận nếu giá trị thực sự có sự thay đổi
+                            if (!Equals(property.OriginalValue, property.CurrentValue))
+                            {
+                                oldValues[propertyName] = property.OriginalValue;
+                                newValues[propertyName] = property.CurrentValue;
+                                affectedColumns.Add(propertyName);
+                            }
+                            break;
+                    }
+                }
+
+                // CHỈ LƯU LOG NẾU CÓ ÍT NHẤT 1 TRƯỜNG DỮ LIỆU ĐƯỢC CẬP NHẬT
+                if (affectedColumns.Count > 0)
+                {
+                    auditLog.OldValues = oldValues.Any() ? JsonSerializer.Serialize(oldValues) : null;
+                    auditLog.NewValues = newValues.Any() ? JsonSerializer.Serialize(newValues) : null;
+                    auditLog.AffectedColumns = JsonSerializer.Serialize(affectedColumns);
+
+                    auditEntries.Add(auditLog);
                 }
             }
+
+            if (auditEntries.Any())
+            {
+                await AuditLogs.AddRangeAsync(auditEntries, cancellationToken);
+            }
+
+            return await base.SaveChangesAsync(cancellationToken);
+        }
     }
 }

@@ -19,8 +19,10 @@ namespace HRM.backend.src.HRM.Core.Entities.System
         public int RoleId { get; set; }
         [ForeignKey("RoleId")]
         public virtual Role Role { get; set; } = null!; // Navigation property
-
+        public string? FullName { get; set; }
+        public string? AvatarUrl { get; set; }
         public AccountStatus Status { get; set; } = AccountStatus.Active;
+
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public string? RefreshToken { get; set; }
         public DateTime? RefreshTokenExpiryTime { get; set; }

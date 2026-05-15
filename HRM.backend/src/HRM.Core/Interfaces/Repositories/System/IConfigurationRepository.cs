@@ -7,21 +7,21 @@ namespace HRM.backend.src.HRM.Core.Interfaces.Repositories.System
         // ==========================================
         // 1. SALARY VARIABLE REPO (Biến lương)
         // ==========================================
-        Task<IEnumerable<Configuration>> FetchVariableMappingsAsync();
-        Task SaveMappingAsync(string code, string tablePath);
+        Task<IEnumerable<Configuration>> FetchVariableMappingsAsync(CancellationToken ct = default);
+        Task SaveMappingAsync(string code, string tablePath, CancellationToken ct = default);
 
         // ==========================================
         // 2. SYSTEM CONFIG REPO (SLA & Điểm danh)
         // ==========================================
-        Task<IEnumerable<Configuration>> FetchSLAByModuleAsync();
-        Task UpdateSLAConfigAsync(string moduleCode, string value, string unit);
-        Task<IEnumerable<Configuration>> FetchLatestConfigAsync();
-        Task SaveAttendanceParamsAsync(string configJsonValue);
+        Task<IEnumerable<Configuration>> FetchSLAByModuleAsync(CancellationToken ct = default);
+        Task UpdateSLAConfigAsync(string moduleCode, string value, string unit, CancellationToken ct = default);
+        Task<IEnumerable<Configuration>> FetchLatestConfigAsync(CancellationToken ct = default);
+        Task SaveAttendanceParamsAsync(string configJsonValue, CancellationToken ct = default);
 
         // ==========================================
         // 3. TEMPLATE REPO (Mẫu thông báo)
         // ==========================================
-        Task<IEnumerable<Configuration>> FetchAllTemplatesAsync();
-        Task UpdateTemplateContentAsync(string templateKey, string subjectAndBodyJson);
+        Task<IEnumerable<Configuration>> FetchAllTemplatesAsync(CancellationToken ct = default);
+        Task UpdateTemplateContentAsync(string templateKey, string subjectAndBodyJson, CancellationToken ct = default);
     }
 }

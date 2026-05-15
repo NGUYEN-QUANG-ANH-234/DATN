@@ -4,6 +4,7 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>214d5a82-dad8-4ecd-9d7c-1e3aee6a94a7</UserSecretsId>
   </PropertyGroup>
 
 	<ItemGroup>
@@ -11,7 +12,9 @@
 		<PackageReference Include="BCrypt.Net-Next" Version="4.1.0" />
 		<PackageReference Include="Bogus" Version="35.6.5" />
 		<PackageReference Include="DotNetEnv" Version="3.1.1" />
+		<PackageReference Include="DynamicExpresso.Core" Version="2.19.3" />
 		<PackageReference Include="Google.Apis.Auth" Version="1.74.0" />
+		<PackageReference Include="MailKit" Version="4.16.0" />
 		<PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.0" />
 		<PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" Version="8.0.0" />
 		<PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.0" />

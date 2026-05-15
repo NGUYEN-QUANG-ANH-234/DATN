@@ -26,6 +26,9 @@ namespace HRM.backend.src.HRM.Core.Entities.PayrollAllowances
         [Column(TypeName = "decimal(15,2)")] public decimal? PitAmount { get; set; }
 
         [Column(TypeName = "decimal(15,2)")] public decimal? NetSalary { get; set; }
+        [Column(TypeName = "decimal(15,2)")] public decimal? TaxDeductionPersonal { get; set; }
+        [Column(TypeName = "decimal(15,2)")] public decimal? AdvancePayment { get; set; }
+        [Column(TypeName = "decimal(5,2)")] public decimal? ActualWorkDays { get; set; }
 
         public PayrollStatus Status { get; set; } = PayrollStatus.Draft;
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

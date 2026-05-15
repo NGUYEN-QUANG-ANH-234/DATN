@@ -18,6 +18,9 @@ namespace HRM.backend.Migrations
 #pragma warning disable 612, 618
             modelBuilder
                 .HasAnnotation("ProductVersion", "8.0.2")
+                .HasAnnotation("Proxies:ChangeTracking", false)
+                .HasAnnotation("Proxies:CheckEquality", false)
+                .HasAnnotation("Proxies:LazyLoading", true)
                 .HasAnnotation("Relational:MaxIdentifierLength", 64);
 
             MySqlModelBuilderExtensions.AutoIncrementColumns(modelBuilder);
@@ -48,6 +51,12 @@ namespace HRM.backend.Migrations
                     b.Property<DateTime?>("EndDate")
                         .HasColumnType("datetime(6)");
 
+                    b.Property<decimal>("InsuranceSalary")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<int?>("PayrollFormulaId")
+                        .HasColumnType("int");
+
                     b.Property<decimal>("SalaryPercentage")
                         .HasColumnType("DECIMAL(15,2)");
 
@@ -65,7 +74,9 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("EmployeeId");
 
-                    b.ToTable("contracts");
+                    b.HasIndex("PayrollFormulaId");
+
+                    b.ToTable("contracts", (string)null);
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.Dependent", b =>
@@ -90,18 +101,21 @@ namespace HRM.backend.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("varchar(20)");
 
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("tinyint(1)");
-
                     b.Property<string>("Relationship")
                         .HasMaxLength(50)
                         .HasColumnType("varchar(50)");
+
+                    b.Property<DateTime>("ValidFrom")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("ValidTo")
+                        .HasColumnType("datetime(6)");
 
                     b.HasKey("Id");
 
                     b.HasIndex("EmployeeId");
 
-                    b.ToTable("dependents");
+                    b.ToTable("dependents", (string)null);
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.Employee", b =>
@@ -194,7 +208,7 @@ namespace HRM.backend.Migrations
                     b.HasIndex("TaxCode")
                         .IsUnique();
 
-                    b.ToTable("employees");
+                    b.ToTable("employees", (string)null);
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.Organization.Department", b =>
@@ -234,7 +248,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("ParentDeptId");
 
-                    b.ToTable("departments");
+                    b.ToTable("departments", (string)null);
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.Organization.Position", b =>
@@ -258,7 +272,7 @@ namespace HRM.backend.Migrations
                     b.HasIndex("Title")
                         .IsUnique();
 
-                    b.ToTable("positions");
+                    b.ToTable("positions", (string)null);
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.AllowanceType", b =>
@@ -281,7 +295,7 @@ namespace HRM.backend.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("allowance_types");
+                    b.ToTable("allowance_types", (string)null);
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.EmployeeAllowance", b =>
@@ -307,7 +321,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("EmployeeId");
 
-                    b.ToTable("employee_allowances");
+                    b.ToTable("employee_allowances", (string)null);
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.Payroll", b =>
@@ -317,6 +331,12 @@ namespace HRM.backend.Migrations
                         .HasColumnType("int");
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal?>("ActualWorkDays")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<decimal?>("AdvancePayment")
+                        .HasColumnType("DECIMAL(15,2)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime(6)");
@@ -346,6 +366,9 @@ namespace HRM.backend.Migrations
                     b.Property<decimal?>("TaxDeductionFamily")
                         .HasColumnType("DECIMAL(15,2)");
 
+                    b.Property<decimal?>("TaxDeductionPersonal")
+                        .HasColumnType("DECIMAL(15,2)");
+
                     b.Property<decimal?>("TaxableIncome")
                         .HasColumnType("DECIMAL(15,2)");
 
@@ -362,7 +385,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("EmployeeId");
 
-                    b.ToTable("payrolls");
+                    b.ToTable("payrolls", (string)null);
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.PayrollFormula", b =>
@@ -393,7 +416,7 @@ namespace HRM.backend.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("payroll_formulas");
+                    b.ToTable("payroll_formulas", (string)null);
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.Recruitment.Candidate", b =>
@@ -431,7 +454,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("RecruitmentRequestId");
 
-                    b.ToTable("candidates");
+                    b.ToTable("candidates", (string)null);
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.Recruitment.RecruitmentRequest", b =>
@@ -470,7 +493,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("PositionId");
 
-                    b.ToTable("recruitment_requests");
+                    b.ToTable("recruitment_requests", (string)null);
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.RequestHandover.EmploymentHistory", b =>
@@ -509,7 +532,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("EmployeeId");
 
-                    b.ToTable("employment_history");
+                    b.ToTable("employment_history", (string)null);
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.RequestHandover.HandoverItem", b =>
@@ -543,7 +566,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("TaskId");
 
-                    b.ToTable("handover_items");
+                    b.ToTable("handover_items", (string)null);
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.RequestHandover.HandoverRequest", b =>
@@ -578,7 +601,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("SenderId");
 
-                    b.ToTable("handover_requests");
+                    b.ToTable("handover_requests", (string)null);
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.RequestHandover.Request", b =>
@@ -623,7 +646,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("TargetPositionId");
 
-                    b.ToTable("requests");
+                    b.ToTable("requests", (string)null);
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.System.Account", b =>
@@ -634,6 +657,9 @@ namespace HRM.backend.Migrations
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("AvatarUrl")
+                        .HasColumnType("longtext");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime(6)");
 
@@ -641,6 +667,9 @@ namespace HRM.backend.Migrations
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("varchar(100)");
+
+                    b.Property<string>("FullName")
+                        .HasColumnType("longtext");
 
                     b.Property<bool>("IsMfaEnabled")
                         .HasColumnType("tinyint(1)");
@@ -674,7 +703,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("RoleId");
 
-                    b.ToTable("accounts");
+                    b.ToTable("accounts", (string)null);
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.System.AuditLog", b =>
@@ -692,10 +721,13 @@ namespace HRM.backend.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("varchar(100)");
 
-                    b.Property<string>("NewValue")
+                    b.Property<string>("AffectedColumns")
                         .HasColumnType("longtext");
 
-                    b.Property<string>("OldValue")
+                    b.Property<string>("NewValues")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("OldValues")
                         .HasColumnType("longtext");
 
                     b.Property<string>("TableName")
@@ -709,7 +741,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("AccountId");
 
-                    b.ToTable("audit_logs");
+                    b.ToTable("audit_logs", (string)null);
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.System.Configuration", b =>
@@ -719,6 +751,11 @@ namespace HRM.backend.Migrations
                         .HasColumnType("int");
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ConfigGroup")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
 
                     b.Property<string>("Description")
                         .HasColumnType("longtext");
@@ -734,7 +771,7 @@ namespace HRM.backend.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("configurations");
+                    b.ToTable("configurations", (string)null);
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.System.MfaRecoveryCode", b =>
@@ -759,7 +796,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("AccountId");
 
-                    b.ToTable("MfaRecoveryCodes");
+                    b.ToTable("MfaRecoveryCodes", (string)null);
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.System.Permission", b =>
@@ -773,6 +810,11 @@ namespace HRM.backend.Migrations
                     b.Property<string>("Description")
                         .HasColumnType("longtext");
 
+                    b.Property<string>("GroupName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
                     b.Property<string>("PermissionCode")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -783,7 +825,7 @@ namespace HRM.backend.Migrations
                     b.HasIndex("PermissionCode")
                         .IsUnique();
 
-                    b.ToTable("permissions");
+                    b.ToTable("permissions", (string)null);
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.System.Role", b =>
@@ -807,7 +849,7 @@ namespace HRM.backend.Migrations
                     b.HasIndex("RoleName")
                         .IsUnique();
 
-                    b.ToTable("roles");
+                    b.ToTable("roles", (string)null);
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.System.RolePermission", b =>
@@ -822,7 +864,35 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("PermissionId");
 
-                    b.ToTable("role_permissions");
+                    b.ToTable("role_permissions", (string)null);
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.System.SourceCatalog", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<string>("Module")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<string>("SourcePath")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("source_catalogs", (string)null);
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TasksTraining.DepartmentBudget", b =>
@@ -856,7 +926,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("DeptId");
 
-                    b.ToTable("department_budgets");
+                    b.ToTable("department_budgets", (string)null);
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TasksTraining.TaskFeedback", b =>
@@ -885,7 +955,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("TaskId");
 
-                    b.ToTable("task_feedbacks");
+                    b.ToTable("task_feedbacks", (string)null);
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TasksTraining.TaskProgress", b =>
@@ -912,7 +982,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("TaskId");
 
-                    b.ToTable("task_progresses");
+                    b.ToTable("task_progresses", (string)null);
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TasksTraining.Training", b =>
@@ -941,7 +1011,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("EmployeeId");
 
-                    b.ToTable("trainings");
+                    b.ToTable("trainings", (string)null);
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TasksTraining.WorkTask", b =>
@@ -990,7 +1060,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("DeptBudgetId");
 
-                    b.ToTable("tasks");
+                    b.ToTable("tasks", (string)null);
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TimeAttendance.AttendanceLog", b =>
@@ -1033,7 +1103,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("ShiftId");
 
-                    b.ToTable("attendance_logs");
+                    b.ToTable("attendance_logs", (string)null);
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TimeAttendance.LeaveBalance", b =>
@@ -1057,7 +1127,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("LeaveTypeId");
 
-                    b.ToTable("leave_balances");
+                    b.ToTable("leave_balances", (string)null);
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TimeAttendance.LeaveRequest", b =>
@@ -1096,7 +1166,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("LeaveTypeId");
 
-                    b.ToTable("leave_requests");
+                    b.ToTable("leave_requests", (string)null);
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TimeAttendance.LeaveType", b =>
@@ -1116,7 +1186,7 @@ namespace HRM.backend.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("leave_types");
+                    b.ToTable("leave_types", (string)null);
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TimeAttendance.WorkShift", b =>
@@ -1143,7 +1213,7 @@ namespace HRM.backend.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("work_shifts");
+                    b.ToTable("work_shifts", (string)null);
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.Contract", b =>
@@ -1152,7 +1222,13 @@ namespace HRM.backend.Migrations
                         .WithMany("Contracts")
                         .HasForeignKey("EmployeeId");
 
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.PayrollFormula", "PayrollFormula")
+                        .WithMany()
+                        .HasForeignKey("PayrollFormulaId");
+
                     b.Navigation("Employee");
+
+                    b.Navigation("PayrollFormula");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.Dependent", b =>

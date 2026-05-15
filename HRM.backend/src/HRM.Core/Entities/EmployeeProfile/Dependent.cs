@@ -17,6 +17,7 @@ namespace HRM.backend.src.HRM.Core.Entities.EmployeeProfile
         [StringLength(20)] public string? IdNumber { get; set; }
 
         public DateTime? BirthDate { get; set; }
-        public bool IsActive { get; set; } = true;
+        public DateTime ValidFrom { get; set; }
+        public DateTime? ValidTo { get; set; }
     }
 }

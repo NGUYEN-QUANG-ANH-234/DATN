@@ -27,13 +27,15 @@ public static class DbInitializer
         // ======================================================
         var roles = new List<Role>
         {
-            new Role { Id = 1, RoleName = "Director", Description = "Ban giám đốc" },
-            new Role { Id = 2, RoleName = "Admin", Description = "Quản trị hệ thống" },
+            new Role { Id = 1, RoleName = "Admin", Description = "Quản trị hệ thống" },
+            new Role { Id = 2, RoleName = "Director", Description = "Ban giám đốc" },            
             new Role { Id = 3, RoleName = "HR", Description = "Nhân sự" },
             new Role { Id = 4, RoleName = "Manager", Description = "Quản lý phòng ban" },
             new Role { Id = 5, RoleName = "Employee", Description = "Nhân viên chính thức" },
-            new Role { Id = 6, RoleName = "Intern", Description = "Thực tập sinh" },
-            new Role { Id = 7, RoleName = "Candidate", Description = "Ứng viên" }
+            new Role { Id = 6, RoleName = "Collaborator", Description = "Cộng tác viên" },
+            new Role { Id = 7, RoleName = "Intern", Description = "Thực tập sinh" },
+            new Role { Id = 8, RoleName = "Candidate", Description = "Ứng viên" },
+            
         };
         context.Roles.AddRange(roles);
         await context.SaveChangesAsync();

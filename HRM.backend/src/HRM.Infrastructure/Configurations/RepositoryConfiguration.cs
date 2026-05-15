@@ -21,16 +21,17 @@ namespace HRM.backend.src.HRM.Infrastructure.Configurations
             services.AddScoped(typeof(IBaseRepository<>), typeof(BaseRepository<>));
 
             // 3. Đăng ký các Repository đặc thù của 8 Module
+            // Module 1: System
             services.AddScoped<IAccountRepository, AccountRepository>(); 
             services.AddScoped<IAuditLogRepository, AuditLogRepository>(); 
             services.AddScoped<IConfigurationRepository, ConfigurationRepository>();
             services.AddScoped<IMfaRecoveryCodeRepository, MfaRecoveryCodeRepository>();
+            services.AddScoped<ISourceCatalogRepository, SourceCatalogRepository>();
+            services.AddScoped<IRbacRepository, RbacRepository>();
+            services.AddScoped<IAuditLogRepository, AuditLogRepository>();
+            services.AddScoped<IRoleRepository, RoleRepository>();
 
-            // Đừng quên những dòng này ở Program.cs hoặc file Config tương ứng
-            services.AddScoped<IJwtService, JwtService>();
-            services.AddScoped<IIdentityUseCase, IdentityUseCase>();
-            services.AddHttpClient<IGoogleOAuthService, GoogleOAuthService>();
-            services.AddScoped<IMfaService, MfaService>();
+
 
             return services;
         }

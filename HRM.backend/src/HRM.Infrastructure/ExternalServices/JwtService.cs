@@ -18,50 +18,41 @@ namespace HRM.backend.src.HRM.Infrastructure.ExternalServices
             _config = config;
         }
 
-        public string GenerateAccessToken(Account user)
+        // Helper lấy Secret Key từ User Secrets / appsettings
+        private string GetSecretKey() => _config["JwtSettings:SecretKey"]
+            ?? throw new InvalidOperationException("LỖI CẤU HÌNH: JwtSettings:SecretKey bị thiếu.");
+
+        public string GenerateAccessToken(Account user, CancellationToken ct = default)
         {
-            var jwtSettings = _config.GetSection("JwtSettings");
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(GetSecretKey()));
 
-            // 1. Kiểm tra SECRET_KEY từ biến môi trường
-            var secretKey = Environment.GetEnvironmentVariable("SECRET_KEY")
-                            ?? throw new InvalidOperationException("SECRET_KEY is missing in environment variables.");
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
-
-            // 2. Khởi tạo danh sách Claims
             var claims = new List<Claim>
             {
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
                 new Claim(ClaimTypes.Email, user.Email),
-                // Claim "role" dùng cho PermissionHandler của bạn
-                new Claim("role", user.RoleId.ToString()),
-                // Claim chuẩn .NET dùng cho [Authorize(Roles = "...")]
-                new Claim(ClaimTypes.Role, user.Role?.RoleName ?? "Guest")
+    
+                // THÊM: Trả về Tên để Frontend hiện trên Header
+                new Claim(ClaimTypes.Name, user.FullName ?? "Người dùng"),
+                new Claim("avatar", user.AvatarUrl ?? ""),
+                // SỬA: Trả về Tên Role (chữ) vào biến "role" để Sidebar map đúng menu
+                new Claim("role", user.Role?.RoleName ?? "Guest"),
+                new Claim("RoleId", user.RoleId.ToString()),
             };
 
-            // 3. Duyệt danh sách quyền (Chỉ chạy nếu AuthService đã dùng .Include)
             if (user.Role?.RolePermissions != null)
             {
-                foreach (var rp in user.Role.RolePermissions)
+                foreach (var rp in user.Role.RolePermissions.Where(rp => rp.Permission != null && !string.IsNullOrEmpty(rp.Permission.PermissionCode)))
                 {
-                    // Kiểm tra null từng tầng để tránh lỗi sập Server (NullReference)
-                    if (rp.Permission != null && !string.IsNullOrEmpty(rp.Permission.PermissionCode))
-                    {
-                        claims.Add(new Claim("permission", rp.Permission.PermissionCode));
-                    }
+                    claims.Add(new Claim("permission", rp.Permission.PermissionCode));
                 }
             }
 
-            // 4. Lấy thời gian hết hạn an toàn
-            var expiryVar = Environment.GetEnvironmentVariable("ExpiryInMinutes");
-            if (!double.TryParse(expiryVar, out double expiryMinutes))
-            {
-                expiryMinutes = 60; // Mặc định 1 tiếng nếu .env lỗi
-            }
+            // Đọc thời gian hết hạn từ IConfiguration (mặc định 60 phút nếu không có)
+            var expiryMinutes = _config.GetValue<double>("JwtSettings:AccessTokenExpirationMinutes", 60);
 
-            // 5. Tạo Token
             var tokenDescriptor = new JwtSecurityToken(
-                issuer: jwtSettings["Issuer"],
-                audience: jwtSettings["Audience"],
+                issuer: _config["JwtSettings:Issuer"],
+                audience: _config["JwtSettings:Audience"],
                 claims: claims,
                 expires: DateTime.Now.AddMinutes(expiryMinutes),
                 signingCredentials: new SigningCredentials(key, SecurityAlgorithms.HmacSha256)
@@ -70,7 +61,7 @@ namespace HRM.backend.src.HRM.Infrastructure.ExternalServices
             return new JwtSecurityTokenHandler().WriteToken(tokenDescriptor);
         }
 
-        public string GenerateRefreshToken()
+        public string GenerateRefreshToken(CancellationToken ct = default)
         {
             var randomNumber = new byte[64];
             using var rng = RandomNumberGenerator.Create();
@@ -78,17 +69,14 @@ namespace HRM.backend.src.HRM.Infrastructure.ExternalServices
             return Convert.ToBase64String(randomNumber);
         }
 
-        public ClaimsPrincipal GetPrincipalFromExpiredToken(string token)
+        public ClaimsPrincipal GetPrincipalFromExpiredToken(string token, CancellationToken ct = default)
         {
-            var secretKey = Environment.GetEnvironmentVariable("SECRET_KEY")
-                            ?? throw new InvalidOperationException("SECRET_KEY missing");
-
             var tokenValidationParameters = new TokenValidationParameters
             {
                 ValidateAudience = false,
                 ValidateIssuer = false,
                 ValidateIssuerSigningKey = true,
-                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey)),
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(GetSecretKey())),
                 ValidateLifetime = false
             };
 
@@ -102,27 +90,19 @@ namespace HRM.backend.src.HRM.Infrastructure.ExternalServices
             return principal;
         }
 
-        // ==========================================
-        // CÁC HÀM BỔ SUNG CHO MFA
-        // ==========================================
-
-        public string GeneratePreAuthToken(Account user)
+        public string GeneratePreAuthToken(Account user, CancellationToken ct = default)
         {
-            var jwtSettings = _config.GetSection("JwtSettings");
-            var secretKey = Environment.GetEnvironmentVariable("SECRET_KEY")
-                            ?? throw new InvalidOperationException("SECRET_KEY missing");
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(GetSecretKey()));
 
             var claims = new List<Claim>
             {
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-                new Claim("IsPreAuth", "true") // Đánh dấu là token tạm thời, không có quyền truy cập resource
+                new Claim("IsPreAuth", "true")
             };
 
-            // Token tạm thời chờ nhập OTP chỉ có hiệu lực trong thời gian ngắn (ví dụ 5 phút)
             var tokenDescriptor = new JwtSecurityToken(
-                issuer: jwtSettings["Issuer"],
-                audience: jwtSettings["Audience"],
+                issuer: _config["JwtSettings:Issuer"],
+                audience: _config["JwtSettings:Audience"],
                 claims: claims,
                 expires: DateTime.Now.AddMinutes(5),
                 signingCredentials: new SigningCredentials(key, SecurityAlgorithms.HmacSha256)
@@ -131,12 +111,10 @@ namespace HRM.backend.src.HRM.Infrastructure.ExternalServices
             return new JwtSecurityTokenHandler().WriteToken(tokenDescriptor);
         }
 
-        public int ExtractUserIdFromToken(string token)
+        public int ExtractUserIdFromToken(string token, CancellationToken ct = default)
         {
             var tokenHandler = new JwtSecurityTokenHandler();
             var jwtToken = tokenHandler.ReadJwtToken(token);
-
-            // Đọc Claim NameIdentifier mà ta đã gán lúc tạo Token (cả AccessToken và PreAuthToken)
             var userIdString = jwtToken.Claims.First(x => x.Type == ClaimTypes.NameIdentifier).Value;
             return int.Parse(userIdString);
         }

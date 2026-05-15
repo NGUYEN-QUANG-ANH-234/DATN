@@ -17,6 +17,11 @@ public class Program
         {
             var builder = WebApplication.CreateBuilder(args);
 
+            // <-- THÊM DÒNG NÀY: Ép hệ thống ưu tiên đọc User Secrets 
+            builder.Configuration.AddUserSecrets<Program>();
+
+            builder.Configuration.AddEnvironmentVariables();
+
             // 2. Cấu hình Logging (Infrastructure)
             builder.Host.UseSerilog();
 
@@ -35,6 +40,8 @@ public class Program
 
             // 4. Cấu hình HTTP Request Pipeline (Middleware)
             app.UseCustomPipeline();
+
+            await PermissionSeederExtension.AutoSyncPermissionsAsync(app.Services);
 
             Log.Information(" HRM HICAS System is running...");
             await app.RunAsync();
@@ -60,10 +67,12 @@ public class Program
     private static void ConfigureServices(WebApplicationBuilder builder)
     {
         builder.Services
+            .AddHttpContextAccessor()
             .SetupInfrastructureLogging(builder.Configuration)
-            .AddDatabaseConfig()                    // Database & DBContext
-            .AddRepositoriesConfig()                // Repositories
-            .AddCacheConfig(builder.Configuration)  // Redis & Caching
+            .AddDatabaseConfig(builder.Configuration)
+            .AddRepositoriesConfig()                // Data Access Layers
+            .AddServicesConfig(builder.Configuration)                    // Business Logic & External Services (MỚI THÊM)
+            .AddCacheConfig(builder.Configuration)                       // Redis & Caching
             .AddSecurityConfig(builder.Configuration) // JWT & AuthService
             .AddCustomAuthorization()               // Phân quyền động (Dynamic RBAC)
             .AddCustomCors()                        // CORS

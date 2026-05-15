@@ -8,12 +8,13 @@ namespace HRM.backend.src.HRM.Application.Interfaces.System.UseCases
 {
     public interface IIdentityUseCase
     {
-        Task<AuthResponseDto> ProcessOAuthLoginAsync(string authCode);
+        Task<AuthResponseDto> LoginWithPasswordAsync(LoginDto dto, CancellationToken ct);
+        Task<AuthResponseDto> ProcessOAuthLoginAsync(string authCode, CancellationToken ct);
         Task LogoutAsync(int userId);
-        Task<AuthResponseDto> VerifyMfaLoginAsync(string otpCode, string tempToken);
-        Task<AuthResponseDto> VerifyRecoveryCodeLoginAsync(string recoveryCode, string tempToken);
+        Task<AuthResponseDto> VerifyMfaLoginAsync(string otpCode, string tempToken, CancellationToken ct);
+        Task<AuthResponseDto> VerifyRecoveryCodeLoginAsync(string recoveryCode, string tempToken, CancellationToken ct);
         Task<MfaSetupResponseDto> InitiateMfaSetupAsync(int userId, string email);
-        Task<List<string>> ConfirmMfaSetupAsync(int userId, string otpCode);
-        Task<AuthResponseDto> RefreshTokenAsync(string expiredToken, string refreshToken);
+        Task<List<string>> ConfirmMfaSetupAsync(int userId, string otpCode, CancellationToken ct);
+        Task<AuthResponseDto> RefreshTokenAsync(string expiredToken, string refreshToken, CancellationToken ct);
     }
 }

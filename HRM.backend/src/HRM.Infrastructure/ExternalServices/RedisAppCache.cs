@@ -14,7 +14,7 @@ public class RedisAppCache : IAppCache
         return jsonData is null ? default : JsonSerializer.Deserialize<T>(jsonData);
     }
 
-    public async Task SetAsync<T>(string key, T data, TimeSpan? absoluteExpireTime = null, TimeSpan? unusedExpireTime = null)
+    public async Task SetAsync<T>(string key, T data, TimeSpan? absoluteExpireTime = null, TimeSpan? unusedExpireTime = null, CancellationToken ct = default)
     {
         var options = new DistributedCacheEntryOptions
         {
@@ -25,5 +25,5 @@ public class RedisAppCache : IAppCache
         await _cache.SetStringAsync(key, jsonData, options);
     }
 
-    public async Task RemoveAsync(string key) => await _cache.RemoveAsync(key);
+    public async Task RemoveAsync(string key, CancellationToken ct = default) => await _cache.RemoveAsync(key, ct);
 }

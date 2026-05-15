@@ -11,6 +11,9 @@ namespace HRM.backend.src.HRM.Core.Entities.System
         [StringLength(50)]
         public required string PermissionCode { get; set; }
 
+        [StringLength(100)]
+        public required string GroupName { get; set; } // THÊM MỚI: VD "Hệ thống & Cấu hình", "Nhân sự"...
+
         public string? Description { get; set; }
 
         // Navigation property
