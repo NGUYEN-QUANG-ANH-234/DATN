@@ -3,32 +3,36 @@ import type { AuthResponse } from "../types";
 
 export const authApi = {
   googleLogin: (code: string): Promise<AuthResponse> => {
-    return axiosClient.post("/v1/auth/google", { code });
+    return axiosClient.post("/auth/google", { code });
   },
 
   verifyRecoveryCode: async (recoveryCode: string, tempToken: string) => {
-    return await axiosClient.post("/v1/auth/verify-recovery-code", {
+    return await axiosClient.post("/auth/verify-recovery-code", {
       recoveryCode,
       tempToken,
     });
   },
 
   verifyMfa: async (otpCode: string, tempToken: string) => {
-    return await axiosClient.post("/v1/auth/verify-mfa", {
+    return await axiosClient.post("/auth/verify-mfa", {
       otpCode,
       tempToken,
     });
   },
 
   initiateMfaSetup: async () => {
-    return await axiosClient.post("/v1/auth/mfa/setup");
+    return await axiosClient.post("/auth/mfa/setup");
   },
 
   confirmMfaSetup: async (otpCode: string) => {
-    return await axiosClient.post("/v1/auth/mfa/confirm", { otpCode });
+    return await axiosClient.post("/auth/mfa/confirm", { otpCode });
   },
 
   logout: async () => {
-    return await axiosClient.post("/v1/auth/logout");
+    return await axiosClient.post("/auth/logout");
+  },
+
+  basicLogin: (email: string, password: string): Promise<AuthResponse> => {
+    return axiosClient.post("/auth/login", { email, password });
   },
 };

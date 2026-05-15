@@ -12,6 +12,7 @@ export const LoginPage = () => {
     step,
     error,
     handleGoogleLogin,
+    handleBasicLogin,
     handleVerifyMfa,
     handleVerifyRecoveryCode,
     setStep,
@@ -41,9 +42,12 @@ export const LoginPage = () => {
     onError: () => console.error("Google Login Failed"),
   });
 
-  const onSubmitBasicLogin = (e: React.FormEvent) => {
+  const onSubmitBasicLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Submit đăng nhập thường với:", email, password);
+    if (!email || !password) return;
+
+    // Gọi hàm xử lý đăng nhập thay vì console.log
+    await handleBasicLogin(email, password);
   };
 
   // CẬP NHẬT: Xử lý submit tùy theo chế độ đang chọn

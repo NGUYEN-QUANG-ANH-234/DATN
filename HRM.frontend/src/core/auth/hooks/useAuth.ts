@@ -21,9 +21,9 @@ export const useAuth = () => {
     }
   };
 
-  const finalizeLogin = (token: string, refreshToken: string) => {
+  const finalizeLogin = (token: string) => {
     localStorage.setItem("accessToken", token);
-    localStorage.setItem("refreshToken", refreshToken);
+    // localStorage.setItem("refreshToken", refreshToken);
     navigate("/dashboard", { replace: true });
   };
 
@@ -31,10 +31,14 @@ export const useAuth = () => {
     try {
       setError("");
       const res = await authApi.googleLogin(code);
-      if (res.status === "SUCCESS" && res.token && res.refreshToken) {
-        finalizeLogin(res.token, res.refreshToken);
-      } else if (res.status === "MFA_REQUIRED" && res.token) {
-        setTempToken(res.token);
+
+      const status = res.status;
+      const token = res.token;
+
+      if (status === "SUCCESS" && token) {
+        finalizeLogin(token);
+      } else if (status === "MFA_REQUIRED" && token) {
+        setTempToken(token);
         setStep("MFA");
       }
     } catch (err: unknown) {
@@ -42,6 +46,33 @@ export const useAuth = () => {
         (err as { response?: { data?: { message?: string } } }).response?.data
           ?.message || "Lỗi xác thực từ máy chủ",
       );
+    }
+  };
+
+  const handleBasicLogin = async (email: string, password: string) => {
+    try {
+      setError("");
+      const res = await authApi.basicLogin(email, password);
+
+      const status = res.status;
+      const token = res.token;
+
+      if (status === "SUCCESS" && token) {
+        finalizeLogin(token);
+      } else if (status === "MFA_REQUIRED" && token) {
+        setTempToken(token);
+        setStep("MFA");
+      }
+    } catch (err: unknown) {
+      // Bắt chính xác lỗi từ Backend trả về (hỗ trợ cả camelCase và PascalCase)
+      const errorMsg =
+        (err as { response?: { data?: { message?: string } } }).response?.data
+          ?.message ||
+        (err as { response?: { data?: { Message?: string } } }).response?.data
+          ?.Message ||
+        "Tài khoản hoặc mật khẩu không chính xác.";
+
+      setError(errorMsg);
     }
   };
 
@@ -79,7 +110,7 @@ export const useAuth = () => {
           // Hoặc bạn có thể dispatch một state để show Modal UI đẹp hơn thay vì dùng alert mặc định
         }
 
-        finalizeLogin(token, refreshToken);
+        finalizeLogin(token);
       } else {
         console.error("Lỗi parse data:", res);
         setError("Không nhận được dữ liệu xác thực từ máy chủ.");
@@ -102,24 +133,17 @@ export const useAuth = () => {
         recoveryCode,
         tempToken,
       )) as unknown as {
-        status?: string;
-        Status?: string;
-        token?: string;
-        Token?: string;
-        accessToken?: string;
-        refreshToken?: string;
-        RefreshToken?: string;
-        requireMfaSetup?: boolean; // Trường mới để biết có cần setup MFA không
-        RequireMfaSetup?: boolean;
+        status: string;
+        token: string;
+        requireMfaSetup?: boolean;
       };
 
       // Bắt mọi trường hợp tên biến (camelCase hoặc PascalCase)
-      const status = res.status || res.Status;
-      const token = res.token || res.Token || res.accessToken;
-      const refreshToken = res.refreshToken || res.RefreshToken;
-      const requireMfaSetup = res.requireMfaSetup || res.RequireMfaSetup;
+      const status = res.status;
+      const token = res.token;
+      const requireMfaSetup = res.requireMfaSetup;
 
-      if (status === "SUCCESS" && token && refreshToken) {
+      if (status === "SUCCESS" && token) {
         // 1. Hiển thị Popup cảnh báo
         if (requireMfaSetup) {
           alert(
@@ -128,7 +152,7 @@ export const useAuth = () => {
           // Hoặc bạn có thể dispatch một state để show Modal UI đẹp hơn thay vì dùng alert mặc định
         }
 
-        finalizeLogin(token, refreshToken);
+        finalizeLogin(token);
       } else {
         setError("Không nhận được dữ liệu xác thực từ máy chủ.");
       }
@@ -175,6 +199,7 @@ export const useAuth = () => {
     step,
     error,
     handleGoogleLogin,
+    handleBasicLogin,
     handleVerifyMfa,
     setStep,
     logout,

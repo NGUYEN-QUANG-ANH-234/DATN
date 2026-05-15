@@ -21,11 +21,16 @@ export interface MfaConfirmResponse {
 
 // Định nghĩa kiểu dữ liệu của Token trả về từ C#
 export interface JwtPayload {
-  IsMfaEnabled(IsMfaEnabled: unknown): unknown;
+  // Thay vì email, .NET dùng chuẩn URL cho các claim mặc định.
+  // Tuy nhiên, đối với Name và Role ta đã custom lại tên ngắn gọn ở Backend
   email?: string;
-  RoleId?: string;
+  name?: string; // <-- Thêm name (Do ta dùng ClaimTypes.Name ở Backend)
+  role?: string; // <-- Thêm role (Do ta dùng claim "role" ở Backend)
+  avatar?: string; // <-- Thêm avatar
+  IsMfaEnabled?: string | boolean;
   sub?: string;
   exp?: number;
+  [key: string]: unknown;
 }
 
 // Định nghĩa kiểu dữ liệu User để hiển thị trên UI

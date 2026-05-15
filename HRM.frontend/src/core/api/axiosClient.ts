@@ -13,7 +13,7 @@ interface CustomAxiosRequestConfig extends InternalAxiosRequestConfig {
 }
 
 const axiosClient = axios.create({
-  baseURL: "https://localhost:7003/api",
+  baseURL: "https://localhost:7003/api/v1",
   withCredentials: true,
 });
 
@@ -56,7 +56,7 @@ axiosClient.interceptors.response.use(
 
       try {
         console.log("[Interceptor] Bắt đầu gọi Refresh Token...");
-        const refreshToken = localStorage.getItem("refreshToken");
+
         const accessToken = localStorage.getItem("accessToken");
 
         // Gọi API refresh token
@@ -64,7 +64,9 @@ axiosClient.interceptors.response.use(
           "https://localhost:7003/api/v1/auth/refresh",
           {
             accessToken,
-            refreshToken,
+          },
+          {
+            withCredentials: true, // BẮT BUỘC ĐỂ TRÌNH DUYỆT GỬI KÈM COOKIE
           },
         );
 
@@ -101,6 +103,19 @@ axiosClient.interceptors.response.use(
     if (error.response?.status === 403) {
       alert("Bạn không có quyền thực hiện hành động này!");
     }
+
+    const responseData = error.response?.data as unknown;
+
+    // Quét tìm thông báo lỗi từ Backend (Hỗ trợ Message hoa, message thường, hoặc title mặc định của .NET)
+    const customErrorMessage =
+      (responseData as { message?: string })?.message ||
+      (responseData as { Message?: string })?.Message ||
+      (responseData as { title?: string })?.title ||
+      error.message ||
+      "Đã có lỗi xảy ra từ máy chủ!";
+
+    // Ghi đè thẳng vào message của Axios
+    error.message = customErrorMessage;
 
     return Promise.reject(error);
   },
