@@ -60,7 +60,7 @@ export const AttendanceConfigManager: React.FC = () => {
   };
 
   return (
-    <div className="p-4 bg-white rounded shadow">
+    <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
       <h2 className="text-xl font-bold mb-4">
         Cấu hình Tham số Chấm công (GPS & IP)
       </h2>

@@ -4,3 +4,4 @@ export { SlaManager } from "./components/SlaManager";
 export { TemplateManager } from "./components/TemplateManager";
 export { RbacManager } from "./components/RbacManager";
 export { AuditLogViewer } from "./components/AuditLogViewer";
+export { ScheduleConfiguration } from "./components/ScheduleConfiguration";

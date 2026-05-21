@@ -5,29 +5,26 @@ const ENDPOINT = "/accounts";
 
 export const accountApi = {
   // Giả định bạn đã (hoặc sẽ) có 1 hàm GET danh sách User ở Backend
-  getAccounts: async () => (await axiosClient.get(ENDPOINT)).data,
+  getAccounts: async () => await axiosClient.get(ENDPOINT),
 
   // YÊU CẦU 3: Lấy danh sách Role từ hệ thống
-  getSystemRoles: async () => (await axiosClient.get("/system/roles")).data,
+  getSystemRoles: async () => await axiosClient.get("/system/roles"),
 
   updateRole: async (id: number, roleId: number) => {
-    return (await axiosClient.patch(`${ENDPOINT}/${id}/role`, roleId)).data;
+    return await axiosClient.patch(`${ENDPOINT}/${id}/role`, roleId);
   },
 
   createAccount: async (data: CreateAccountDto) => {
-    const response = await axiosClient.post(ENDPOINT, data);
-    return response.data;
+    return await axiosClient.post(ENDPOINT, data);
   },
 
   toggleStatus: async (id: number, status: AccountStatus) => {
-    const response = await axiosClient.patch(`${ENDPOINT}/${id}/status`, {
+    return await axiosClient.patch(`${ENDPOINT}/${id}/status`, {
       status,
     });
-    return response.data;
   },
 
   resetPassword: async (id: number) => {
-    const response = await axiosClient.post(`${ENDPOINT}/${id}/reset-password`);
-    return response.data;
+    return await axiosClient.post(`${ENDPOINT}/${id}/reset-password`);
   },
 };

@@ -5,8 +5,11 @@ export interface Account {
   email: string;
   fullName: string;
   roleId: number;
+  roleName?: string;
   status: AccountStatus;
   isMfaEnabled: boolean;
+  createdAt?: string;
+  avatarUrl?: string | null;
 }
 
 export interface CreateAccountDto {

@@ -40,7 +40,7 @@ export const AccountManagement: React.FC = () => {
   };
 
   return (
-    <div className="p-4 bg-white rounded shadow">
+    <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
       <h2 className="text-xl font-bold mb-4">Quản trị Tài khoản Hệ thống</h2>
 
       {/* Form Tạo Tài Khoản */}

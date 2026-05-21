@@ -11,12 +11,10 @@ const ENDPOINT = "/system/sla";
 
 export const slaApi = {
   getAll: async (): Promise<BaseResponse<SlaConfig[]>> => {
-    const response = await axiosClient.get(ENDPOINT);
-    return response.data;
+    return await axiosClient.get(ENDPOINT);
   },
 
   update: async (payload: SlaUpdateRequest): Promise<BaseResponse<null>> => {
-    const response = await axiosClient.put(ENDPOINT, payload);
-    return response.data || response;
+    return await axiosClient.put(ENDPOINT, payload);
   },
 };

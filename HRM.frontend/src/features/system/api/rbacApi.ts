@@ -6,19 +6,16 @@ const ENDPOINT = "/rbac";
 
 export const rbacApi = {
   getRoles: async (): Promise<BaseResponse<RoleWithPermissions[]>> => {
-    const response = await axiosClient.get(`${ENDPOINT}/roles`);
-    return response.data;
+    return await axiosClient.get(`${ENDPOINT}/roles`);
   },
 
   updatePermissions: async (
     payload: UpdateRolePermissions,
   ): Promise<BaseResponse<null>> => {
-    const response = await axiosClient.put(`${ENDPOINT}/permissions`, payload);
-    return response.data || response;
+    return await axiosClient.put(`${ENDPOINT}/permissions`, payload);
   },
 
   getAllPermissions: async () => {
-    const response = await axiosClient.get(`${ENDPOINT}/permissions/all`);
-    return response.data;
+    return await axiosClient.get(`${ENDPOINT}/permissions/all`);
   },
 };

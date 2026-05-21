@@ -6,18 +6,16 @@ const ENDPOINT = "/system/notification-templates";
 
 export const notificationTemplateApi = {
   getAll: async (): Promise<BaseResponse<NotificationTemplate[]>> => {
-    const response = await axiosClient.get(ENDPOINT);
-    return response.data;
+    return await axiosClient.get(ENDPOINT);
   },
 
   update: async (
     templateKey: string,
     payload: NotificationTemplate,
   ): Promise<BaseResponse<null>> => {
-    const response = await axiosClient.put(
+    return await axiosClient.put(
       `${ENDPOINT}/${templateKey}`,
       payload,
     );
-    return response.data || response;
   },
 };

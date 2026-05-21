@@ -6,12 +6,10 @@ const ENDPOINT = "/system/attendance-config";
 
 export const attendanceConfigApi = {
   get: async (): Promise<BaseResponse<AttendanceConfig>> => {
-    const response = await axiosClient.get(ENDPOINT);
-    return response.data;
+    return await axiosClient.get(ENDPOINT);
   },
 
   update: async (payload: AttendanceConfig): Promise<BaseResponse<null>> => {
-    const response = await axiosClient.put(ENDPOINT, payload);
-    return response.data || response;
+    return await axiosClient.put(ENDPOINT, payload);
   },
 };

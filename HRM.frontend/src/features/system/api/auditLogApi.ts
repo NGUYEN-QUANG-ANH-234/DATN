@@ -15,7 +15,6 @@ export const auditLogApi = {
       ),
     );
 
-    const response = await axiosClient.get(ENDPOINT, { params: cleanedFilter });
-    return response.data;
+    return await axiosClient.get(ENDPOINT, { params: cleanedFilter });
   },
 };

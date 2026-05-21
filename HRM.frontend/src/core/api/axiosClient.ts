@@ -1,4 +1,5 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from "axios";
+import { BACKEND_URL, API_BASE_URL } from "./config";
 
 // 1. Định nghĩa Interface cho dữ liệu Token
 interface TokenResponse {
@@ -13,7 +14,7 @@ interface CustomAxiosRequestConfig extends InternalAxiosRequestConfig {
 }
 
 const axiosClient = axios.create({
-  baseURL: "https://localhost:7003/api/v1",
+  baseURL: API_BASE_URL,
   withCredentials: true,
 });
 
@@ -61,13 +62,9 @@ axiosClient.interceptors.response.use(
 
         // Gọi API refresh token
         const res = await axios.post<TokenResponse>(
-          "https://localhost:7003/api/v1/auth/refresh",
-          {
-            accessToken,
-          },
-          {
-            withCredentials: true, // BẮT BUỘC ĐỂ TRÌNH DUYỆT GỬI KÈM COOKIE
-          },
+          `${BACKEND_URL}/api/v1/auth/refresh`,
+          { accessToken },
+          { withCredentials: true },
         );
 
         const data = res.data;

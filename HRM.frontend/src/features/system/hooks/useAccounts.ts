@@ -5,13 +5,14 @@ import type {
   CreateAccountDto,
   AccountStatus,
 } from "../types/account";
+import { useNotification } from "../../../core/context/NotificationContext";
 
 export const useAccounts = () => {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [roles, setRoles] = useState<{ id: number; name: string }[]>([]);
   const [loading, setLoading] = useState(false);
+  const { triggerAlert } = useNotification();
 
-  // Gộp chung hàm lấy Data để luôn đồng bộ Account và Role
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
@@ -20,7 +21,6 @@ export const useAccounts = () => {
         accountApi.getSystemRoles(),
       ]);
 
-      // Xử lý an toàn cho cả Object bọc data hoặc Array thuần
       const getResponseData = <T>(res: unknown): T[] => {
         if (Array.isArray(res)) return res;
         if (res && typeof res === "object" && "data" in res) {
@@ -34,22 +34,28 @@ export const useAccounts = () => {
       setRoles(getResponseData<{ id: number; name: string }>(roleRes));
     } catch (error) {
       console.error("Lỗi tải dữ liệu:", error);
+      triggerAlert("error", "Lỗi", "Không thể tải tài khoản và vai trò.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [triggerAlert]);
+
+  const getErrorMessage = (error: unknown, fallback: string) =>
+    (error as { response?: { data?: { message?: string } } }).response?.data
+      ?.message || (error as { message?: string }).message || fallback;
 
   const handleCreateAccount = async (data: CreateAccountDto) => {
     try {
       await accountApi.createAccount(data);
-      alert("Khởi tạo tài khoản thành công! Mật khẩu đã được gửi qua email.");
-      fetchData(); // Render lại bảng
+      triggerAlert(
+        "success",
+        "Đã tạo tài khoản",
+        "Mật khẩu đã được gửi qua email nhân viên.",
+      );
+      fetchData();
       return true;
     } catch (error: unknown) {
-      alert(
-        (error as { response?: { data?: { message?: string } } }).response?.data
-          ?.message || "Lỗi khi tạo tài khoản",
-      );
+      triggerAlert("error", "Lỗi", getErrorMessage(error, "Lỗi khi tạo tài khoản."));
       return false;
     }
   };
@@ -59,47 +65,61 @@ export const useAccounts = () => {
     currentStatus: AccountStatus,
   ) => {
     const newStatus = currentStatus === "Active" ? "Inactive" : "Active";
-    if (
-      !window.confirm(`Bạn có chắc muốn chuyển trạng thái thành ${newStatus}?`)
-    )
-      return;
-
-    try {
-      await accountApi.toggleStatus(id, newStatus);
-      alert("Cập nhật trạng thái thành công!");
-      fetchData();
-    } catch (error: unknown) {
-      alert(
-        (error as { response?: { data?: { message?: string } } }).response?.data
-          ?.message || "Lỗi khi đổi trạng thái",
-      );
-    }
+    triggerAlert(
+      "confirm",
+      "Xác nhận đổi trạng thái",
+      `Bạn có chắc muốn chuyển trạng thái thành ${newStatus}?`,
+      async () => {
+        try {
+          await accountApi.toggleStatus(id, newStatus);
+          triggerAlert(
+            "success",
+            "Đã cập nhật",
+            "Cập nhật trạng thái thành công.",
+          );
+          fetchData();
+        } catch (error: unknown) {
+          triggerAlert(
+            "error",
+            "Lỗi",
+            getErrorMessage(error, "Lỗi khi đổi trạng thái."),
+          );
+        }
+      },
+    );
   };
 
   const handleResetPassword = async (id: number) => {
-    if (!window.confirm("Cấp lại mật khẩu mới cho nhân viên này?")) return;
-
-    try {
-      await accountApi.resetPassword(id);
-      alert("Mật khẩu mới đã được tạo và gửi vào Email nhân viên.");
-    } catch (error: unknown) {
-      alert(
-        (error as { response?: { data?: { message?: string } } }).response?.data
-          ?.message || "Lỗi khi cấp lại mật khẩu",
-      );
-    }
+    triggerAlert(
+      "confirm",
+      "Cấp lại mật khẩu",
+      "Cấp lại mật khẩu mới cho nhân viên này?",
+      async () => {
+        try {
+          await accountApi.resetPassword(id);
+          triggerAlert(
+            "success",
+            "Đã cấp lại mật khẩu",
+            "Mật khẩu mới đã được tạo và gửi vào email nhân viên.",
+          );
+        } catch (error: unknown) {
+          triggerAlert(
+            "error",
+            "Lỗi",
+            getErrorMessage(error, "Lỗi khi cấp lại mật khẩu."),
+          );
+        }
+      },
+    );
   };
 
   const handleUpdateRole = async (id: number, roleId: number) => {
     try {
       await accountApi.updateRole(id, roleId);
-      alert("Cập nhật quyền thành công!");
+      triggerAlert("success", "Đã cập nhật", "Cập nhật quyền thành công.");
       fetchData();
     } catch (error: unknown) {
-      alert(
-        (error as { response?: { data?: { message?: string } } }).response?.data
-          ?.message || "Lỗi cập nhật",
-      );
+      triggerAlert("error", "Lỗi", getErrorMessage(error, "Lỗi cập nhật quyền."));
     }
   };
 

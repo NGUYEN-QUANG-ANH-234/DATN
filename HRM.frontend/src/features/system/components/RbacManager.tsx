@@ -86,7 +86,7 @@ export const RbacManager: React.FC = () => {
   const selectedRole = roles.find((r) => r.roleId === selectedRoleId);
 
   return (
-    <div className="p-4 bg-white rounded shadow">
+    <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
       <h2 className="text-xl font-bold mb-4">Phân quyền Hệ thống (RBAC)</h2>
 
       {loading && roles.length === 0 ? (
