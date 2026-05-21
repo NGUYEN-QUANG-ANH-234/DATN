@@ -1,4 +1,6 @@
-﻿using HRM.backend.src.HRM.Application.DTOs.System;
+﻿using HRM.backend.src.HRM.API.Middlewares;
+using HRM.backend.src.HRM.Application.DTOs;
+using HRM.backend.src.HRM.Application.DTOs.System;
 using HRM.backend.src.HRM.Application.Interfaces.System.UseCases;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -19,6 +21,7 @@ namespace HRM.backend.src.HRM.API.Controllers.System
         }
 
         [HttpGet("salary-variables")]
+        [RequirePermission("SALARY_VARIABLE_VIEW", GroupName = SystemModules.SalaryBonus, Description = "Xem danh sách các biến cấu hình tính lương")]
         public async Task<IActionResult> GetAllVariables(CancellationToken ct)
         {
             var variables = await _useCase.GetAllVariablesAsync(ct);
@@ -26,6 +29,7 @@ namespace HRM.backend.src.HRM.API.Controllers.System
         }
 
         [HttpPost("salary-variables")]
+        [RequirePermission("SALARY_VARIABLE_CREATE", GroupName = SystemModules.SalaryBonus, Description = "Định nghĩa và thêm mới biến cấu hình tính lương")]
         public async Task<IActionResult> DefineVariable([FromBody] VariableDto dto, CancellationToken ct)
         {
             if (!ModelState.IsValid)

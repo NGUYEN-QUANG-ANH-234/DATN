@@ -38,6 +38,8 @@ public class Program
             //    await DbInitializer.SeedData(context); // Gọi hàm Seed tại đây
             //}
 
+            app.UseStaticFiles();
+
             // 4. Cấu hình HTTP Request Pipeline (Middleware)
             app.UseCustomPipeline();
 

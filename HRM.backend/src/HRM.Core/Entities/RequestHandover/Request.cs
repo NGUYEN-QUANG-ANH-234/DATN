@@ -24,7 +24,7 @@ namespace HRM.backend.src.HRM.Core.Entities.RequestHandover
 
         public string? Content { get; set; }
 
-        public RequestStatus Status { get; set; } = RequestStatus.Pending;
+        public RequestStatus Status { get; set; } = RequestStatus.Pending_Manager;
 
         public int? CurrentApproverId { get; set; }
         public DateTime? DeadlineAt { get; set; }

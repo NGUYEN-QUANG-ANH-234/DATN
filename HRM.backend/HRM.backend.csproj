@@ -15,6 +15,7 @@
 		<PackageReference Include="DynamicExpresso.Core" Version="2.19.3" />
 		<PackageReference Include="Google.Apis.Auth" Version="1.74.0" />
 		<PackageReference Include="MailKit" Version="4.16.0" />
+		<PackageReference Include="MediatR" Version="14.1.0" />
 		<PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.0" />
 		<PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" Version="8.0.0" />
 		<PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.0" />
@@ -28,7 +29,7 @@
 			<PrivateAssets>all</PrivateAssets>
 		</PackageReference>
 		<PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="9.0.5" />
-		<PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.0.0" />
+		<PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.14.0" />
 		<PackageReference Include="Otp.NET" Version="1.4.1" />
 		<PackageReference Include="Pomelo.EntityFrameworkCore.MySql" Version="8.0.2" />
 		<PackageReference Include="Serilog.AspNetCore" Version="8.0.3" />
@@ -50,27 +51,26 @@
 	</ItemGroup>
 
   <ItemGroup>
-    <Folder Include="src\HRM.API\Controllers\EmployeeProfile\" />
-    <Folder Include="src\HRM.API\Controllers\Organization\" />
     <Folder Include="src\HRM.API\Controllers\PayrollAllowances\" />
-    <Folder Include="src\HRM.API\Controllers\Recruitment\" />
     <Folder Include="src\HRM.API\Controllers\RequestHandover\" />
     <Folder Include="src\HRM.API\Controllers\TasksTraining\" />
     <Folder Include="src\HRM.API\Controllers\TimeAttendance\" />
-    <Folder Include="src\HRM.Application\DTOs\EmployeeProfile\" />
-    <Folder Include="src\HRM.Application\DTOs\Organization\" />
     <Folder Include="src\HRM.Application\DTOs\PayrollAllowances\" />
-    <Folder Include="src\HRM.Application\DTOs\Recruitment\" />
     <Folder Include="src\HRM.Application\DTOs\RequestHandover\" />
     <Folder Include="src\HRM.Application\DTOs\TasksTraining\" />
     <Folder Include="src\HRM.Application\DTOs\TimeAttendance\" />
-    <Folder Include="src\HRM.Application\Interfaces\EmployeeProfile\" />
-    <Folder Include="src\HRM.Application\Interfaces\Organization\" />
-    <Folder Include="src\HRM.Application\Interfaces\PayrollAllowances\" />
-    <Folder Include="src\HRM.Application\Interfaces\Recruitment\" />
-    <Folder Include="src\HRM.Application\Interfaces\RequestHandover\" />
-    <Folder Include="src\HRM.Application\Interfaces\TasksTraining\" />
-    <Folder Include="src\HRM.Application\Interfaces\TimeAttendance\" />
+    <Folder Include="src\HRM.Application\Interfaces\EmployeeProfile\Services\" />
+    <Folder Include="src\HRM.Application\Interfaces\Organization\Services\" />
+    <Folder Include="src\HRM.Application\Interfaces\Organization\Usecases\" />
+    <Folder Include="src\HRM.Application\Interfaces\PayrollAllowances\Services\" />
+    <Folder Include="src\HRM.Application\Interfaces\PayrollAllowances\Usecases\" />
+    <Folder Include="src\HRM.Application\Interfaces\Recruitment\Services\" />
+    <Folder Include="src\HRM.Application\Interfaces\RequestHandover\Services\" />
+    <Folder Include="src\HRM.Application\Interfaces\RequestHandover\Usecases\" />
+    <Folder Include="src\HRM.Application\Interfaces\TasksTraining\Services\" />
+    <Folder Include="src\HRM.Application\Interfaces\TasksTraining\Usecases\" />
+    <Folder Include="src\HRM.Application\Interfaces\TimeAttendance\Services\" />
+    <Folder Include="src\HRM.Application\Interfaces\TimeAttendance\Usecases\" />
     <Folder Include="src\HRM.Application\Mappings\" />
     <Folder Include="src\HRM.Application\Services\EmployeeProfile\" />
     <Folder Include="src\HRM.Application\Services\Organization\" />
@@ -79,10 +79,8 @@
     <Folder Include="src\HRM.Application\Services\RequestHandover\" />
     <Folder Include="src\HRM.Application\Services\TasksTraining\" />
     <Folder Include="src\HRM.Application\Services\TimeAttendance\" />
-    <Folder Include="src\HRM.Application\UseCases\EmployeeProfile\" />
     <Folder Include="src\HRM.Application\UseCases\Organization\" />
     <Folder Include="src\HRM.Application\UseCases\PayrollAllowances\" />
-    <Folder Include="src\HRM.Application\UseCases\Recruitment\" />
     <Folder Include="src\HRM.Application\UseCases\RequestHandover\" />
     <Folder Include="src\HRM.Application\UseCases\TasksTraining\" />
     <Folder Include="src\HRM.Application\UseCases\TimeAttendance\" />

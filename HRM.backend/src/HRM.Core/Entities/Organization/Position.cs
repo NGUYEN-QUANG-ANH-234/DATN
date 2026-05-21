@@ -13,8 +13,11 @@ namespace HRM.backend.src.HRM.Core.Entities.Organization
 
         public int JobLevel { get; set; } = 1;
 
+        // Trạng thái vị trí (True: Đang sử dụng, False: Đã hủy bỏ/không dùng nữa)
+        public bool IsActive { get; set; } = true;
+
         // --- Navigation Properties (Quan hệ 1-N) ---
         // Một vị trí/chức vụ có thể được nắm giữ bởi nhiều nhân viên
-         public virtual ICollection<Employee> Employees { get; set; } = new List<Employee>();
+        public virtual ICollection<Employee> Employees { get; set; } = new List<Employee>();
     }
 }

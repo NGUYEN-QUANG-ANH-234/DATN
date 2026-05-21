@@ -9,43 +9,25 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.Organizati
     {
         public DepartmentRepository(MyDbContext context) : base(context) { }
 
-        public async Task DissolveDepartmentAsync(int deptId)
+        public async Task<List<Department>> GetAllActiveAsync(CancellationToken ct = default)
         {
-            var dept = await _dbSet.FindAsync(deptId);
-            if (dept != null)
-            {
-                // Cập nhật trạng thái phòng ban thành Giải thể (Dissolved / Inactive)
-                dept.Status = DeptStatus.Dissolved;
-                // Hoặc dept.IsActive = false; tùy theo thiết kế Entity của bạn
-            }
-        }
-
-        public async Task ProcessTerminationAsync(int employeeId)
-        {
-            // Truy cập chéo sang bảng Employees thông qua _context
-            var employee = await _context.Employees.FindAsync(employeeId);
-            if (employee != null)
-            {
-                employee.Status = EmployeeStatus.Terminated; // Cập nhật trạng thái nghỉ việc
-                employee.DeptId = null; // Gỡ khỏi phòng ban
-            }
-        }
-
-        public async Task ProcessTransferAsync(int employeeId, int newDeptId)
-        {
-            var employee = await _context.Employees.FindAsync(employeeId);
-            if (employee != null)
-            {
-                employee.DeptId = newDeptId; // Chuyển sang phòng ban mới
-            }
-        }
-
-        public async Task<Department?> GetDepartmentWithEmployeesAsync(int deptId)
-        {
-            // Hỗ trợ UseCase check xem phòng ban còn nhân sự không trước khi giải thể
+            // Trả về danh sách không tracking để tăng tốc độ dựng Sơ đồ cây (Chỉ đọc)
             return await _dbSet
-                .Include(d => d.Employees)
-                .FirstOrDefaultAsync(d => d.Id == deptId);
+                .Where(d => d.Status == DeptStatus.Active)
+                .AsNoTracking()
+                .ToListAsync(ct);
+        }
+
+        public async Task<bool> HasActiveSubDepartmentsAsync(int deptId, CancellationToken ct = default)
+        {
+            // Kiểm tra siêu tốc xem có phòng ban con nào còn hoạt động không
+            return await _dbSet
+                .AnyAsync(d => d.ParentDeptId == deptId && d.Status == DeptStatus.Active, ct);
+        }
+
+        public async Task<bool> CheckCodeExistsAsync(string deptCode, CancellationToken ct = default)
+        {
+            return await _dbSet.AnyAsync(d => d.DeptCode == deptCode, ct);
         }
     }
 }

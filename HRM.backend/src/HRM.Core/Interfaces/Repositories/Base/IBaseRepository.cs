@@ -24,5 +24,6 @@ namespace HRM.backend.src.HRM.Core.Interfaces.Repositories
         // Xóa
         void Remove(T entity);
         void RemoveRange(IEnumerable<T> entities);
+        Task UpdateAsync(T entity, CancellationToken ct = default);
     }
 }

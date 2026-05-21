@@ -79,14 +79,16 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.System
             return await _context.Set<Permission>()
                 .AsNoTracking()
                 .GroupBy(p => p.GroupName)
+                .OrderBy(g => g.Key) // 1. Sắp xếp các Nhóm (Module) theo bảng chữ cái A-Z hoặc mã định danh
                 .Select(g => new PermissionGroupDto
                 {
                     Group = string.IsNullOrEmpty(g.Key) ? "Chưa phân loại" : g.Key,
-                    Codes = g.Select(p => new PermissionItemDto
-                    {
-                        Code = p.PermissionCode,
-                        Desc = p.Description
-                    }).ToList()
+                    Codes = g.OrderBy(p => p.PermissionCode) // 2. Sắp xếp các mã quyền trong nhóm theo A-Z để UI cố định
+                             .Select(p => new PermissionItemDto
+                             {
+                                 Code = p.PermissionCode,
+                                 Desc = p.Description
+                             }).ToList()
                 })
                 .ToListAsync(ct);
         }

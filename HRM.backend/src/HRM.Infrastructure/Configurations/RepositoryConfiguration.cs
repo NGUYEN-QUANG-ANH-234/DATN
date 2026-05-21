@@ -1,12 +1,22 @@
-﻿using HRM.backend.src.HRM.Application.Interfaces.Services;
+using HRM.backend.src.HRM.Application.Interfaces;
+using HRM.backend.src.HRM.Application.Interfaces.Services;
 using HRM.backend.src.HRM.Application.Interfaces.System.Services;
 using HRM.backend.src.HRM.Application.Interfaces.System.UseCases;
 using HRM.backend.src.HRM.Application.Services.System;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories;
+using HRM.backend.src.HRM.Core.Interfaces.Repositories.EmployeeProfile;
+using HRM.backend.src.HRM.Core.Interfaces.Repositories.Organization;
+using HRM.backend.src.HRM.Core.Interfaces.Repositories.Recruitment;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.System;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.System.HRM.backend.src.HRM.Infrastructure.Repositories.Interfaces.System;
+using HRM.backend.src.HRM.Core.Interfaces.Repositories.TimeAttendance;
+using HRM.backend.src.HRM.Infrastructure.ExternalServices;
 using HRM.backend.src.HRM.Infrastructure.Persistence.Repositories;
+using HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.EmployeeProfile;
+using HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.Organization;
+using HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.Recruitment;
 using HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.System;
+using HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.TimeAttendance;
 
 namespace HRM.backend.src.HRM.Infrastructure.Configurations
 {
@@ -14,6 +24,13 @@ namespace HRM.backend.src.HRM.Infrastructure.Configurations
     {
         public static IServiceCollection AddRepositoriesConfig(this IServiceCollection services)
         {
+            // Đăng ký MediatR quét các Handler trong cả API và Application Assembly
+            services.AddMediatR(cfg =>
+            {
+                cfg.RegisterServicesFromAssembly(typeof(Program).Assembly);
+                cfg.RegisterServicesFromAssembly(typeof(IUnitOfWork).Assembly);
+            });
+
             // 1. Đăng ký Unit Of Work
             services.AddScoped<IUnitOfWork, UnitOfWork>();
 
@@ -21,7 +38,7 @@ namespace HRM.backend.src.HRM.Infrastructure.Configurations
             services.AddScoped(typeof(IBaseRepository<>), typeof(BaseRepository<>));
 
             // 3. Đăng ký các Repository đặc thù của 8 Module
-            // Module 1: System
+            // System
             services.AddScoped<IAccountRepository, AccountRepository>(); 
             services.AddScoped<IAuditLogRepository, AuditLogRepository>(); 
             services.AddScoped<IConfigurationRepository, ConfigurationRepository>();
@@ -30,7 +47,29 @@ namespace HRM.backend.src.HRM.Infrastructure.Configurations
             services.AddScoped<IRbacRepository, RbacRepository>();
             services.AddScoped<IAuditLogRepository, AuditLogRepository>();
             services.AddScoped<IRoleRepository, RoleRepository>();
+            services.AddScoped<ILeaveTypeRepository, LeaveTypeRepository>();
+            services.AddScoped<ISlaTrackingRepository, SlaTrackingRepository>();
 
+
+            // Department
+            services.AddScoped<IDepartmentRepository, DepartmentRepository>();
+            services.AddScoped<IPositionRepository, PositionRepository>();
+
+            // Attendence
+            services.AddScoped<IWorkShiftRepository, WorkShiftRepository>();
+            services.AddScoped<IAttendanceRepository, AttendanceRepository>();
+            services.AddScoped<ILeaveBalanceRepository, LeaveBalanceRepository>();
+
+            // Profile
+            services.AddScoped<IEmployeeRepository, EmployeeRepository>();
+            services.AddScoped<IContractRepository, ContractRepository>();
+            services.AddScoped<IContractAddendumRepository, ContractAddendumRepository>();
+            services.AddScoped<IHistoryTrackingRepository, HistoryTrackingRepository>();
+
+            // Recruitment
+            services.AddScoped<IRecruitmentRequestRepository, RecruitmentRequestRepository>();
+            services.AddScoped<IPositionRepository, PositionRepository>();
+            services.AddScoped<ICandidateRepository, CandidateRepository>();
 
 
             return services;

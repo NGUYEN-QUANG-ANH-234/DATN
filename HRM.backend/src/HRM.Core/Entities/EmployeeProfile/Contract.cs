@@ -9,7 +9,7 @@ namespace HRM.backend.src.HRM.Core.Entities.EmployeeProfile
     public class Contract
     {
         [Key] public int Id { get; set; }
-
+        public int Version { get; set; } = 1; // Quản lý bản Draft v1, v2...
         public int? EmployeeId { get; set; }
 
         [ForeignKey("EmployeeId")]
@@ -31,8 +31,15 @@ namespace HRM.backend.src.HRM.Core.Entities.EmployeeProfile
 
         public DateTime StartDate { get; set; }
         public DateTime? EndDate { get; set; }
+        [StringLength(1000)]
+        public string? NegotiationNote { get; set; } // Ý kiến thương lượng của nhân viên
 
+        // Các mốc SLA để Worker chạy ngầm quét
+        public DateTime? EmployeeDeadline { get; set; }
+        public DateTime? DirectorDeadline { get; set; }
 
         public ContractStatus Status { get; set; } = ContractStatus.Draft;
+
+        public virtual ICollection<ContractAddendum> Addendums { get; set; } = new List<ContractAddendum>();
     }
 }

@@ -1,5 +1,6 @@
 ﻿using HRM.backend.src.HRM.Core.Entities.EmployeeProfile;
 using HRM.backend.src.HRM.Core.Entities.RequestHandover;
+using HRM.backend.src.HRM.Core.Enums;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.EmployeeProfile;
 using Microsoft.EntityFrameworkCore;
 
@@ -9,28 +10,26 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.EmployeePr
     {
         public EmployeeRepository(MyDbContext context) : base(context) { }
 
-        public async Task UpdateProfileInfoAsync(Employee employee)
+        public async Task<int> CountActiveInDeptAsync(int deptId, CancellationToken ct = default)
         {
-            // Chỉ cập nhật trạng thái In-Memory, chờ UoW commit
-            _dbSet.Update(employee);
-            await Task.CompletedTask;
+            // Đếm số lượng nhân sự chưa nghỉ việc thuộc phòng ban này
+            return await _dbSet
+                .CountAsync(e => e.DeptId == deptId && e.Status != EmployeeStatus.Terminated, ct);
         }
 
-        public async Task<(IEnumerable<EmploymentHistory> Items, int TotalCount)> FetchHistoryByEmployeeIdAsync(
-            int employeeId, DateTime? fromDate, DateTime? toDate, int skip, int take)
+        public async Task<bool> CheckIdentityNumberExistsAsync(string identityNumber, int excludeEmployeeId, CancellationToken ct = default)
         {
-            // Giả định bạn có entity EmploymentHistory trong DbContext
-            var query = _context.EmploymentHistories.Where(h => h.EmployeeId == employeeId);
+            return await _dbSet.AnyAsync(e => e.IdentityNumber == identityNumber && e.Id != excludeEmployeeId, ct);
+        }
 
-            if (fromDate.HasValue) query = query.Where(h => h.EffectiveDate >= fromDate.Value);
-            if (toDate.HasValue) query = query.Where(h => h.EffectiveDate <= toDate.Value);
+        public async Task<Employee?> GetProfileByIdAsync(int id, CancellationToken ct = default)
+        {
+            return await _dbSet.AsNoTracking().FirstOrDefaultAsync(e => e.Id == id, ct);
+        }
 
-            var total = await query.CountAsync();
-            var items = await query.OrderByDescending(h => h.EffectiveDate)
-                                   .Skip(skip).Take(take)
-                                   .ToListAsync();
-
-            return (items, total);
+        public async Task<Employee?> GetByAccountIdAsync(int accountId, CancellationToken ct = default)
+        {
+            return await _dbSet.FirstOrDefaultAsync(e => e.AccountId == accountId, ct);
         }
     }
 }

@@ -60,5 +60,11 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories
         {
             _dbSet.RemoveRange(entities);
         }
+
+        public Task UpdateAsync(T entity, CancellationToken ct = default)
+        {
+            _dbSet.Update(entity);
+            return Task.CompletedTask;
+        }
     }    
 }

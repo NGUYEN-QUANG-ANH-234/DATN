@@ -87,5 +87,23 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.System
                 .FirstOrDefaultAsync(a => a.Email == email, ct);
         }
 
+        public async Task<List<Account>> GetAllWithRoleAsync(CancellationToken ct = default)
+        {
+            return await _dbSet
+                .Include(a => a.Role)
+                .AsNoTracking()
+                .ToListAsync(ct);
+        }
+
+        public async Task<List<int>> GetAccountIdsByRoleAsync(string roleName, CancellationToken ct = default)
+        {
+            return await _dbSet
+                .Include(a => a.Role)
+                .Where(a => a.Role != null &&
+                            a.Role.RoleName == roleName &&
+                            a.Status == AccountStatus.Active)
+                .Select(a => a.Id)
+                .ToListAsync(ct);
+        }
     }
 }

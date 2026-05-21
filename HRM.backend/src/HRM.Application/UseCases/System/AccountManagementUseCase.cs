@@ -138,9 +138,22 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
             await _unitOfWork.CommitAsync(ct);
         }
 
-        public async Task<IEnumerable<Account>> GetAllAccountsAsync(CancellationToken ct = default)
+        public async Task<IEnumerable<AccountListItemDto>> GetAllAccountsAsync(CancellationToken ct = default)
         {
-            return await _accountRepo.GetAllAsync(ct); // Đảm bảo AccountRepo đã có hàm GetAll
+            var accounts = await _accountRepo.GetAllWithRoleAsync(ct);
+
+            return accounts.Select(account => new AccountListItemDto
+            {
+                Id = account.Id,
+                Email = account.Email,
+                FullName = account.FullName ?? string.Empty,
+                RoleId = account.RoleId,
+                RoleName = account.Role?.RoleName ?? string.Empty,
+                Status = account.Status.ToString(),
+                IsMfaEnabled = account.IsMfaEnabled,
+                CreatedAt = account.CreatedAt,
+                AvatarUrl = account.AvatarUrl
+            });
         }
     }
 }

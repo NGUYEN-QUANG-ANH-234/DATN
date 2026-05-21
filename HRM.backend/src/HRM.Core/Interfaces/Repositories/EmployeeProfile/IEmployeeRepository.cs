@@ -5,16 +5,9 @@ namespace HRM.backend.src.HRM.Core.Interfaces.Repositories.EmployeeProfile
 {
     public interface IEmployeeRepository : IBaseRepository<Employee>
     {
-        // --- 1. Mảng Profile ---
-        Task UpdateProfileInfoAsync(Employee employee);
-
-        // --- 2. Mảng History ---
-        // Lưu ý: Không truyền DTO (HistoryFilterDto) xuống Repo. Tách thành các tham số nguyên thủy.
-        Task<(IEnumerable<EmploymentHistory> Items, int TotalCount)> FetchHistoryByEmployeeIdAsync(
-            int employeeId,
-            DateTime? fromDate,
-            DateTime? toDate,
-            int skip,
-            int take);
+        Task<int> CountActiveInDeptAsync(int deptId, CancellationToken ct = default);
+        Task<bool> CheckIdentityNumberExistsAsync(string identityNumber, int excludeEmployeeId, CancellationToken ct = default);
+        Task<Employee?> GetProfileByIdAsync(int id, CancellationToken ct = default);
+        Task<Employee?> GetByAccountIdAsync(int accountId, CancellationToken ct = default);
     }
 }

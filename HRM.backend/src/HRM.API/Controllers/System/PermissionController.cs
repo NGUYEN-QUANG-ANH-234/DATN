@@ -1,4 +1,6 @@
-﻿using HRM.backend.src.HRM.Application.DTOs.System;
+﻿using HRM.backend.src.HRM.API.Middlewares;
+using HRM.backend.src.HRM.Application.DTOs;
+using HRM.backend.src.HRM.Application.DTOs.System;
 using HRM.backend.src.HRM.Application.Interfaces.System.UseCases;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -19,6 +21,7 @@ namespace HRM.backend.src.HRM.API.Controllers.System
         }
 
         [HttpGet("roles")]
+        [RequirePermission("RBAC_ROLE_VIEW", GroupName = SystemModules.SystemManagement, Description = "Xem danh sách vai trò và quyền hạn")]
         public async Task<IActionResult> GetRolesAndPermissions(CancellationToken ct)
         {
             var data = await _useCase.GetAllRolesAndPermissionsAsync(ct);
@@ -26,6 +29,7 @@ namespace HRM.backend.src.HRM.API.Controllers.System
         }
 
         [HttpPut("permissions")]
+        [RequirePermission("RBAC_ROLE_UPDATE", GroupName = SystemModules.SystemManagement, Description = "Cập nhật phân quyền cho vai trò")]
         public async Task<IActionResult> UpdatePermissions([FromBody] UpdateRolePermissionsDto dto, CancellationToken ct)
         {
             if (!ModelState.IsValid)
@@ -59,6 +63,7 @@ namespace HRM.backend.src.HRM.API.Controllers.System
         }
 
         [HttpGet("permissions/all")]
+        [RequirePermission("RBAC_PERMISSION_VIEW", GroupName = SystemModules.SystemManagement, Description = "Xem danh sách toàn bộ mã quyền hệ thống")]
         public async Task<IActionResult> GetAllPermissions(CancellationToken ct)
         {
             var data = await _useCase.GetAllAvailablePermissionsAsync(ct);

@@ -112,7 +112,7 @@ public static class DbInitializer
                 BankName = "Vietcombank",
                 DeptId = faker.PickRandom(departments).Id,
                 PositionId = faker.PickRandom(positions).Id,
-                IsIntern = faker.Random.Bool(0.2f),
+                //IsIntern = faker.Random.Bool(0.2f),
                 Status = EmployeeStatus.Official,
                 JoinedDate = faker.Date.Past(2)
             };
@@ -179,33 +179,39 @@ public static class DbInitializer
         await context.SaveChangesAsync();
 
         // ======================================================
-        // MODULE 6: TASKS & BUDGET (Công việc & Thưởng)
+        // MODULE 6: PERFORMANCE & TRAINING (Hiệu suất & Đào tạo)
         // ======================================================
-        var budget = new DepartmentBudget
-        {
-            DeptId = departments[0].Id,
-            MonthYear = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1),
-            TotalBudget = 50000000,
-            UsedBudget = 10000000,
-            Status = BudgetStatus.Approved
-        };
-        context.DepartmentBudgets.Add(budget);
-        await context.SaveChangesAsync();
+
+        var kpiNames = new[] { "Hoàn thành dự án đúng hạn", "Chất lượng công việc", "Thái độ & Kỷ luật" };
 
         for (int i = 0; i < 5; i++)
         {
-            context.Tasks.Add(new WorkTask
+            // 1. Tạo Phiếu đánh giá KPI tổng
+            var review = new PerformanceReview
             {
-                Title = $"Task dự án {faker.Company.CompanyName()}",
-                TaskType = TaskType.Project,
-                AssignedTo = employees[i].Id,
-                DeptBudgetId = budget.Id,
-                BonusAmount = faker.Random.Decimal(1000000, 3000000),
-                ActualBonus = 0,
-                Status = TaskStatus.Doing,
-                Deadline = DateTime.Now.AddDays(7)
-            });
+                EmployeeId = employees[i].Id,
+                Period = $"{DateTime.Now.Month:D2}/{DateTime.Now.Year}", // VD: "05/2026"
+                TotalScore = faker.Random.Decimal(75, 100),
+                FinalRating = faker.PickRandom(new[] { "A", "B", "C" }),
+                Status = ReviewStatus.Approved
+            };
+            context.PerformanceReviews.Add(review);
+            await context.SaveChangesAsync(); // Lưu để lấy Id
+
+            // 2. Tạo các dòng chi tiết KPI
+            foreach (var kpi in kpiNames)
+            {
+                context.PerformanceDetails.Add(new PerformanceDetail
+                {
+                    ReviewId = review.Id,
+                    KpiName = kpi,
+                    WeightPercent = 33,
+                    AchievedPercent = faker.Random.Decimal(80, 100),
+                    FinalPoint = faker.Random.Decimal(25, 33)
+                });
+            }
         }
+
         await context.SaveChangesAsync();
 
         // ======================================================
@@ -244,7 +250,7 @@ public static class DbInitializer
             EmployeeId = employees[10].Id,
             RequestType = RequestType.Resignation,
             Content = "Xin nghỉ việc vì lý do cá nhân",
-            Status = RequestStatus.Pending,
+            Status = RequestStatus.Pending_Manager,
             DeadlineAt = DateTime.Now.AddDays(2)
         };
         context.Requests.Add(resignationRequest);
@@ -255,7 +261,7 @@ public static class DbInitializer
             RequestId = resignationRequest.Id,
             SenderId = employees[10].Id,
             ReceiverId = employees[11].Id, // Bàn giao cho người khác
-            Status = HandoverStatus.Pending
+            Status = HandoverStatus.Pending_Verification
         });
 
         await context.SaveChangesAsync();

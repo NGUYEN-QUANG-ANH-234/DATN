@@ -10,7 +10,9 @@ namespace HRM.backend.src.HRM.API.Controllers.System
     [ApiController]
     [Route("api/v1/accounts")]
     [Authorize]
-    [RequirePermission("USER_MANAGE")] // Chỉ Admin/HR có quyền này mới được gọi
+    [RequirePermission("USER_MANAGE",
+        GroupName = SystemModules.SystemManagement,
+        Description = "Quản lý toàn bộ tài khoản nhân sự (Xem, Thêm, Đổi trạng thái, Phân quyền)")] // Chỉ Admin/HR có quyền này mới được gọi
     public class AccountManagementController : ControllerBase
     {
         private readonly IAccountManagementUseCase _useCase;

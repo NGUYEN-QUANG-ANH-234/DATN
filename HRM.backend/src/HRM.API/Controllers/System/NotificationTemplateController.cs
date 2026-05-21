@@ -1,4 +1,6 @@
-﻿using HRM.backend.src.HRM.Application.DTOs.System;
+﻿using HRM.backend.src.HRM.API.Middlewares;
+using HRM.backend.src.HRM.Application.DTOs;
+using HRM.backend.src.HRM.Application.DTOs.System;
 using HRM.backend.src.HRM.Application.Interfaces.System.UseCases;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -19,6 +21,7 @@ namespace HRM.backend.src.HRM.API.Controllers.System
         }
 
         [HttpGet]
+        [RequirePermission("NOTIFICATION_TEMPLATE_VIEW", GroupName = SystemModules.Config, Description = "Xem danh sách mẫu thông báo")]
         public async Task<IActionResult> GetTemplates(CancellationToken ct)
         {
             var data = await _useCase.GetTemplatesAsync(ct);
@@ -26,6 +29,7 @@ namespace HRM.backend.src.HRM.API.Controllers.System
         }
 
         [HttpPut("{templateKey}")]
+        [RequirePermission("NOTIFICATION_TEMPLATE_UPDATE", GroupName = SystemModules.Config, Description = "Cập nhật mẫu thông báo")]
         public async Task<IActionResult> UpdateTemplate(string templateKey, [FromBody] TemplateDto dto, CancellationToken ct)
         {
             if (!ModelState.IsValid)

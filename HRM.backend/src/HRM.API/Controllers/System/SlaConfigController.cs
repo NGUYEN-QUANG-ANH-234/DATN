@@ -1,4 +1,6 @@
-﻿using HRM.backend.src.HRM.Application.DTOs.System;
+﻿using HRM.backend.src.HRM.API.Middlewares;
+using HRM.backend.src.HRM.Application.DTOs;
+using HRM.backend.src.HRM.Application.DTOs.System;
 using HRM.backend.src.HRM.Application.Interfaces.System.UseCases;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -19,6 +21,7 @@ namespace HRM.backend.src.HRM.API.Controllers.System
         }
 
         [HttpGet]
+        [RequirePermission("SLA_CONFIG_VIEW", GroupName = SystemModules.Config, Description = "Xem cấu hình KPI thời gian xử lý (SLA) hệ thống")]
         public async Task<IActionResult> GetSLAConfigs(CancellationToken ct)
         {
             var data = await _useCase.GetSLAConfigsAsync(ct);
@@ -26,6 +29,7 @@ namespace HRM.backend.src.HRM.API.Controllers.System
         }
 
         [HttpPut]
+        [RequirePermission("SLA_CONFIG_UPDATE", GroupName = SystemModules.Config, Description = "Cập nhật thông số KPI thời gian xử lý (SLA) hệ thống")]
         public async Task<IActionResult> UpdateSLAConfig([FromBody] SlaDto dto, CancellationToken ct)
         {
             if (!ModelState.IsValid)

@@ -1,4 +1,6 @@
-﻿using HRM.backend.src.HRM.Application.DTOs.System;
+﻿using HRM.backend.src.HRM.API.Middlewares;
+using HRM.backend.src.HRM.Application.DTOs;
+using HRM.backend.src.HRM.Application.DTOs.System;
 using HRM.backend.src.HRM.Application.Interfaces.System.UseCases;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -18,6 +20,7 @@ namespace HRM.backend.src.HRM.API.Controllers.System
             _useCase = useCase;
         }
 
+        [RequirePermission("ATTENDANCE_CONFIG_VIEW", GroupName = SystemModules.TimekeepingLeave, Description = "Xem tham số cấu hình chấm công")]
         [HttpGet]
         public async Task<IActionResult> GetConfig(CancellationToken ct)
         {
@@ -25,6 +28,7 @@ namespace HRM.backend.src.HRM.API.Controllers.System
             return Ok(new { success = true, data });
         }
 
+        [RequirePermission("ATTENDANCE_CONFIG_UPDATE", GroupName = SystemModules.TimekeepingLeave, Description = "Cập nhật tham số cấu hình chấm công")]
         [HttpPut]
         public async Task<IActionResult> UpdateConfig([FromBody] AttendanceConfigDto dto, CancellationToken ct)
         {

@@ -14,38 +14,60 @@ namespace HRM.backend.src.HRM.API.Extensions
             using var scope = serviceProvider.CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<MyDbContext>();
 
-            // 1. Quét toàn bộ Controller để tìm các mã quyền từ RequirePermissionAttribute
-            var apiPermissions = Assembly.GetExecutingAssembly().GetTypes()
-                .Where(t => typeof(ControllerBase).IsAssignableFrom(t)) // Lấy các Controller
-                .SelectMany(t => t.GetMethods()) // Lấy các API Action
-                .SelectMany(m => m.GetCustomAttributes<RequirePermissionAttribute>())
-                .Select(a => a.PermissionCode)
-                .Distinct()
+            var controllers = Assembly.GetExecutingAssembly().GetTypes()
+                .Where(t => typeof(ControllerBase).IsAssignableFrom(t));
+
+            // 1. Quét và gom nhóm, lấy định nghĩa chuẩn nhất từ code
+            var apiPermissions = controllers
+                .SelectMany(t => t.GetCustomAttributes<RequirePermissionAttribute>())
+                .Concat(
+                    controllers.SelectMany(t => t.GetMethods())
+                                .SelectMany(m => m.GetCustomAttributes<RequirePermissionAttribute>())
+                )
+                .GroupBy(a => a.PermissionCode)
+                .Select(g => g.OrderByDescending(a => a.GroupName != "Chưa phân loại").First())
                 .ToList();
 
             if (!apiPermissions.Any()) return;
 
-            // 2. Lấy các quyền hiện có trong DB
-            var dbPermissions = await context.Set<Permission>()
-                .Select(p => p.PermissionCode)
-                .ToListAsync();
+            // 2. Lấy toàn bộ Entity quyền trong DB (để kiểm tra và Update)
+            var dbPermissions = await context.Set<Permission>().ToListAsync();
+            var hasChanges = false;
 
-            // 3. Tìm các quyền có trong Code nhưng chưa có trong DB (Delta)
-            var newPermissions = apiPermissions
-                .Except(dbPermissions)
-                .Select(code => new Permission
-                {
-                    PermissionCode = code,
-                    GroupName = "Chưa phân loại", // Admin sẽ vào UI để đổi tên nhóm sau
-                    Description = "Hệ thống tự động quét từ mã nguồn"
-                }).ToList();
-
-            // 4. Lưu vào DB nếu có quyền mới
-            if (newPermissions.Any())
+            // 3. Xử lý Upsert (Thêm mới hoặc Cập nhật)
+            foreach (var apiPerm in apiPermissions)
             {
-                await context.Set<Permission>().AddRangeAsync(newPermissions);
+                var existingPerm = dbPermissions.FirstOrDefault(p => p.PermissionCode == apiPerm.PermissionCode);
+
+                if (existingPerm == null)
+                {
+                    // Chưa có -> Thêm mới
+                    context.Set<Permission>().Add(new Permission
+                    {
+                        PermissionCode = apiPerm.PermissionCode,
+                        GroupName = apiPerm.GroupName,
+                        Description = apiPerm.Description
+                    });
+                    hasChanges = true;
+                }
+                else
+                {
+                    // Đã có -> Kiểm tra xem có cần cập nhật GroupName/Description không
+                    if (existingPerm.GroupName != apiPerm.GroupName || existingPerm.Description != apiPerm.Description)
+                    {
+                        existingPerm.GroupName = apiPerm.GroupName;
+                        existingPerm.Description = apiPerm.Description;
+                        context.Set<Permission>().Update(existingPerm);
+                        hasChanges = true;
+                    }
+                }
+            }
+
+            // 4. Chỉ gọi SaveChanges khi thực sự có thay đổi
+            if (hasChanges)
+            {
                 await context.SaveChangesAsync();
             }
-        }
+        }        
     }
 }

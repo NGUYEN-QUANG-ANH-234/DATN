@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using HRM.backend.src.HRM.Core.Enums;
 
 namespace HRM.backend.src.HRM.Core.Entities.EmployeeProfile
 {
@@ -12,12 +13,15 @@ namespace HRM.backend.src.HRM.Core.Entities.EmployeeProfile
         [ForeignKey("EmployeeId")]
         public virtual Employee? Employee { get; set; }
 
-        [StringLength(100)] public string? FullName { get; set; }
-        [StringLength(50)] public string? Relationship { get; set; }
+        [StringLength(100)] public required string FullName { get; set; }
+        public DependentRelation Relationship { get; set; }
+
         [StringLength(20)] public string? IdNumber { get; set; }
+        [StringLength(20)] public string? TaxDependentCode { get; set; } // Mã số thuế phụ thuộc
 
         public DateTime? BirthDate { get; set; }
         public DateTime ValidFrom { get; set; }
         public DateTime? ValidTo { get; set; }
+        public bool IsActive { get; set; } = true;
     }
 }

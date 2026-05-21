@@ -14,6 +14,17 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.TimeAttend
             await _dbSet.AddAsync(log);
         }
 
+        public async Task<AttendanceLog?> GetTodayLogAsync(int employeeId, DateTime day, CancellationToken ct = default)
+        {
+            var start = day.Date;
+            var end = start.AddDays(1);
+
+            return await _dbSet
+                .Where(l => l.EmployeeId == employeeId && l.CheckIn >= start && l.CheckIn < end)
+                .OrderByDescending(l => l.CheckIn)
+                .FirstOrDefaultAsync(ct);
+        }
+
         public async Task<IEnumerable<AttendanceLog>> FetchLogsAsync(DateTime startDate, DateTime endDate)
         {
             // Lọc log quẹt thẻ theo ngày CheckIn

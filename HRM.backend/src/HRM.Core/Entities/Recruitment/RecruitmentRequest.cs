@@ -25,6 +25,8 @@ namespace HRM.backend.src.HRM.Core.Entities.Recruitment
         public RecruitmentRequestStatus Status { get; set; } = RecruitmentRequestStatus.PendingHR;
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        // Thêm vào trong class RecruitmentRequest
+        public int CreatedById { get; set; }
 
         // --- Navigation Properties (Quan hệ 1-N) ---
         // Một Yêu cầu tuyển dụng (Job Posting) có thể có nhiều Ứng viên nộp CV vào

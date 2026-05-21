@@ -1,4 +1,6 @@
-﻿using HRM.backend.src.HRM.Application.Interfaces.System.UseCases;
+﻿using HRM.backend.src.HRM.API.Middlewares;
+using HRM.backend.src.HRM.Application.DTOs;
+using HRM.backend.src.HRM.Application.Interfaces.System.UseCases;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -17,6 +19,7 @@ namespace HRM.backend.src.HRM.API.Controllers.System
         }
 
         [HttpGet]
+        [RequirePermission("ROLE_VIEW", GroupName = SystemModules.SystemManagement, Description = "Xem danh sách các vai trò (Role) trong hệ thống")]
         public async Task<IActionResult> GetSystemRoles(CancellationToken ct)
         {
             try

@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using HRM.backend.src.HRM.Core.Enums;
 
@@ -20,6 +20,9 @@ namespace HRM.backend.src.HRM.Core.Entities.Recruitment
         [EmailAddress]
         [StringLength(100)]
         public string? Email { get; set; }
+
+        [StringLength(50)]
+        public string? TrackingCode { get; set; }
 
         [StringLength(255)]
         public string? CvFilePath { get; set; }

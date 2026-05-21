@@ -60,6 +60,10 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
         public DbSet<AuditLog> AuditLogs { get; set; }
         public DbSet<MfaRecoveryCode> MfaRecoveryCodes { get; set; }
         public DbSet<SourceCatalog> SourceCatalogs { get; set; }
+        public DbSet<SlaTrackingTask> SlaTrackingTasks { get; set; }
+        public DbSet<ApprovalRequest> ApprovalRequests { get; set; }
+        public DbSet<ApprovalStep> ApprovalSteps { get; set; }
+
         // 2. Organization
         public DbSet<Department> Departments { get; set; }
         public DbSet<Position> Positions { get; set; }
@@ -72,6 +76,9 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
         public DbSet<Employee> Employees { get; set; }
         public DbSet<Dependent> Dependents { get; set; }
         public DbSet<Contract> Contracts { get; set; }
+        public DbSet<ContractAddendum> ContractAddendums { get; set; }
+        public DbSet<OnboardingRequest> OnboardingRequests { get; set; }
+        public DbSet<ProfileUpdateRequest> ProfileUpdateRequests { get; set; }
 
         // 5. Time & Attendance
         public DbSet<WorkShift> WorkShifts { get; set; }
@@ -81,9 +88,9 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
         public DbSet<LeaveRequest> LeaveRequests { get; set; }
 
         // 6. Tasks & Training
-        public DbSet<DepartmentBudget> DepartmentBudgets { get; set; }
+        public DbSet<PerformanceDetail> PerformanceDetails { get; set; }
         public DbSet<WorkTask> Tasks { get; set; }
-        public DbSet<TaskProgress> TaskProgresses { get; set; }
+        public DbSet<PerformanceReview> PerformanceReviews { get; set; }
         public DbSet<TaskFeedback> TaskFeedbacks { get; set; }
         public DbSet<Training> Trainings { get; set; }
 
@@ -122,6 +129,8 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
             modelBuilder.Entity<Department>().HasIndex(d => d.DeptCode).IsUnique();
             modelBuilder.Entity<Position>().HasIndex(p => p.Title).IsUnique();
             modelBuilder.Entity<Contract>().HasIndex(c => c.ContractNumber).IsUnique();
+            modelBuilder.Entity<ContractAddendum>().HasIndex(ca => ca.AddendumNumber).IsUnique();
+            modelBuilder.Entity<ContractAddendum>().HasIndex(ca => new { ca.ContractId, ca.Status });
             modelBuilder.Entity<Employee>().HasIndex(e => e.EmployeeCode).IsUnique();
             modelBuilder.Entity<Employee>().HasIndex(e => e.AccountId).IsUnique();
             modelBuilder.Entity<Employee>().HasIndex(e => e.CandidateId).IsUnique();
@@ -165,14 +174,33 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
                 .HasForeignKey(e => e.PositionId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            // --- TASKS & TRAINING ---
-            modelBuilder.Entity<WorkTask>()
-                .HasOne(t => t.Assignee).WithMany()
-                .HasForeignKey(t => t.AssignedTo).OnDelete(DeleteBehavior.SetNull);
+            modelBuilder.Entity<ContractAddendum>()
+                .HasOne(ca => ca.Contract)
+                .WithMany(c => c.Addendums)
+                .HasForeignKey(ca => ca.ContractId)
+                .OnDelete(DeleteBehavior.Restrict);
 
-            modelBuilder.Entity<TaskFeedback>()
-                .HasOne(tf => tf.Reviewer).WithMany()
-                .HasForeignKey(tf => tf.ReviewerId).OnDelete(DeleteBehavior.Restrict);
+            // --- TASKS & TRAINING ---
+            // 1. Mối quan hệ Employee 1-N PerformanceReview
+            modelBuilder.Entity<PerformanceReview>()
+                .HasOne(pr => pr.Employee)
+                .WithMany()
+                .HasForeignKey(pr => pr.EmployeeId)
+                .OnDelete(DeleteBehavior.Restrict); // Không cho phép xóa Employee nếu đã có điểm đánh giá (Nên dùng soft-delete cho nhân viên)
+
+            // 2. Mối quan hệ PerformanceReview 1-N PerformanceDetail
+            modelBuilder.Entity<PerformanceReview>()
+                .HasMany(pr => pr.Details)
+                .WithOne(pd => pd.Review)
+                .HasForeignKey(pd => pd.ReviewId)
+                .OnDelete(DeleteBehavior.Cascade); // Xóa phiếu đánh giá thì xóa luôn các dòng chi tiết KPI
+
+            // 3. Mối quan hệ Employee 1-N Training
+            modelBuilder.Entity<Training>()
+                .HasOne(t => t.Employee)
+                .WithMany()
+                .HasForeignKey(t => t.EmployeeId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             // --- REQUESTS & HANDOVER ---
             modelBuilder.Entity<HandoverRequest>()

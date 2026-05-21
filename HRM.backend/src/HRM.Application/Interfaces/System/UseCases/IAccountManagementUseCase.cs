@@ -1,5 +1,4 @@
 ﻿using HRM.backend.src.HRM.Application.DTOs;
-using HRM.backend.src.HRM.Core.Entities.System;
 using HRM.backend.src.HRM.Core.Enums;
 
 namespace HRM.backend.src.HRM.Application.Interfaces.System.UseCases
@@ -11,6 +10,6 @@ namespace HRM.backend.src.HRM.Application.Interfaces.System.UseCases
         Task ResetPasswordManuallyAsync(int accountId, CancellationToken ct = default);
         Task UpdateAccountRoleAsync(int accountId, int newRoleId, CancellationToken ct = default);
         Task UpdateAccountRoleAsync(int targetAccountId, int newRoleId, int actorId, CancellationToken ct = default);
-        Task<IEnumerable<Account>> GetAllAccountsAsync(CancellationToken ct = default);
+        Task<IEnumerable<AccountListItemDto>> GetAllAccountsAsync(CancellationToken ct = default);
     }
 }

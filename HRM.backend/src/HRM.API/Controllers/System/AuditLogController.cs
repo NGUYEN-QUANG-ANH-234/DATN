@@ -1,4 +1,5 @@
 ﻿using HRM.backend.src.HRM.API.Middlewares;
+using HRM.backend.src.HRM.Application.DTOs;
 using HRM.backend.src.HRM.Application.DTOs.System;
 using HRM.backend.src.HRM.Application.Interfaces.System.UseCases;
 using Microsoft.AspNetCore.Authorization;
@@ -20,6 +21,7 @@ namespace HRM.backend.src.HRM.API.Controllers.System
         }
 
         [HttpGet]
+        [RequirePermission("AUDIT_LOG_VIEW", GroupName = SystemModules.SystemManagement, Description = "Xem danh sách nhật ký hệ thống")]
         public async Task<IActionResult> GetAuditLogs([FromQuery] AuditLogFilterDto filter, CancellationToken ct)
         {
             try
@@ -34,6 +36,7 @@ namespace HRM.backend.src.HRM.API.Controllers.System
         }
 
         [HttpGet("dashboard-stats")]
+        [RequirePermission("AUDIT_LOG_STATS_VIEW", GroupName = SystemModules.SystemManagement, Description = "Xem biểu đồ thống kê nhật ký hoạt động")]
         public async Task<IActionResult> GetDashboardStats([FromQuery] int days = 30, CancellationToken ct = default)
         {
             try

@@ -19,7 +19,7 @@ namespace HRM.backend.src.HRM.Core.Entities.RequestHandover
         public int? ReceiverId { get; set; }
          [ForeignKey("ReceiverId")] public virtual Employee? Receiver { get; set; }
 
-        public HandoverStatus Status { get; set; } = HandoverStatus.Pending;
+        public HandoverStatus Status { get; set; } = HandoverStatus.Pending_Verification;
         public DateTime? DeadlineAt { get; set; }
 
         // Navigation Property: 1 Phiếu bàn giao có nhiều hạng mục con

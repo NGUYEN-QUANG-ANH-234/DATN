@@ -69,6 +69,14 @@ namespace HRM.backend.src.HRM.API.Middlewares
     public class RequirePermissionAttribute : Attribute
     {
         public string PermissionCode { get; }
-        public RequirePermissionAttribute(string permissionCode) => PermissionCode = permissionCode;
+        public string GroupName { get; set; } // Đổi thành public set
+        public string Description { get; set; } // Đổi thành public set
+
+        public RequirePermissionAttribute(string permissionCode)
+        {
+            PermissionCode = permissionCode;
+            GroupName = "Chưa phân loại";
+            Description = "Hệ thống tự động quét từ mã nguồn";
+        }
     }
 }
