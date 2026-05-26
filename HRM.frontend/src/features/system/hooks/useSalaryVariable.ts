@@ -1,56 +1,50 @@
-import { useState, useEffect, useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { salaryVariableApi } from "../api/salaryVariableApi";
 import type {
+  CreateSourceCatalogPayload,
   SalaryVariable,
   SourceCatalogItem,
-} from "../types/salaryVariable"; // Nhớ import thêm type này
+} from "../types/salaryVariable";
 
 export const useSalaryVariable = () => {
   const [variables, setVariables] = useState<SalaryVariable[]>([]);
-  const [catalogs, setCatalogs] = useState<SourceCatalogItem[]>([]); // Thêm state catalogs
+  const [catalogs, setCatalogs] = useState<SourceCatalogItem[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
 
   const fetchVariables = useCallback(async () => {
     setLoading(true);
     try {
-      const res = (await salaryVariableApi.getAll()) as {
-        success: boolean;
-        data: SalaryVariable[];
-      };
+      const res = await salaryVariableApi.getAll();
 
       if (Array.isArray(res)) {
         setVariables(res);
       } else if (res && Array.isArray(res.data)) {
         setVariables(res.data);
       } else {
-        console.warn("Dữ liệu không đúng định dạng mảng:", res);
         setVariables([]);
       }
     } catch (error) {
-      console.error("Lỗi khi tải danh sách biến lương:", error);
+      console.error("Error loading salary variables:", error);
+      setVariables([]);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // THÊM MỚI: Hàm fetch Source Catalogs
   const fetchCatalogs = useCallback(async () => {
     try {
-      // Nhớ thêm hàm getCatalogs vào file salaryVariableApi.ts của bạn
       const res = await salaryVariableApi.getCatalogs();
 
       if (Array.isArray(res)) {
         setCatalogs(res);
-      } else if (
-        res &&
-        typeof res === "object" &&
-        "data" in res &&
-        Array.isArray((res as { data: SourceCatalogItem[] }).data)
-      ) {
-        setCatalogs((res as { data: SourceCatalogItem[] }).data);
+      } else if (res && Array.isArray(res.data)) {
+        setCatalogs(res.data);
+      } else {
+        setCatalogs([]);
       }
     } catch (error) {
-      console.error("Lỗi khi tải danh mục nguồn:", error);
+      console.error("Error loading source catalogs:", error);
+      setCatalogs([]);
     }
   }, []);
 
@@ -58,22 +52,36 @@ export const useSalaryVariable = () => {
     try {
       const res = await salaryVariableApi.define(payload);
       if (res.success) {
-        await fetchVariables(); // Cập nhật lại danh sách sau khi thêm thành công
+        await fetchVariables();
       }
       return res;
     } catch (error: unknown) {
       throw (
         (error as { response?: { data?: { message?: string } } }).response?.data
-          ?.message || "Lỗi hệ thống"
+          ?.message || "Loi he thong"
+      );
+    }
+  };
+
+  const createCatalog = async (payload: CreateSourceCatalogPayload) => {
+    try {
+      const res = await salaryVariableApi.createCatalog(payload);
+      if (res.success) {
+        await fetchCatalogs();
+      }
+      return res;
+    } catch (error: unknown) {
+      throw (
+        (error as { response?: { data?: { message?: string } } }).response?.data
+          ?.message || "Loi he thong"
       );
     }
   };
 
   useEffect(() => {
     fetchVariables();
-    fetchCatalogs(); // Gọi thêm fetchCatalogs khi Component mount
+    fetchCatalogs();
   }, [fetchVariables, fetchCatalogs]);
 
-  // Trả về thêm catalogs để UI sử dụng
-  return { variables, catalogs, loading, defineVariable };
+  return { variables, catalogs, loading, defineVariable, createCatalog };
 };

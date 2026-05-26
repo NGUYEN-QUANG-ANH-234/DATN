@@ -16,4 +16,5 @@ export interface CreateAccountDto {
   email: string;
   fullName: string;
   roleId: number;
+  password?: string;
 }

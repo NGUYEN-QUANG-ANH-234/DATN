@@ -40,6 +40,12 @@ export const AttendanceLogPage = () => {
   }, []);
 
   const fetchTodayStatus = useCallback(async () => {
+    if (isAdmin) {
+      setTodayStatus(null);
+      setStatusLoading(false);
+      return;
+    }
+
     setStatusLoading(true);
     try {
       const res = await attendanceApi.getTodayStatus();
@@ -49,7 +55,7 @@ export const AttendanceLogPage = () => {
     } finally {
       setStatusLoading(false);
     }
-  }, []);
+  }, [isAdmin]);
 
   useEffect(() => {
     void fetchTodayStatus();
@@ -75,7 +81,16 @@ export const AttendanceLogPage = () => {
     };
   }, [isAdmin]);
 
-  const handleAttendance = async () => {
+  const recordAttendance = () => {
+    if (isAdmin) {
+      triggerAlert(
+        "warning",
+        "Tài khoản quản trị",
+        "Admin chỉ quản trị cấu hình, OT và bảng công; check-in/check-out cá nhân cần dùng tài khoản nhân viên có hồ sơ nhân sự.",
+      );
+      return;
+    }
+
     if (todayStatus?.nextAction === "DONE") {
       triggerAlert("warning", "Đã hoàn tất", "Bạn đã check-in và check-out trong ngày hôm nay.");
       return;
@@ -129,12 +144,45 @@ export const AttendanceLogPage = () => {
     );
   };
 
+  const handleAttendance = () => {
+    if (isAdmin) {
+      triggerAlert(
+        "warning",
+        "Tài khoản quản trị",
+        "Admin không thực hiện check-in/check-out cá nhân. Hãy dùng các mục quản trị chấm công, OT hoặc tổng hợp bảng công.",
+      );
+      return;
+    }
+
+    if (todayStatus?.nextAction === "DONE") {
+      triggerAlert("warning", "Đã hoàn tất", "Bạn đã check-in và check-out trong ngày hôm nay.");
+      return;
+    }
+
+    const actionLabel = getActionLabel(todayStatus?.nextAction).toLowerCase();
+    triggerAlert(
+      "confirm",
+      `Xác nhận ${actionLabel}`,
+      `Bạn có chắc chắn muốn ${actionLabel} vào thời điểm hiện tại không?`,
+      () => recordAttendance(),
+    );
+  };
+
   return (
     <FeaturePage
       title="Chấm công"
       description="Ghi nhận check-in/check-out qua Web. Hệ thống xác thực IP từ request và lưu GPS để đối chiếu khi cần."
       width="normal"
     >
+      {isAdmin && (
+        <FeatureCard title="Chế độ quản trị chấm công">
+          <p className="text-sm leading-6 text-gray-600">
+            Tài khoản Admin không dùng để check-in/check-out cá nhân vì không đại diện cho một hồ sơ nhân sự cụ thể.
+            Admin vẫn có thể cấu hình tham số chấm công, xem mạng backend, quản lý OT và tổng hợp bảng công.
+          </p>
+        </FeatureCard>
+      )}
+
       <FeatureCard>
         <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -153,10 +201,10 @@ export const AttendanceLogPage = () => {
           <button
             type="button"
             className={`${primaryButtonClass} min-h-12 px-6`}
-            disabled={loading || statusLoading || todayStatus?.nextAction === "DONE"}
+            disabled={isAdmin || loading || statusLoading || todayStatus?.nextAction === "DONE"}
             onClick={handleAttendance}
           >
-            {loading ? "Đang xác thực..." : getActionLabel(todayStatus?.nextAction)}
+            {isAdmin ? "Chỉ dành cho nhân viên" : loading ? "Đang xác thực..." : getActionLabel(todayStatus?.nextAction)}
           </button>
         </div>
       </FeatureCard>
@@ -176,6 +224,9 @@ export const AttendanceLogPage = () => {
           <InfoItem label="Hành động kế tiếp" value={getActionLabel(todayStatus?.nextAction)} />
           <InfoItem label="Check-in" value={formatDateTime(todayStatus?.checkIn || lastResult?.checkIn)} />
           <InfoItem label="Check-out" value={formatDateTime(todayStatus?.checkOut || lastResult?.checkOut)} />
+          <InfoItem label="Đi muộn" value={formatMinutes(todayStatus?.lateMinutes ?? lastResult?.lateMinutes)} />
+          <InfoItem label="Về sớm" value={formatMinutes(todayStatus?.earlyLeaveMinutes ?? lastResult?.earlyLeaveMinutes)} />
+          <InfoItem label="Ở lại sau ca" value={formatMinutes(todayStatus?.overtimeMinutes ?? lastResult?.overtimeMinutes)} />
           <InfoItem label="GPS gần nhất" value={formatGps(lastPosition)} />
           <InfoItem label="Độ chính xác GPS" value={lastPosition?.accuracy ? `${Math.round(lastPosition.accuracy)} m` : "Chưa có"} />
         </div>
@@ -221,6 +272,15 @@ const formatDateTime = (value?: string | null) => {
 const formatGps = (position: PositionState | null) => {
   if (!position) return "Chưa có";
   return `${position.latitude.toFixed(6)}, ${position.longitude.toFixed(6)}`;
+};
+
+const formatMinutes = (value?: number | null) => {
+  if (!value || value <= 0) return "0 phút";
+  const hours = Math.floor(value / 60);
+  const minutes = value % 60;
+  if (hours === 0) return `${minutes} phút`;
+  if (minutes === 0) return `${hours} giờ`;
+  return `${hours} giờ ${minutes} phút`;
 };
 
 const formatBreakTime = (status: AttendanceTodayStatus | null) => {

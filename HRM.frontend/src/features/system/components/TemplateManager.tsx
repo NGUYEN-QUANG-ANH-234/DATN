@@ -7,6 +7,12 @@ const PLACEHOLDERS: Record<string, string> = {
   PROMOTION: "{name}, {position}, {date}",
   NEW_TASK: "{name}, {task_name}, {deadline}",
   SLA_WARNING: "{name}, {module}, {hours_left}",
+  LEAVE_REQUEST_CREATED:
+    "{name}, {leave_type}, {start_date}, {end_date}, {days}, {status}",
+  LEAVE_REQUEST_APPROVED:
+    "{name}, {leave_type}, {start_date}, {end_date}, {days}, {status}",
+  LEAVE_REQUEST_REJECTED:
+    "{name}, {leave_type}, {start_date}, {end_date}, {days}, {status}, {reason}",
 };
 
 export const TemplateManager: React.FC = () => {
@@ -68,7 +74,7 @@ export const TemplateManager: React.FC = () => {
           <div className="col-span-1 border-r pr-4">
             <h3 className="font-semibold mb-3">Chọn loại thông báo</h3>
             <div className="space-y-2">
-              {["PROMOTION", "NEW_TASK", "SLA_WARNING"].map((key) => (
+              {Object.keys(PLACEHOLDERS).map((key) => (
                 <button
                   key={key}
                   onClick={() => setSelectedKey(key)}

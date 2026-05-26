@@ -37,6 +37,10 @@ export const recruitmentApi = {
     return await axiosClient.get("/approvals/pending");
   },
 
+  getPendingRequests: async () => {
+    return await axiosClient.get("/recruitment/requests/pending");
+  },
+
   getMyRequests: async () => {
     return await axiosClient.get("/recruitment/requests/my-requests");
   },

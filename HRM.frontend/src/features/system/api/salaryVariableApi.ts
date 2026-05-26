@@ -1,6 +1,7 @@
 import axiosClient from "../../../core/api/axiosClient"; // Điều chỉnh theo cấu hình thực tế
 import type {
   BaseResponse,
+  CreateSourceCatalogPayload,
   SalaryVariable,
   SourceCatalogItem,
 } from "../types/salaryVariable";
@@ -15,6 +16,12 @@ export const salaryVariableApi = {
 
   getCatalogs: async (): Promise<BaseResponse<SourceCatalogItem[]>> => {
     return await axiosClient.get(CATALOG_ENDPOINT);
+  },
+
+  createCatalog: async (
+    payload: CreateSourceCatalogPayload,
+  ): Promise<BaseResponse<SourceCatalogItem>> => {
+    return await axiosClient.post(CATALOG_ENDPOINT, payload);
   },
 
   define: async (payload: SalaryVariable): Promise<BaseResponse<null>> => {

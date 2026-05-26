@@ -10,6 +10,7 @@ export interface PendingProfileRequest {
   employeeName: string;
   employeeCode: string;
   requestedDataJson: string; // Chuỗi JSON chứa dữ liệu thay đổi
+  status?: string;
   createdAt: string;
   deadlineSLA: string;
 }

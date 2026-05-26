@@ -12,6 +12,9 @@ export interface AttendanceLogResult {
   checkOut: string | null;
   ipAddress: string;
   status: string;
+  lateMinutes: number;
+  earlyLeaveMinutes: number;
+  overtimeMinutes: number;
   message: string;
 }
 
@@ -30,6 +33,9 @@ export interface AttendanceTodayStatus {
   breakEndTime: string | null;
   checkIn: string | null;
   checkOut: string | null;
+  lateMinutes: number;
+  earlyLeaveMinutes: number;
+  overtimeMinutes: number;
   nextAction: "CHECK_IN" | "CHECK_OUT" | "DONE";
   message: string;
 }

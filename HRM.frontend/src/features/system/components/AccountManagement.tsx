@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useMemo, useState } from "react";
 import { useAccounts } from "../hooks/useAccounts";
 import type { CreateAccountDto } from "../types/account";
 
 export const AccountManagement: React.FC = () => {
   const {
     accounts,
-    roles, // Lấy mảng Role động từ Backend
+    roles,
     loading,
     handleCreateAccount,
     handleToggleStatus,
@@ -13,43 +13,60 @@ export const AccountManagement: React.FC = () => {
     handleUpdateRole,
   } = useAccounts();
 
+  const candidateRoleId = useMemo(() => {
+    const candidateRole = roles.find((role) => {
+      const roleName = role.name.toLowerCase();
+      return (
+        roleName.includes("candidate") ||
+        roleName.includes("ung vien") ||
+        roleName.includes("ứng viên")
+      );
+    });
+
+    return candidateRole?.id ?? 8;
+  }, [roles]);
+
   const [formData, setFormData] = useState<CreateAccountDto>({
     email: "",
     fullName: "",
-    roleId: 1,
+    roleId: candidateRoleId,
+    password: "",
   });
 
-  // Tự động gán roleId mặc định bằng phần tử đầu tiên nếu roles đã được load
-  useEffect(() => {
-    if (roles.length > 0 && formData.roleId === 1) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setFormData((prev) => ({ ...prev, roleId: roles[0].id }));
-    }
-  }, [formData.roleId, roles]);
+  const selectedRoleId = roles.some((role) => role.id === formData.roleId)
+    ? formData.roleId
+    : candidateRoleId;
 
   const onSubmitCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    const success = await handleCreateAccount(formData);
+    const success = await handleCreateAccount({
+      ...formData,
+      roleId: selectedRoleId,
+      password: formData.password?.trim() || undefined,
+    });
+
     if (success) {
       setFormData({
         email: "",
         fullName: "",
-        roleId: roles.length > 0 ? roles[0].id : 1,
+        roleId: candidateRoleId,
+        password: "",
       });
     }
   };
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
-      <h2 className="text-xl font-bold mb-4">Quản trị Tài khoản Hệ thống</h2>
+      <h2 className="mb-4 text-xl font-bold text-gray-900">
+        Quan tri tai khoan he thong
+      </h2>
 
-      {/* Form Tạo Tài Khoản */}
       <form
         onSubmit={onSubmitCreate}
-        className="mb-8 p-4 bg-gray-50 rounded border flex flex-wrap gap-4 items-end"
+        className="mb-8 flex flex-wrap items-end gap-4 rounded border bg-gray-50 p-4"
       >
         <div>
-          <label className="block text-sm font-medium mb-1">Email nội bộ</label>
+          <label className="mb-1 block text-sm font-medium">Email noi bo</label>
           <input
             type="email"
             required
@@ -58,11 +75,12 @@ export const AccountManagement: React.FC = () => {
               setFormData({ ...formData, email: e.target.value })
             }
             placeholder="nguyenvana@hicas.vn"
-            className="border p-2 rounded w-64 bg-white"
+            className="w-64 rounded border bg-white p-2"
           />
         </div>
+
         <div>
-          <label className="block text-sm font-medium mb-1">Họ và tên</label>
+          <label className="mb-1 block text-sm font-medium">Ho va ten</label>
           <input
             type="text"
             required
@@ -70,23 +88,38 @@ export const AccountManagement: React.FC = () => {
             onChange={(e) =>
               setFormData({ ...formData, fullName: e.target.value })
             }
-            placeholder="Nguyễn Văn A"
-            className="border p-2 rounded w-56 bg-white"
+            placeholder="Nguyen Van A"
+            className="w-56 rounded border bg-white p-2"
           />
         </div>
 
-        {/* ĐÃ SỬA: Đổi từ input nhập số sang Thẻ Select Box động */}
         <div>
-          <label className="block text-sm font-medium mb-1">
-            Quyền hạn (Role)
+          <label className="mb-1 block text-sm font-medium">
+            Mat khau khoi tao
+          </label>
+          <input
+            type="password"
+            minLength={8}
+            value={formData.password || ""}
+            onChange={(e) =>
+              setFormData({ ...formData, password: e.target.value })
+            }
+            placeholder="De trong de sinh tu dong"
+            className="w-56 rounded border bg-white p-2"
+          />
+        </div>
+
+        <div>
+          <label className="mb-1 block text-sm font-medium">
+            Quyen han mac dinh
           </label>
           <select
             required
-            value={formData.roleId}
+            value={selectedRoleId}
             onChange={(e) =>
               setFormData({ ...formData, roleId: Number(e.target.value) })
             }
-            className="border p-2 rounded w-48 bg-white"
+            className="w-48 rounded border bg-white p-2"
           >
             {roles.map((role) => (
               <option key={role.id} value={role.id}>
@@ -94,31 +127,33 @@ export const AccountManagement: React.FC = () => {
               </option>
             ))}
           </select>
+          <p className="mt-1 text-xs text-gray-500">
+            Mac dinh la Candidate neu khong chon role.
+          </p>
         </div>
 
         <button
           type="submit"
-          className="bg-blue-600 text-white px-5 py-2 rounded hover:bg-blue-700 font-medium"
+          className="rounded bg-blue-600 px-5 py-2 font-medium text-white hover:bg-blue-700"
         >
-          Tạo tài khoản & Gửi Mail
+          Tao tai khoan
         </button>
       </form>
 
-      {/* Bảng Danh sách Tài khoản */}
       <div className="overflow-x-auto">
         {loading ? (
-          <p className="text-center p-4">Đang đồng bộ dữ liệu...</p>
+          <p className="p-4 text-center">Dang dong bo du lieu...</p>
         ) : (
-          <table className="w-full text-left border-collapse">
+          <table className="w-full border-collapse text-left">
             <thead>
-              <tr className="bg-gray-100 border-b">
+              <tr className="border-b bg-gray-100">
                 <th className="p-3 text-sm font-semibold">ID</th>
-                <th className="p-3 text-sm font-semibold">Nhân sự</th>
-                <th className="p-3 text-sm font-semibold">Quyền</th>
-                <th className="p-3 text-sm font-semibold">Trạng thái</th>
-                <th className="p-3 text-sm font-semibold">Bảo mật (MFA)</th>
-                <th className="p-3 text-sm font-semibold text-center">
-                  Hành động
+                <th className="p-3 text-sm font-semibold">Nhan su</th>
+                <th className="p-3 text-sm font-semibold">Quyen</th>
+                <th className="p-3 text-sm font-semibold">Trang thai</th>
+                <th className="p-3 text-sm font-semibold">MFA</th>
+                <th className="p-3 text-center text-sm font-semibold">
+                  Hanh dong
                 </th>
               </tr>
             </thead>
@@ -128,17 +163,15 @@ export const AccountManagement: React.FC = () => {
                   <td className="p-3 text-sm text-gray-500">#{acc.id}</td>
                   <td className="p-3 text-sm">
                     <p className="font-bold text-gray-800">{acc.fullName}</p>
-                    <p className="text-gray-500 text-xs">{acc.email}</p>
+                    <p className="text-xs text-gray-500">{acc.email}</p>
                   </td>
-
-                  {/* ĐÃ SỬA: Cột cập nhật Quyền sử dụng Role List động và cảnh báo Admin */}
                   <td className="p-3 text-sm">
                     <select
                       value={acc.roleId}
                       onChange={(e) =>
                         handleUpdateRole(acc.id, Number(e.target.value))
                       }
-                      className={`border rounded p-1 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow ${
+                      className={`rounded border bg-white p-1 text-sm transition-shadow focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                         acc.roleId === 1
                           ? "border-red-300 font-bold text-red-600"
                           : "border-gray-300"
@@ -151,48 +184,53 @@ export const AccountManagement: React.FC = () => {
                       ))}
                     </select>
                     {acc.roleId === 1 && (
-                      <span className="block text-[10px] text-red-500 italic mt-1">
-                        * Quản trị hệ thống
+                      <span className="mt-1 block text-[10px] italic text-red-500">
+                        * Quan tri he thong
                       </span>
                     )}
                   </td>
-
                   <td className="p-3">
                     <span
-                      className={`px-2 py-1 text-xs font-bold rounded ${acc.status === "Active" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}
+                      className={`rounded px-2 py-1 text-xs font-bold ${
+                        acc.status === "Active"
+                          ? "bg-green-100 text-green-800"
+                          : "bg-red-100 text-red-800"
+                      }`}
                     >
                       {acc.status}
                     </span>
                   </td>
                   <td className="p-3 text-sm">
                     {acc.isMfaEnabled ? (
-                      <span className="text-blue-600 font-semibold">
-                        Đã bật
-                      </span>
+                      <span className="font-semibold text-blue-600">Da bat</span>
                     ) : (
-                      <span className="text-gray-400">Chưa bật</span>
+                      <span className="text-gray-400">Chua bat</span>
                     )}
                   </td>
-                  <td className="p-3 text-center space-x-2">
+                  <td className="space-x-2 p-3 text-center">
                     <button
                       onClick={() => handleToggleStatus(acc.id, acc.status)}
-                      className={`px-3 py-1 text-xs font-semibold rounded text-white ${acc.status === "Active" ? "bg-orange-500 hover:bg-orange-600" : "bg-green-500 hover:bg-green-600"}`}
+                      className={`rounded px-3 py-1 text-xs font-semibold text-white ${
+                        acc.status === "Active"
+                          ? "bg-orange-500 hover:bg-orange-600"
+                          : "bg-green-500 hover:bg-green-600"
+                      }`}
                     >
-                      {acc.status === "Active" ? "Khóa User" : "Mở khóa"}
+                      {acc.status === "Active" ? "Khoa" : "Mo khoa"}
                     </button>
                     <button
                       onClick={() => handleResetPassword(acc.id)}
-                      className="px-3 py-1 text-xs font-semibold rounded bg-gray-600 text-white hover:bg-gray-700"
+                      className="rounded bg-gray-600 px-3 py-1 text-xs font-semibold text-white hover:bg-gray-700"
                     >
-                      Cấp lại mật khẩu
+                      Cap lai mat khau
                     </button>
                   </td>
                 </tr>
               ))}
               {accounts.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="text-center p-4 text-gray-500">
-                    Chưa có tài khoản nào.
+                  <td colSpan={6} className="p-4 text-center text-gray-500">
+                    Chua co tai khoan nao.
                   </td>
                 </tr>
               )}

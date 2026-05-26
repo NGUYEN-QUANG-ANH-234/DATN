@@ -1,143 +1,304 @@
 import React, { useState } from "react";
 import { useSalaryVariable } from "../hooks/useSalaryVariable";
-import type { SalaryVariable } from "../types/salaryVariable";
+import type {
+  CreateSourceCatalogPayload,
+  SalaryVariable,
+} from "../types/salaryVariable";
+
+const emptyVariable: SalaryVariable = {
+  code: "",
+  source: "",
+  description: "",
+};
+
+const emptyCatalog: CreateSourceCatalogPayload = {
+  displayName: "",
+  sourcePath: "",
+  module: "Payroll",
+  dataType: "Decimal",
+  aggregationType: "Sum",
+  isPeriodBased: true,
+  isActive: true,
+};
 
 export const SalaryVariableManager: React.FC = () => {
-  // Lấy thêm catalogs từ hook
-  const { variables, catalogs, loading, defineVariable } = useSalaryVariable();
-  const [formData, setFormData] = useState<SalaryVariable>({
-    code: "",
-    source: "",
-    description: "",
-  });
+  const {
+    variables,
+    catalogs,
+    loading,
+    defineVariable,
+    createCatalog,
+  } = useSalaryVariable();
+
+  const [variableForm, setVariableForm] =
+    useState<SalaryVariable>(emptyVariable);
+  const [catalogForm, setCatalogForm] =
+    useState<CreateSourceCatalogPayload>(emptyCatalog);
   const [message, setMessage] = useState<string>("");
 
-  // SỬA ĐIỂM 1: Cập nhật Type để nhận cả Input và Select
-  const handleInputChange = (
+  const handleVariableChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    setVariableForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleCatalogChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+  ) => {
+    const { name, value, type } = e.target;
+    const checked =
+      type === "checkbox" ? (e.target as HTMLInputElement).checked : undefined;
+
+    setCatalogForm((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
+    }));
+  };
+
+  const handleVariableSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await defineVariable(formData);
-      setMessage(res.message || "Lưu thành công!");
-      setFormData({ code: "", source: "", description: "" });
+      const res = await defineVariable(variableForm);
+      setMessage(res.message || "Da luu bien luong.");
+      setVariableForm(emptyVariable);
     } catch (error: unknown) {
-      setMessage(`Lỗi: ${(error as Error).message}`);
+      setMessage(`Loi: ${String(error)}`);
+    }
+  };
+
+  const handleCatalogSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await createCatalog(catalogForm);
+      setMessage(res.message || "Da them nguon du lieu luong.");
+      setCatalogForm(emptyCatalog);
+    } catch (error: unknown) {
+      setMessage(`Loi: ${String(error)}`);
     }
   };
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
-      <h2 className="text-xl font-bold mb-4">
-        Quản lý Biến Lương Hệ Thống (F0.1)
-      </h2>
+    <div className="space-y-6">
+      <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
+        <h2 className="mb-4 text-xl font-bold">
+          Quan ly bien luong he thong (F0.1)
+        </h2>
 
-      <form
-        onSubmit={handleSubmit}
-        className="mb-8 grid grid-cols-1 md:grid-cols-4 gap-4 items-end"
-      >
-        {/* Input Code (Giữ nguyên) */}
-        <div>
-          <label className="block text-sm font-medium mb-1">
-            Mã biến (Code) *
-          </label>
-          <input
-            required
-            name="code"
-            value={formData.code}
-            onChange={handleInputChange}
-            pattern="^[a-zA-Z0-9_]+$"
-            title="Không chứa ký tự đặc biệt"
-            className="w-full border p-2 rounded"
-            placeholder="vd: ot_hours"
-          />
-        </div>
-
-        {/* SỬA ĐIỂM 2: Thay Input thành Select cho Nguồn dữ liệu */}
-        <div>
-          <label className="block text-sm font-medium mb-1">
-            Nguồn dữ liệu (Source) *
-          </label>
-          <select
-            required
-            name="source"
-            value={formData.source}
-            onChange={handleInputChange}
-            className="w-full border p-2 rounded bg-white"
-          >
-            <option value="" disabled>
-              -- Chọn mỏ dữ liệu chuẩn --
-            </option>
-            {catalogs.map((item) => (
-              <option key={item.id} value={item.sourcePath}>
-                [{item.module}] {item.displayName}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Input Description (Giữ nguyên) */}
-        <div>
-          <label className="block text-sm font-medium mb-1">Mô tả</label>
-          <input
-            name="description"
-            value={formData.description}
-            onChange={handleInputChange}
-            className="w-full border p-2 rounded"
-            placeholder="vd: Giờ tăng ca"
-          />
-        </div>
-
-        <button
-          type="submit"
-          className="bg-blue-600 text-white p-2 rounded hover:bg-blue-700"
+        <form
+          onSubmit={handleVariableSubmit}
+          className="mb-6 grid grid-cols-1 items-end gap-4 md:grid-cols-4"
         >
-          Lưu Biến Lương
-        </button>
-      </form>
+          <div>
+            <label className="mb-1 block text-sm font-medium">
+              Ma bien (Code) *
+            </label>
+            <input
+              required
+              name="code"
+              value={variableForm.code}
+              onChange={handleVariableChange}
+              pattern="^[a-zA-Z0-9_]+$"
+              title="Chi dung chu, so va dau gach duoi"
+              className="w-full rounded border p-2"
+              placeholder="vd: ot_hours"
+            />
+          </div>
 
-      {message && (
-        <p className="mb-4 text-sm font-medium text-blue-600">{message}</p>
-      )}
+          <div>
+            <label className="mb-1 block text-sm font-medium">
+              Nguon du lieu (Source) *
+            </label>
+            <select
+              required
+              name="source"
+              value={variableForm.source}
+              onChange={handleVariableChange}
+              className="w-full rounded border bg-white p-2"
+            >
+              <option value="" disabled>
+                -- Chon source catalog --
+              </option>
+              {catalogs
+                .filter((item) => item.isActive)
+                .map((item) => (
+                  <option key={item.id} value={item.sourcePath}>
+                    [{item.module}] {item.displayName} - {item.dataType}/
+                    {item.aggregationType}
+                  </option>
+                ))}
+            </select>
+          </div>
 
-      {/* Bảng danh sách (Giữ nguyên) */}
-      {loading ? (
-        <p className="text-center py-4">Đang tải dữ liệu...</p>
-      ) : (
-        <table className="w-full text-left border-collapse border">
-          <thead className="bg-gray-100">
-            <tr>
-              <th className="border p-2">Mã biến (Code)</th>
-              <th className="border p-2">Nguồn dữ liệu (Mapping)</th>
-              <th className="border p-2">Mô tả</th>
-            </tr>
-          </thead>
-          <tbody>
-            {variables && variables.length > 0 ? (
-              variables.map((v, index) => (
-                <tr key={`${v.code}-${index}`} className="hover:bg-gray-50">
-                  <td className="border p-2 font-mono text-blue-600">
-                    {v.code}
-                  </td>
-                  <td className="border p-2 font-mono">{v.source}</td>
-                  <td className="border p-2">{v.description}</td>
-                </tr>
-              ))
-            ) : (
+          <div>
+            <label className="mb-1 block text-sm font-medium">Mo ta</label>
+            <input
+              name="description"
+              value={variableForm.description}
+              onChange={handleVariableChange}
+              className="w-full rounded border p-2"
+              placeholder="vd: Gio tang ca hop le"
+            />
+          </div>
+
+          <button
+            type="submit"
+            className="rounded bg-blue-600 p-2 text-white hover:bg-blue-700"
+          >
+            Luu bien luong
+          </button>
+        </form>
+
+        {message && (
+          <p className="mb-4 text-sm font-medium text-blue-600">{message}</p>
+        )}
+
+        {loading ? (
+          <p className="py-4 text-center">Dang tai du lieu...</p>
+        ) : (
+          <table className="w-full border-collapse border text-left">
+            <thead className="bg-gray-100">
               <tr>
-                <td colSpan={3} className="text-center p-4 text-gray-500">
-                  Chưa có biến lương nào được định nghĩa hoặc lỗi tải dữ liệu.
-                </td>
+                <th className="border p-2">Code</th>
+                <th className="border p-2">Source</th>
+                <th className="border p-2">Mo ta</th>
               </tr>
-            )}
-          </tbody>
-        </table>
-      )}
+            </thead>
+            <tbody>
+              {variables.length > 0 ? (
+                variables.map((item, index) => (
+                  <tr key={`${item.code}-${index}`} className="hover:bg-gray-50">
+                    <td className="border p-2 font-mono text-blue-600">
+                      {item.code}
+                    </td>
+                    <td className="border p-2 font-mono">{item.source}</td>
+                    <td className="border p-2">{item.description}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={3} className="p-4 text-center text-gray-500">
+                    Chua co bien luong nao duoc dinh nghia.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
+        <h3 className="mb-4 text-lg font-semibold">
+          Mo rong nguon du lieu luong
+        </h3>
+
+        <form
+          onSubmit={handleCatalogSubmit}
+          className="grid grid-cols-1 gap-4 md:grid-cols-3"
+        >
+          <div>
+            <label className="mb-1 block text-sm font-medium">
+              Ten hien thi *
+            </label>
+            <input
+              required
+              name="displayName"
+              value={catalogForm.displayName}
+              onChange={handleCatalogChange}
+              className="w-full rounded border p-2"
+              placeholder="vd: So phut OT hop le"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium">
+              Source path *
+            </label>
+            <input
+              required
+              name="sourcePath"
+              value={catalogForm.sourcePath}
+              onChange={handleCatalogChange}
+              className="w-full rounded border p-2"
+              placeholder="vd: Overtime.ActualOtMinutes"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium">Module</label>
+            <input
+              name="module"
+              value={catalogForm.module}
+              onChange={handleCatalogChange}
+              className="w-full rounded border p-2"
+              placeholder="Payroll"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium">Data type</label>
+            <select
+              name="dataType"
+              value={catalogForm.dataType}
+              onChange={handleCatalogChange}
+              className="w-full rounded border bg-white p-2"
+            >
+              <option value="Decimal">Decimal</option>
+              <option value="Integer">Integer</option>
+              <option value="Boolean">Boolean</option>
+              <option value="Date">Date</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium">
+              Aggregation
+            </label>
+            <select
+              name="aggregationType"
+              value={catalogForm.aggregationType}
+              onChange={handleCatalogChange}
+              className="w-full rounded border bg-white p-2"
+            >
+              <option value="Sum">Sum</option>
+              <option value="Average">Average</option>
+              <option value="Latest">Latest</option>
+              <option value="Count">Count</option>
+              <option value="None">None</option>
+            </select>
+          </div>
+
+          <div className="flex items-center gap-6 pt-7">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                name="isPeriodBased"
+                checked={catalogForm.isPeriodBased}
+                onChange={handleCatalogChange}
+              />
+              Theo ky luong
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                name="isActive"
+                checked={catalogForm.isActive}
+                onChange={handleCatalogChange}
+              />
+              Dang dung
+            </label>
+          </div>
+
+          <div className="md:col-span-3">
+            <button
+              type="submit"
+              className="rounded bg-gray-900 px-4 py-2 text-white hover:bg-gray-800"
+            >
+              Them source catalog
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 };

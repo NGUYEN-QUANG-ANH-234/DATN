@@ -16,7 +16,14 @@ import { AccountManagement } from "./features/system/components/AccountManagemen
 
 import { NotificationProvider } from "./core/context/NotificationContext";
 import { DepartmentManagement } from "./features/organization";
-import { AttendanceLogPage } from "./features/attendance";
+import { ApprovalTrackingPage, ApprovalWorkspacePage } from "./features/approvals";
+import {
+  AttendanceLogPage,
+  AttendanceSummaryPage,
+  LeaveRequestPage,
+  OvertimeApprovalPage,
+  OvertimeRequestPage,
+} from "./features/attendance";
 import {
   HRProfileReviewList,
   MyContracts,
@@ -36,6 +43,12 @@ import {
   CandidateHistory,
   CandidateManagement,
 } from "./features/recruitment";
+import {
+  KpiImportPage,
+  PerformanceEvaluationPage,
+  TaskWorkspacePage,
+  TrainingEvaluationPage,
+} from "./features/tasks";
 
 function App() {
   return (
@@ -79,7 +92,13 @@ function App() {
                 path="/organization/department-management"
                 element={<DepartmentManagement />}
               />
+              <Route path="/approvals" element={<ApprovalWorkspacePage />} />
+              <Route path="/approvals/tracking" element={<ApprovalTrackingPage />} />
               <Route path="/attendance" element={<AttendanceLogPage />} />
+              <Route path="/attendance/overtime" element={<OvertimeRequestPage />} />
+              <Route path="/attendance/overtime-approvals" element={<OvertimeApprovalPage />} />
+              <Route path="/attendance/leaves" element={<LeaveRequestPage />} />
+              <Route path="/attendance/summary" element={<AttendanceSummaryPage />} />
 
               {/* Module 3: Hồ sơ nhân sự */}
               <Route
@@ -121,6 +140,10 @@ function App() {
                 path="/recruitment/candidates-management"
                 element={<CandidateManagement />}
               />
+              <Route path="/tasks/kpi-import" element={<KpiImportPage />} />
+              <Route path="/tasks/workspace" element={<TaskWorkspacePage />} />
+              <Route path="/tasks/performance-evaluation" element={<PerformanceEvaluationPage />} />
+              <Route path="/tasks/training-evaluation" element={<TrainingEvaluationPage />} />
             </Route>
           </Route>
         </Routes>

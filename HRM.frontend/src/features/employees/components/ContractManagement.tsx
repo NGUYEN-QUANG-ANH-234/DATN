@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Check, MessageSquareText, Plus, RefreshCw, Send } from "lucide-react";
+import { Check, MessageSquareText, Plus, RefreshCw, Send, X } from "lucide-react";
 import { contractApi } from "../api/contractApi";
 import type { ContractDto } from "../api/contractApi";
+import { contractAddendumApi } from "../api/contractAddendumApi";
+import type { ContractAddendumDto } from "../api/contractAddendumApi";
 import { useNotification } from "../../../core/context/NotificationContext";
 import {
   EmptyState,
@@ -39,6 +41,7 @@ const dateText = (value?: string | null) =>
 
 export const ContractManagement = () => {
   const [contracts, setContracts] = useState<ContractDto[]>([]);
+  const [pendingAddendums, setPendingAddendums] = useState<ContractAddendumDto[]>([]);
   const [loading, setLoading] = useState(false);
   const [showRequest, setShowRequest] = useState(false);
   const [requestNote, setRequestNote] = useState("");
@@ -56,9 +59,14 @@ export const ContractManagement = () => {
   const fetchContracts = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await contractApi.getMyContracts();
+      const [res, addendumRes] = await Promise.all([
+        contractApi.getMyContracts(),
+        contractAddendumApi.getMyPendingConfirmation(),
+      ]);
       const raw = res as unknown as { data?: ContractDto[]; Data?: ContractDto[] };
+      const addendumRaw = addendumRes as unknown as { data?: ContractAddendumDto[]; Data?: ContractAddendumDto[] };
       setContracts(raw.data || raw.Data || []);
+      setPendingAddendums(addendumRaw.data || addendumRaw.Data || []);
     } catch (err: unknown) {
       const e = err as { message?: string };
       alertRef.current("error", "Lỗi tải dữ liệu", e?.message || "Không thể tải danh sách hợp đồng.");
@@ -85,6 +93,35 @@ export const ContractManagement = () => {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleAddendumConfirm = (addendum: ContractAddendumDto, isApproved: boolean) => {
+    alertRef.current(
+      "confirm",
+      isApproved ? "Xác nhận phụ lục" : "Từ chối phụ lục",
+      isApproved
+        ? "Bạn đồng ý với toàn bộ điều khoản của phụ lục hợp đồng này?"
+        : "Bạn muốn từ chối điều khoản phụ lục hợp đồng này?",
+      async () => {
+        try {
+          await contractAddendumApi.employeeConfirm(addendum.id, {
+            isApproved,
+            rejectReason: isApproved ? undefined : "Người lao động từ chối điều khoản phụ lục.",
+          });
+          alertRef.current(
+            "success",
+            isApproved ? "Đã xác nhận phụ lục" : "Đã từ chối phụ lục",
+            isApproved
+              ? "Phụ lục đã được chuyển sang Giám đốc phê duyệt cuối."
+              : "Phụ lục đã được ghi nhận là bị từ chối.",
+          );
+          fetchContracts();
+        } catch (err: unknown) {
+          const e = err as { message?: string };
+          alertRef.current("error", "Lỗi", e?.message || "Không thể xử lý phụ lục.");
+        }
+      },
+    );
   };
 
   const handleAccept = (id: number) => {
@@ -145,6 +182,37 @@ export const ContractManagement = () => {
       }
       width="normal"
     >
+      {pendingAddendums.length > 0 && (
+        <div className="mb-4 space-y-3">
+          {pendingAddendums.map(addendum => (
+            <FeatureCard key={addendum.id} className="border-amber-200 bg-amber-50 p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <span className="inline-flex rounded-md border border-amber-200 bg-white px-2.5 py-1 text-xs font-semibold text-amber-700">
+                    Chức năng sửa đổi: Chờ người lao động xác nhận phụ lục
+                  </span>
+                  <h2 className="mt-2 text-base font-semibold text-gray-900">{addendum.addendumNumber}</h2>
+                  <p className="mt-1 text-sm text-gray-600">
+                    HĐ gốc: {addendum.contractNumber || `#${addendum.contractId}`} · Hiệu lực: {dateText(addendum.effectiveDate)}
+                  </p>
+                  {addendum.content && <p className="mt-2 text-sm text-gray-700">{addendum.content}</p>}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button className={secondaryButtonClass} onClick={() => handleAddendumConfirm(addendum, false)}>
+                    <X size={16} />
+                    Từ chối
+                  </button>
+                  <button className={primaryButtonClass} onClick={() => handleAddendumConfirm(addendum, true)}>
+                    <Check size={16} />
+                    Đồng ý phụ lục
+                  </button>
+                </div>
+              </div>
+            </FeatureCard>
+          ))}
+        </div>
+      )}
+
       {loading ? (
         <FeatureCard>
           <div className="py-10 text-center text-sm text-gray-500">Đang tải danh sách hợp đồng...</div>

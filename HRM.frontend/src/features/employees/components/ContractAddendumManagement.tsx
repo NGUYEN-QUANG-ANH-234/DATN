@@ -48,6 +48,9 @@ const defaultForm: AddendumForm = {
 
 const STATUS_MAP: Record<string, { label: string; cls: string }> = {
   Draft: { label: "Bản nháp", cls: "bg-gray-100 text-gray-700 border-gray-200" },
+  PendingDept: { label: "Chờ Trưởng phòng xác nhận", cls: "bg-blue-50 text-blue-700 border-blue-200" },
+  PendingHR: { label: "Chờ HR xác nhận chính sách", cls: "bg-indigo-50 text-indigo-700 border-indigo-200" },
+  PendingEmployee: { label: "Chờ người lao động xác nhận", cls: "bg-amber-50 text-amber-700 border-amber-200" },
   PendingDirector: { label: "Chờ Giám đốc duyệt", cls: "bg-purple-50 text-purple-700 border-purple-200" },
   Active: { label: "Có hiệu lực", cls: "bg-green-50 text-green-700 border-green-200" },
   Rejected: { label: "Bị từ chối", cls: "bg-red-50 text-red-700 border-red-200" },

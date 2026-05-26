@@ -4,6 +4,20 @@ export interface SourceCatalogItem {
   displayName: string;
   sourcePath: string;
   module: string;
+  dataType: string;
+  aggregationType: string;
+  isPeriodBased: boolean;
+  isActive: boolean;
+}
+
+export interface CreateSourceCatalogPayload {
+  displayName: string;
+  sourcePath: string;
+  module: string;
+  dataType: string;
+  aggregationType: string;
+  isPeriodBased: boolean;
+  isActive: boolean;
 }
 
 // Giữ nguyên các phần cũ

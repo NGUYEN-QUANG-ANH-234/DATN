@@ -1,9 +1,17 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { jwtDecode } from "jwt-decode";
 import type { UserState, JwtPayload } from "../types";
+import { API_BASE_URL } from "../../api/config";
+
+interface MyProfileHeaderResponse {
+  success?: boolean;
+  data?: {
+    fullName?: string | null;
+    avatarUrl?: string | null;
+  };
+}
 
 export const useCurrentUser = () => {
-  // Đưa logic vào hàm khởi tạo của useState (chỉ chạy 1 lần khi mount)
   const [user, setUser] = useState<UserState | null>(() => {
     const token = localStorage.getItem("accessToken");
     if (!token) return null;
@@ -33,6 +41,55 @@ export const useCurrentUser = () => {
     }
   });
 
-  // Export thêm setUser đề phòng trường hợp bạn muốn update user sau khi edit profile
+  useEffect(() => {
+    const token = localStorage.getItem("accessToken");
+    if (!token) return;
+
+    let isMounted = true;
+
+    const syncEmployeeProfileName = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/employees/me/profile`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          credentials: "include",
+        });
+
+        if (!response.ok) return;
+
+        const res = (await response.json()) as MyProfileHeaderResponse;
+        const profile = res.data;
+
+        if (!isMounted || !profile) return;
+
+        setUser((current) => {
+          if (!current) return current;
+
+          const name = profile.fullName?.trim() || current.name;
+          const avatar = profile.avatarUrl?.trim() || current.avatar;
+
+          if (name === current.name && avatar === current.avatar) {
+            return current;
+          }
+
+          return {
+            ...current,
+            name,
+            avatar,
+          };
+        });
+      } catch {
+        // Candidate/admin-only accounts may not have an employee profile yet.
+      }
+    };
+
+    void syncEmployeeProfileName();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   return { user, setUser };
 };

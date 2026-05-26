@@ -27,6 +27,11 @@ export interface CreateContractAddendumPayload {
   effectiveDate: string;
 }
 
+export interface ReviewContractAddendumPayload {
+  isApproved: boolean;
+  rejectReason?: string | null;
+}
+
 export const contractAddendumApi = {
   createDraft: async (contractId: number, payload: CreateContractAddendumPayload) => {
     return await axiosClient.post(`/contracts/${contractId}/addendums`, payload);
@@ -48,12 +53,36 @@ export const contractAddendumApi = {
     return await axiosClient.get("/addendums/pending-director");
   },
 
+  getPendingDept: async (): Promise<{ success: boolean; data: ContractAddendumDto[] }> => {
+    return await axiosClient.get("/addendums/pending-dept");
+  },
+
+  getPendingHr: async (): Promise<{ success: boolean; data: ContractAddendumDto[] }> => {
+    return await axiosClient.get("/addendums/pending-hr");
+  },
+
+  getMyPendingConfirmation: async (): Promise<{ success: boolean; data: ContractAddendumDto[] }> => {
+    return await axiosClient.get("/addendums/my-pending-confirmation");
+  },
+
   submit: async (id: number) => {
     return await axiosClient.patch(`/addendums/${id}/submit`);
   },
 
   approve: async (id: number) => {
     return await axiosClient.patch(`/addendums/${id}/approve`);
+  },
+
+  deptReview: async (id: number, payload: ReviewContractAddendumPayload) => {
+    return await axiosClient.patch(`/addendums/${id}/dept-review`, payload);
+  },
+
+  hrConfirm: async (id: number, payload: ReviewContractAddendumPayload) => {
+    return await axiosClient.patch(`/addendums/${id}/hr-confirm`, payload);
+  },
+
+  employeeConfirm: async (id: number, payload: ReviewContractAddendumPayload) => {
+    return await axiosClient.patch(`/addendums/${id}/employee-confirm`, payload);
   },
 
   reject: async (id: number, rejectReason: string) => {

@@ -1,8 +1,8 @@
 export interface MenuItem {
-  path?: string; // Khối cha có thể không cần path nếu chỉ dùng để mở dropdown
+  path?: string;
   label: string;
   roles: string[];
-  icon?: string; // Tương lai bạn nên thêm icon
+  icon?: string;
   children?: MenuItem[];
 }
 
@@ -10,128 +10,178 @@ export const MENU_ITEMS: MenuItem[] = [
   {
     path: "/dashboard",
     label: "Tổng quan",
-    roles: ["Admin", "HR", "Manager", "Employee", "Candidate"],
+    roles: ["Admin", "HR", "Manager", "Director", "Employee", "Intern", "Candidate"],
   },
   {
     label: "Cơ cấu tổ chức",
-    roles: ["Admin"],
+    roles: ["Admin", "HR", "Director"],
     children: [
       {
         path: "/organization/department-management",
-        label: "Tổng quan Cơ cấu tổ chức",
-        roles: ["HR", "Director", "Admin"],
+        label: "Sơ đồ tổ chức",
+        roles: ["Admin", "HR", "Director"],
       },
     ],
   },
   {
     label: "Tuyển dụng",
-    roles: ["Admin", "Candidate", "HR", "Manager", "Director", "Employee"],
+    roles: ["Admin", "HR", "Manager", "Director", "Employee", "Candidate"],
     children: [
       {
         path: "/recruitment/all",
-        label: "Tất cả vị trí tuyển dụng",
-        roles: ["Admin", "HR", "Manager", "Director", "Candidate"],
+        label: "Vị trí tuyển dụng",
+        roles: ["Admin", "HR", "Manager", "Director", "Employee", "Candidate"],
       },
       {
         path: "/recruitment/create",
-        label: "Tạo việc làm mới",
-        roles: ["Admin", "HR", "Manager", "Director"],
+        label: "Tạo nhu cầu tuyển dụng",
+        roles: ["Admin", "HR", "Manager"],
       },
       {
-        path: "/recruitment/approval-inbox",
-        label: "Hộp thư phê duyệt",
-        roles: ["Admin", "HR", "Director", "Manager"],
-      },
-      {
-        path: "/recruitment/candidates-management", // Đã đồng bộ với App.tsx
-        label: "Quản lý Ứng viên",
-        roles: ["Admin", "HR", "Manager", "Director"],
-      },
-      {
-        path: "/recruitment/history", // Đã bổ sung trang tra cứu lịch sử ứng tuyển
+        path: "/recruitment/history",
         label: "Lịch sử ứng tuyển",
-        roles: ["Admin", "HR", "Manager", "Director", "Candidate", "Employee"],
+        roles: ["Admin", "HR", "Manager", "Director", "Employee", "Candidate"],
+      },
+      {
+        path: "/recruitment/candidates-management",
+        label: "Theo dõi ứng viên",
+        roles: ["Admin", "HR", "Manager", "Director"],
       },
     ],
   },
   {
-    label: "Hồ sơ nhân viên",
-    roles: [
-      "Admin",
-      "HR",
-      "Manager",
-      "Candidate",
-      "Employee",
-      "Director",
-      "Intern",
-    ],
+    label: "Hồ sơ & hợp đồng",
+    roles: ["Admin", "HR", "Manager", "Director", "Employee", "Intern"],
     children: [
       {
         path: "/employees/my-profile",
-        label: "Tổng quan Hồ sơ nhân viên",
-        roles: ["HR", "Director", "Admin", "Employee"],
-      },
-      {
-        path: "/employees/my-contracts",
-        label: "Tổng quan Hợp đồng nhân viên",
-        roles: ["HR", "Director", "Admin", "Employee"],
-      },
-      {
-        path: "/employees/history",
-        label: "Lịch sử biến động",
-        roles: ["HR", "Director", "Admin", "Employee", "Manager", "Intern"],
+        label: "Hồ sơ cá nhân",
+        roles: ["HR", "Manager", "Director", "Employee", "Intern"],
       },
       {
         path: "/employees/profile-update",
-        label: "Thay đổi thông tin cá nhân",
-        roles: ["HR", "Director", "Admin", "Employee"],
+        label: "Cập nhật hồ sơ",
+        roles: ["HR", "Manager", "Director", "Employee", "Intern"],
       },
       {
-        path: "/employees/onboarding",
-        label: "Onboarding",
-        roles: ["HR", "Director", "Admin"],
-      },
-      {
-        path: "/employees/hr-profile-review",
-        label: "Duyệt hồ sơ nhân viên",
-        roles: ["HR", "Director", "Admin"],
+        path: "/employees/my-contracts",
+        label: "Hợp đồng của tôi",
+        roles: ["HR", "Manager", "Director", "Employee", "Intern"],
       },
       {
         path: "/employees/contract-management",
-        label: "Ký kết / Gia hạn hợp đồng",
+        label: "Ký kết / gia hạn hợp đồng",
         roles: ["Employee", "Manager", "Intern"],
       },
       {
         path: "/employees/hr-contract-management",
-        label: "Quản lý Hợp đồng (HR)",
-        roles: ["HR", "Admin"],
-      },
-      {
-        path: "/employees/director-contract-approval",
-        label: "Phê duyệt Hợp đồng (GĐ)",
-        roles: ["Director", "Admin"],
+        label: "Soạn thảo hợp đồng",
+        roles: ["Admin", "HR"],
       },
       {
         path: "/employees/contract-addendums",
         label: "Phụ lục hợp đồng",
         roles: ["HR", "Director", "Admin"],
       },
+      {
+        path: "/employees/history",
+        label: "Lịch sử biến động",
+        roles: ["Admin", "HR", "Manager", "Director", "Employee", "Intern"],
+      },
+      {
+        path: "/employees/onboarding",
+        label: "Onboarding",
+        roles: ["Admin", "HR", "Director"],
+      },
     ],
   },
   {
-    path: "/attendance",
-    label: "Chấm công",
-    roles: ["Admin", "HR", "Manager", "Employee"],
+    label: "Chấm công & nghỉ phép",
+    roles: ["Admin", "HR", "Manager", "Director", "Employee"],
+    children: [
+      {
+        path: "/attendance",
+        label: "Chấm công cá nhân",
+        roles: ["Admin", "HR", "Manager", "Employee"],
+      },
+      {
+        path: "/attendance/overtime",
+        label: "Làm thêm giờ (OT)",
+        roles: ["Admin", "HR", "Manager", "Employee"],
+      },
+      {
+        path: "/attendance/leaves",
+        label: "Nghỉ phép",
+        roles: ["Admin", "Manager", "Director", "Employee"],
+      },
+      {
+        path: "/attendance/summary",
+        label: "Tổng hợp bảng công",
+        roles: ["Admin", "HR"],
+      },
+    ],
   },
   {
-    path: "/tasks",
-    label: "Công việc & Đào tạo",
-    roles: ["Admin", "Manager", "Employee"],
+    label: "Phê duyệt",
+    roles: ["Admin", "HR", "Manager", "Director"],
+    children: [
+      {
+        path: "/approvals",
+        label: "Phê duyệt của tôi",
+        roles: ["Admin", "HR", "Manager", "Director"],
+      },
+      {
+        path: "/approvals/tracking",
+        label: "Theo dõi trạng thái",
+        roles: ["Admin", "HR", "Manager", "Director"],
+      },
+    ],
   },
-  { path: "/payroll", label: "Lương & Phụ cấp", roles: ["Admin", "HR"] },
+  {
+    label: "Theo dõi yêu cầu",
+    roles: ["Employee", "Intern", "Candidate"],
+    children: [
+      {
+        path: "/approvals/tracking",
+        label: "Trạng thái của tôi",
+        roles: ["Employee", "Intern", "Candidate"],
+      },
+    ],
+  },
+  {
+    label: "Công việc & đào tạo",
+    roles: ["Admin", "HR", "Manager", "Employee", "Intern"],
+    children: [
+      {
+        path: "/tasks/workspace",
+        label: "Cập nhật tiến độ / duyệt task",
+        roles: ["Admin", "HR", "Manager", "Employee", "Intern"],
+      },
+      {
+        path: "/tasks/kpi-import",
+        label: "Import KPI đầu kỳ",
+        roles: ["Admin", "HR", "Manager"],
+      },
+      {
+        path: "/tasks/performance-evaluation",
+        label: "Đánh giá KPI",
+        roles: ["Admin", "HR", "Manager"],
+      },
+      {
+        path: "/tasks/training-evaluation",
+        label: "Theo dõi & đánh giá đào tạo",
+        roles: ["Admin", "HR", "Manager"],
+      },
+    ],
+  },
+  {
+    path: "/payroll",
+    label: "Lương & phụ cấp",
+    roles: ["Admin", "HR"],
+  },
   {
     path: "/requests",
-    label: "Yêu cầu",
+    label: "Yêu cầu nhân sự",
     roles: ["Admin", "HR", "Manager", "Employee"],
   },
   {
@@ -140,12 +190,12 @@ export const MENU_ITEMS: MenuItem[] = [
     children: [
       {
         path: "/system",
-        label: "Tổng quan Hệ thống",
+        label: "Tổng quan hệ thống",
         roles: ["Admin"],
       },
       {
         path: "/system/salary-variables",
-        label: "Cấu hình Biến lương",
+        label: "Cấu hình biến lương",
         roles: ["Admin"],
       },
       {
@@ -160,28 +210,28 @@ export const MENU_ITEMS: MenuItem[] = [
       },
       {
         path: "/system/attendance-config",
-        label: "Cấu hình Chấm công",
-        roles: ["Admin"],
-      },
-      {
-        path: "/system/rbac",
-        label: "Quản lý Quyền",
-        roles: ["Admin"],
-      },
-      {
-        path: "/system/audit-logs",
-        label: "Xem nhật ký kiểm toán",
-        roles: ["Admin"],
-      },
-      {
-        path: "/system/account-management",
-        label: "Quản lý Tài khoản",
+        label: "Cấu hình chấm công",
         roles: ["Admin"],
       },
       {
         path: "/system/schedule-configuration",
-        label: "Cấu hình Lịch làm việc",
-        roles: ["HR", "Director", "Admin"],
+        label: "Cấu hình lịch làm việc",
+        roles: ["Admin"],
+      },
+      {
+        path: "/system/rbac",
+        label: "Quản lý quyền",
+        roles: ["Admin"],
+      },
+      {
+        path: "/system/audit-logs",
+        label: "Nhật ký kiểm toán",
+        roles: ["Admin"],
+      },
+      {
+        path: "/system/account-management",
+        label: "Quản lý tài khoản",
+        roles: ["Admin"],
       },
     ],
   },
