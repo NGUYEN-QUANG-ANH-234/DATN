@@ -23,7 +23,7 @@ namespace HRM.backend.src.HRM.API.Controllers.System
             try
             {
                 int approverId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-                string actorRoleName = User.FindFirst(ClaimTypes.Role)!.Value;
+                string actorRoleName = GetRole();
 
                 var result = await _approvalService.GetPendingApprovalsAsync(approverId, actorRoleName, ct);
 
@@ -42,7 +42,7 @@ namespace HRM.backend.src.HRM.API.Controllers.System
             try
             {
                 int approverId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-                string actorRoleName = User.FindFirst(ClaimTypes.Role)!.Value;
+                string actorRoleName = GetRole();
 
                 var status = await _approvalService.ProcessStepAsync(dto.ModuleCode, dto.ReferenceId, approverId, actorRoleName, dto.IsApproved, dto.Note, ct);
 
@@ -61,6 +61,10 @@ namespace HRM.backend.src.HRM.API.Controllers.System
                 return StatusCode(500, new { Success = false, Message = "Lỗi hệ thống: " + ex.Message });
             }
         }
+        private string GetRole()
+        {
+            return User.FindFirst("role")?.Value ?? User.FindFirst(ClaimTypes.Role)?.Value ?? string.Empty;
+        }
     }
 
     public class ProcessApprovalDto
@@ -70,4 +74,5 @@ namespace HRM.backend.src.HRM.API.Controllers.System
         public bool IsApproved { get; set; }
         public string? Note { get; set; }
     }
+
 }

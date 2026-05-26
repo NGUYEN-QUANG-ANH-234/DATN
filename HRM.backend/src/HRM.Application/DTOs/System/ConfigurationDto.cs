@@ -30,9 +30,21 @@ namespace HRM.backend.src.HRM.Application.DTOs.System
 
     public class AttendanceConfigDto
     {
+        // Backward-compatible fields for old ATTENDANCE_CONFIG rows.
         public double Latitude { get; set; }
         public double Longitude { get; set; }
         public int RadiusInMeters { get; set; }
-        public List<string> AllowedIpRanges { get; set; } = new(); // Hỗ trợ mảng các dải IP/CIDR
+        public List<string> AllowedIpRanges { get; set; } = new();
+        public List<AttendanceOfficeLocationDto> OfficeLocations { get; set; } = new();
+    }
+
+    public class AttendanceOfficeLocationDto
+    {
+        public string Name { get; set; } = string.Empty;
+        public double Latitude { get; set; }
+        public double Longitude { get; set; }
+        public int RadiusInMeters { get; set; }
+        public List<string> AllowedIpRanges { get; set; } = new();
+        public bool IsActive { get; set; } = true;
     }
 }

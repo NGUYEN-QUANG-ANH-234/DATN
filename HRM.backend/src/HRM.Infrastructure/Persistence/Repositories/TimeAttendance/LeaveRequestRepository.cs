@@ -24,8 +24,64 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.TimeAttend
         public async Task<IEnumerable<LeaveRequest>> FetchExpiredRequestsAsync()
         {
             return await _dbSet
-                .Where(r => r.Status == LeaveRequestStatus.Pending && r.DeadlineAt < DateTime.UtcNow)
+                .Include(r => r.Employee)
+                .Include(r => r.LeaveType)
+                .Where(r => (r.Status == LeaveRequestStatus.PendingDept ||
+                             r.Status == LeaveRequestStatus.PendingDirector) &&
+                            r.DeadlineAt < DateTime.UtcNow)
                 .ToListAsync();
+        }
+
+        public async Task<LeaveRequest?> GetDetailAsync(int id, CancellationToken ct = default)
+        {
+            return await _dbSet
+                .Include(r => r.Employee)
+                    .ThenInclude(e => e!.Department)
+                .Include(r => r.Employee)
+                    .ThenInclude(e => e!.Account)
+                .Include(r => r.LeaveType)
+                .FirstOrDefaultAsync(r => r.Id == id, ct);
+        }
+
+        public async Task<List<LeaveRequest>> GetByEmployeeAsync(int employeeId, CancellationToken ct = default)
+        {
+            return await _dbSet
+                .Include(r => r.Employee)
+                .ThenInclude(e => e!.Department)
+                .Include(r => r.LeaveType)
+                .Where(r => r.EmployeeId == employeeId)
+                .OrderByDescending(r => r.StartDate)
+                .AsNoTracking()
+                .ToListAsync(ct);
+        }
+
+        public async Task<List<LeaveRequest>> GetPendingDeptAsync(int? deptId, CancellationToken ct = default)
+        {
+            var query = _dbSet
+                .Include(r => r.Employee)
+                .ThenInclude(e => e!.Department)
+                .Include(r => r.LeaveType)
+                .Where(r => r.Status == LeaveRequestStatus.PendingDept);
+
+            if (deptId.HasValue)
+                query = query.Where(r => r.Employee != null && r.Employee.DeptId == deptId.Value);
+
+            return await query
+                .OrderBy(r => r.DeadlineAt)
+                .AsNoTracking()
+                .ToListAsync(ct);
+        }
+
+        public async Task<List<LeaveRequest>> GetByStatusAsync(LeaveRequestStatus status, CancellationToken ct = default)
+        {
+            return await _dbSet
+                .Include(r => r.Employee)
+                .ThenInclude(e => e!.Department)
+                .Include(r => r.LeaveType)
+                .Where(r => r.Status == status)
+                .OrderBy(r => r.DeadlineAt)
+                .AsNoTracking()
+                .ToListAsync(ct);
         }
     }
 }

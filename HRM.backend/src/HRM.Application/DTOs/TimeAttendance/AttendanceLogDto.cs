@@ -14,6 +14,9 @@ namespace HRM.backend.src.HRM.Application.DTOs.TimeAttendance
         public DateTime? CheckOut { get; set; }
         public string IpAddress { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
+        public int LateMinutes { get; set; }
+        public int EarlyLeaveMinutes { get; set; }
+        public int OvertimeMinutes { get; set; }
         public string Message { get; set; } = string.Empty;
     }
 
@@ -34,6 +37,9 @@ namespace HRM.backend.src.HRM.Application.DTOs.TimeAttendance
         public string? BreakEndTime { get; set; }
         public DateTime? CheckIn { get; set; }
         public DateTime? CheckOut { get; set; }
+        public int LateMinutes { get; set; }
+        public int EarlyLeaveMinutes { get; set; }
+        public int OvertimeMinutes { get; set; }
         public string NextAction { get; set; } = "CHECK_IN";
         public string Message { get; set; } = string.Empty;
     }

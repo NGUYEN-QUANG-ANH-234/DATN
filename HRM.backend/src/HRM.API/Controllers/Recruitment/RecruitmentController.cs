@@ -31,10 +31,10 @@ namespace HRM.backend.src.HRM.API.Controllers.Recruitment
             {
                 // Lấy ID người đang tạo đơn
                 int userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-                string actorRoleName = User.FindFirst(ClaimTypes.Role)!.Value;
+                string actorRoleName = GetRole();
 
                 // Truyền thêm userId xuống UseCase
-                int id = await _useCase.CreateRequestAsync(dto, userId, actorRoleName, ct);
+                int id = await _useCase.CreateRequestAsync(dto, userId, actorRoleName, ct, GetIdempotencyKey());
 
                 return Created($"/api/v1/recruitment/requests/{id}", new { Success = true, Data = id });
             }
@@ -52,6 +52,16 @@ namespace HRM.backend.src.HRM.API.Controllers.Recruitment
             }
         }
 
+        private string? GetIdempotencyKey()
+        {
+            return Request.Headers["Idempotency-Key"].FirstOrDefault();
+        }
+
+        private string GetRole()
+        {
+            return User.FindFirst("role")?.Value ?? User.FindFirst(ClaimTypes.Role)?.Value ?? string.Empty;
+        }
+
         [HttpPatch("requests/{id}/review")]
         [Authorize]
         [RequirePermission("RECRUITMENT_REQUEST_REVIEW", GroupName = SystemModules.Recruitment, Description = "Phê duyệt yêu cầu tuyển dụng")]
@@ -62,7 +72,7 @@ namespace HRM.backend.src.HRM.API.Controllers.Recruitment
                 int approverId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
 
                 // TRỌNG TÂM: Lấy RoleName của người dùng từ Token
-                string actorRoleName = User.FindFirst(ClaimTypes.Role)!.Value;
+                string actorRoleName = GetRole();
 
                 // Truyền actorRoleName vào hàm UseCase như đã sửa ở bước trước
                 await _useCase.ReviewRequestAsync(id, approverId, actorRoleName, dto, ct);

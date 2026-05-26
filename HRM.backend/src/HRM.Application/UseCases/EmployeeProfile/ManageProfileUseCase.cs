@@ -24,7 +24,9 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
         private readonly ISlaTrackingService _slaTrackingService;
         private readonly ISlaTrackingRepository _slaRepo;
         private readonly IApprovalWorkflowService _approvalWorkflowService;
+        private readonly IApprovalConflictGuard _approvalConflictGuard;
         private readonly IUnitOfWork _unitOfWork;
+        private readonly ILockService _lockService;
 
         public ManageProfileUseCase(
             IEmployeeRepository employeeRepo,
@@ -35,7 +37,9 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
             ISlaTrackingService slaTrackingService,
             ISlaTrackingRepository slaRepo,
             IApprovalWorkflowService approvalWorkflowService,
-            IUnitOfWork unitOfWork)
+            IApprovalConflictGuard approvalConflictGuard,
+            IUnitOfWork unitOfWork,
+            ILockService lockService)
         {
             _employeeRepo = employeeRepo;
             _profileRequestRepo = profileRequestRepo;
@@ -45,31 +49,41 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
             _slaTrackingService = slaTrackingService;
             _slaRepo = slaRepo;
             _approvalWorkflowService = approvalWorkflowService;
+            _approvalConflictGuard = approvalConflictGuard;
             _unitOfWork = unitOfWork;
+            _lockService = lockService;
         }
 
         public async Task<int> RequestProfileUpdateAsync(int accountId, ProfileUpdateRequestDto dto, CancellationToken ct = default)
         {
+            var employee = await _employeeRepo.GetByAccountIdAsync(accountId, ct);
+            if (employee == null) throw new ArgumentException("Tài khoản chưa liên kết hồ sơ.");
+
+            return await _lockService.GetWithLockAsync($"profile_update_create_{employee.Id}", async (innerCt) =>
+            {
             int newRequestId = 0;
 
             // BỌC TRONG GIAO DỊCH (TRANSACTION)
             await _unitOfWork.ExecuteTransactionAsync(async () =>
             {
-                var employee = await _employeeRepo.GetByAccountIdAsync(accountId, ct);
-                if (employee == null) throw new ArgumentException("Tài khoản chưa liên kết hồ sơ.");
                 int actualEmployeeId = employee.Id;
 
                 if (!string.IsNullOrEmpty(dto.IdentityNumber))
                 {
-                    var isConflict = await _employeeRepo.CheckIdentityNumberExistsAsync(dto.IdentityNumber, actualEmployeeId, ct);
+                    var isConflict = await _employeeRepo.CheckIdentityNumberExistsAsync(dto.IdentityNumber, actualEmployeeId, innerCt);
                     if (isConflict) throw new InvalidOperationException("CONFLICT_IDENTITY");
                 }
 
-                var existingRequests = await _profileRequestRepo.FindAsync(r => r.EmployeeId == actualEmployeeId && r.Status == RequestStatus.Pending_HR, ct);
+                var existingRequests = await _profileRequestRepo.FindAsync(r =>
+                    r.EmployeeId == actualEmployeeId &&
+                    (r.Status == RequestStatus.Pending_HR || r.Status == RequestStatus.Pending_Director), innerCt);
                 if (existingRequests.Any()) throw new InvalidOperationException("Đang có yêu cầu chờ duyệt.");
 
+                var isHrTarget = await _approvalConflictGuard.IsEmployeeInRoleAsync(actualEmployeeId, "HR", innerCt);
+                var requiresDirectorApproval = isHrTarget &&
+                    !await _approvalConflictGuard.HasAlternativeHrApproverAsync(actualEmployeeId, innerCt);
+
                 var updatePayload = new Dictionary<string, object>();
-                // ... (Giữ nguyên các đoạn if add dữ liệu vào updatePayload như cũ) ...
                 if (!string.IsNullOrEmpty(dto.FullName)) updatePayload["FullName"] = dto.FullName;
                 if (dto.Gender.HasValue) updatePayload["Gender"] = (int)dto.Gender.Value;
                 if (dto.BirthDate.HasValue) updatePayload["BirthDate"] = dto.BirthDate.Value;
@@ -88,10 +102,10 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                 if (!string.IsNullOrEmpty(dto.EmergencyPhone)) updatePayload["EmergencyPhone"] = dto.EmergencyPhone;
                 if (!string.IsNullOrEmpty(dto.EmergencyRelation)) updatePayload["EmergencyRelation"] = dto.EmergencyRelation;
 
-                if (dto.AvatarFile != null) updatePayload["AvatarUrl"] = await _storageService.UploadFileAsync(dto.AvatarFile, "avatars", ct);
-                if (dto.IdentityFrontFile != null) updatePayload["IdentityFrontUrl"] = await _storageService.UploadFileAsync(dto.IdentityFrontFile, "evidences", ct);
-                if (dto.IdentityBackFile != null) updatePayload["IdentityBackUrl"] = await _storageService.UploadFileAsync(dto.IdentityBackFile, "evidences", ct);
-                if (dto.CertificateFile != null) updatePayload["CertificateUrl"] = await _storageService.UploadFileAsync(dto.CertificateFile, "evidences", ct);
+                if (dto.AvatarFile != null) updatePayload["AvatarUrl"] = await _storageService.UploadFileAsync(dto.AvatarFile, "avatars", innerCt);
+                if (dto.IdentityFrontFile != null) updatePayload["IdentityFrontUrl"] = await _storageService.UploadFileAsync(dto.IdentityFrontFile, "evidences", innerCt);
+                if (dto.IdentityBackFile != null) updatePayload["IdentityBackUrl"] = await _storageService.UploadFileAsync(dto.IdentityBackFile, "evidences", innerCt);
+                if (dto.CertificateFile != null) updatePayload["CertificateUrl"] = await _storageService.UploadFileAsync(dto.CertificateFile, "evidences", innerCt);
 
                 if (updatePayload.Count == 0) throw new ArgumentException("Không có dữ liệu nào được yêu cầu cập nhật.");
 
@@ -99,20 +113,20 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                 {
                     EmployeeId = actualEmployeeId,
                     RequestedDataJson = JsonSerializer.Serialize(updatePayload),
-                    Status = RequestStatus.Pending_HR,
+                    Status = requiresDirectorApproval ? RequestStatus.Pending_Director : RequestStatus.Pending_HR,
                     CreatedAt = DateTime.UtcNow
                 };
 
                 // Lệnh này giờ chỉ lưu nháp vào Context, chưa chốt hẳn vào DB nếu chưa xong Transaction
-                await _profileRequestRepo.AddAsync(requestEntity, ct);
-                await _unitOfWork.CommitAsync(ct);
+                await _profileRequestRepo.AddAsync(requestEntity, innerCt);
+                await _unitOfWork.CommitAsync(innerCt);
 
                 newRequestId = requestEntity.Id;
 
                 // Bọc try-catch nhẹ cho SLA, nếu chưa cấu hình SLA trong DB thì không làm sập cả luồng Update
                 try
                 {
-                    await _slaTrackingService.CreateTaskAsync(SlaModuleType.ProfileUpdate, requestEntity.Id, ct);
+                    await _slaTrackingService.CreateTaskAsync(SlaModuleType.ProfileUpdate, requestEntity.Id, innerCt);
                 }
                 catch (Exception ex)
                 {
@@ -120,20 +134,32 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                 }
 
                 await _auditLogRepo.LogSystemEventAsync("REQUEST_PROFILE_UPDATE", accountId, "employee_profile", "Nhân viên nộp minh chứng và yêu cầu cập nhật hồ sơ");
+                await _unitOfWork.CommitAsync(innerCt);
 
-            }, ct); // Transaction tự động Commit an toàn tại đây
+            }, innerCt); // Transaction tự động Commit an toàn tại đây
 
             return newRequestId;
+            }, cancellationToken: ct);
         }
 
         // 4. HÀM DÀNH CHO HR DUYỆT (Tách riêng biệt)
         public async Task<bool> ReviewProfileUpdateAsync(int requestId, int hrAccountId, string actorRoleName, ReviewProfileUpdateDto dto, CancellationToken ct = default)
         {
+            return await _lockService.GetWithLockAsync($"profile_update_{requestId}", async (innerCt) =>
+            {
             await _unitOfWork.ExecuteTransactionAsync(async () =>
             {
-                var requestEntity = await _profileRequestRepo.GetByIdAsync(requestId, ct);
-                if (requestEntity == null || requestEntity.Status != RequestStatus.Pending_HR)
+                var requestEntity = await _profileRequestRepo.GetByIdAsync(requestId, innerCt);
+                if (requestEntity == null ||
+                    (requestEntity.Status != RequestStatus.Pending_HR && requestEntity.Status != RequestStatus.Pending_Director))
                     throw new ArgumentException("Yêu cầu không tồn tại hoặc đã được xử lý.");
+
+                if (requestEntity.Status == RequestStatus.Pending_Director)
+                    EnsureDirectorOrAdmin(actorRoleName);
+                else
+                    EnsureHrOrAdmin(actorRoleName);
+
+                await _approvalConflictGuard.EnsureNotSelfApprovalForEmployeeAsync(requestEntity.EmployeeId, hrAccountId, innerCt);
 
                 if (!dto.IsApproved)
                 {
@@ -142,7 +168,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                 }
                 else
                 {
-                    var employee = await _employeeRepo.GetProfileByIdAsync(requestEntity.EmployeeId, ct);
+                    var employee = await _employeeRepo.GetByIdAsync(requestEntity.EmployeeId, innerCt);
                     if (employee == null) throw new ArgumentException("Không tìm thấy nhân viên.");
 
                     // Đọc JSON và ghi đè trực tiếp
@@ -173,19 +199,20 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                         if (updateData.ContainsKey("CertificateUrl")) employee.CertificateUrl = updateData["CertificateUrl"].GetString();
                     }
 
-                    await _employeeRepo.UpdateAsync(employee, ct);
                     requestEntity.Status = RequestStatus.Approved;
                 }
 
-                await _profileRequestRepo.UpdateAsync(requestEntity, ct);
-                await _slaTrackingService.ResolveTaskAsync(SlaModuleType.ProfileUpdate, requestEntity.Id, ct);
+                await _profileRequestRepo.UpdateAsync(requestEntity, innerCt);
+                await _slaTrackingService.ResolveTaskAsync(SlaModuleType.ProfileUpdate, requestEntity.Id, innerCt);
 
                 string actionLog = dto.IsApproved ? "PROFILE_UPDATE_APPROVED" : "PROFILE_UPDATE_REJECTED";
                 await _auditLogRepo.LogSystemEventAsync(actionLog, hrAccountId, "employee_profile", $"Xử lý hồ sơ ID {requestId}");
+                await _unitOfWork.CommitAsync(innerCt);
 
-            }, ct);
+            }, innerCt);
 
             return true;
+            }, cancellationToken: ct);
         }
 
         public async Task<MyProfileDto?> GetMyProfileAsync(int accountId, CancellationToken ct = default)
@@ -258,10 +285,16 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
         }
        
 
-        public async Task<List<PendingProfileRequestDto>> GetPendingProfileRequestsAsync(CancellationToken ct = default)
+        public async Task<List<PendingProfileRequestDto>> GetPendingProfileRequestsAsync(int actorAccountId, string actorRoleName, CancellationToken ct = default)
         {
             // 1. Lấy tất cả Request đang Pending
-            var pendingRequests = await _profileRequestRepo.FindAsync(r => r.Status == RequestStatus.Pending_HR, ct);
+            var pendingStatuses = IsDirector(actorRoleName)
+                ? new[] { RequestStatus.Pending_Director }
+                : IsAdmin(actorRoleName)
+                    ? new[] { RequestStatus.Pending_HR, RequestStatus.Pending_Director }
+                    : new[] { RequestStatus.Pending_HR };
+
+            var pendingRequests = await _profileRequestRepo.FindAsync(r => pendingStatuses.Contains(r.Status), ct);
             if (!pendingRequests.Any()) return new List<PendingProfileRequestDto>();
 
             var employeeIds = pendingRequests.Select(r => r.EmployeeId).Distinct().ToList();
@@ -278,6 +311,15 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                 s.Status == SlaTaskStatus.Pending, ct);
             var slaDict = slaTasks.ToDictionary(s => s.ReferenceId);
 
+            if (IsHr(actorRoleName) && !IsAdmin(actorRoleName))
+            {
+                pendingRequests = pendingRequests
+                    .Where(r => !empDict.TryGetValue(r.EmployeeId, out var employee) ||
+                                !employee.AccountId.HasValue ||
+                                employee.AccountId.Value != actorAccountId)
+                    .ToList();
+            }
+
             // 4. Lắp ráp và trả về
             return pendingRequests.Select(r => new PendingProfileRequestDto
             {
@@ -286,6 +328,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                 EmployeeName = empDict.ContainsKey(r.EmployeeId) ? empDict[r.EmployeeId].FullName : "Không xác định",
                 EmployeeCode = empDict.ContainsKey(r.EmployeeId) ? empDict[r.EmployeeId].EmployeeCode : "N/A",
                 RequestedDataJson = r.RequestedDataJson,
+                Status = r.Status.ToString(),
                 CreatedAt = r.CreatedAt,
                 // Ưu tiên lấy Deadline từ SLA Tracking, nếu không có lấy mặc định +72h
                 DeadlineSLA = slaDict.ContainsKey(r.Id) ? slaDict[r.Id].Deadline : r.CreatedAt.AddHours(72)
@@ -293,5 +336,21 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
             .OrderBy(r => r.DeadlineSLA) // Sắp xếp cái nào sắp hết hạn lên đầu để HR duyệt trước
             .ToList();
         }
+
+        private static void EnsureHrOrAdmin(string actorRoleName)
+        {
+            if (!IsHr(actorRoleName) && !IsAdmin(actorRoleName))
+                throw new UnauthorizedAccessException("Chỉ HR hoặc Admin được duyệt yêu cầu cập nhật hồ sơ thông thường.");
+        }
+
+        private static void EnsureDirectorOrAdmin(string actorRoleName)
+        {
+            if (!IsDirector(actorRoleName) && !IsAdmin(actorRoleName))
+                throw new UnauthorizedAccessException("Chỉ Giám đốc hoặc Admin được duyệt yêu cầu cập nhật hồ sơ khi không có HR khác xử lý.");
+        }
+
+        private static bool IsHr(string role) => string.Equals(role, "HR", StringComparison.OrdinalIgnoreCase);
+        private static bool IsAdmin(string role) => string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase);
+        private static bool IsDirector(string role) => string.Equals(role, "Director", StringComparison.OrdinalIgnoreCase);
     }
 }

@@ -8,6 +8,7 @@ namespace HRM.backend.src.HRM.Core.Interfaces.Repositories.TimeAttendance
         Task InsertLogAsync(AttendanceLog log);
         Task<AttendanceLog?> GetTodayLogAsync(int employeeId, DateTime day, CancellationToken ct = default);
         Task<IEnumerable<AttendanceLog>> FetchLogsAsync(DateTime startDate, DateTime endDate);
+        Task<List<AttendanceLog>> FetchLogsByPeriodAsync(DateTime startDate, DateTime endDate, CancellationToken ct = default);
         Task BulkUpdateLogStatusesAsync(IEnumerable<AttendanceLog> logs);
         Task SyncLeaveToAttendanceAsync(int empId, List<DateTime> dates, AttendanceStatus status);
     }

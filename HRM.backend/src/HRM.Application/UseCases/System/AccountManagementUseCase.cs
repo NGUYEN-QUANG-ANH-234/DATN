@@ -1,4 +1,5 @@
-﻿using HRM.backend.src.HRM.Application.DTOs;
+using HRM.backend.src.HRM.Application.DTOs;
+using HRM.backend.src.HRM.Application.Interfaces;
 using HRM.backend.src.HRM.Application.Interfaces.System.Services;
 using HRM.backend.src.HRM.Application.Interfaces.System.UseCases;
 using HRM.backend.src.HRM.Core.Entities.System;
@@ -13,129 +14,121 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
         private readonly IAccountRepository _accountRepo;
         private readonly IUnitOfWork _unitOfWork;
         private readonly IEmailService _emailService;
+        private readonly ILockService _lockService;
 
-        public AccountManagementUseCase(IAccountRepository accountRepo, IUnitOfWork unitOfWork, IEmailService emailService)
+        public AccountManagementUseCase(
+            IAccountRepository accountRepo,
+            IUnitOfWork unitOfWork,
+            IEmailService emailService,
+            ILockService lockService)
         {
             _accountRepo = accountRepo;
             _unitOfWork = unitOfWork;
             _emailService = emailService;
+            _lockService = lockService;
         }
 
         public async Task<int> CreateAccountAsync(CreateAccountDto dto, CancellationToken ct = default)
         {
-            var existingUser = await _accountRepo.GetByEmailAsync(dto.Email, ct);
-            if (existingUser != null)
-                throw new Exception("Email này đã được sử dụng trong hệ thống.");
-
-            string rawPassword = GenerateSecurePassword();
-            string hashedPassword = BCrypt.Net.BCrypt.HashPassword(rawPassword);
-
-            var newAccount = new Account
+            var email = dto.Email.Trim();
+            return await _lockService.GetWithLockAsync($"account_create_{email.ToLowerInvariant()}", async (innerCt) =>
             {
-                Email = dto.Email,
-                FullName = dto.FullName,
-                RoleId = dto.RoleId,
-                PasswordHash = hashedPassword,
-                Status = AccountStatus.Active,
-                IsMfaEnabled = false
-            };
+                var existingUser = await _accountRepo.GetByEmailAsync(email, innerCt);
+                if (existingUser != null)
+                    throw new Exception("Email nay da duoc su dung trong he thong.");
 
-            await _accountRepo.AddAsync(newAccount, ct);
+                string rawPassword = string.IsNullOrWhiteSpace(dto.Password)
+                    ? GenerateSecurePassword()
+                    : dto.Password.Trim();
+                string hashedPassword = BCrypt.Net.BCrypt.HashPassword(rawPassword);
+                var roleId = dto.RoleId > 0 ? dto.RoleId : 8;
 
-            // Tự động ghi Log qua ChangeTracker trong MyDbContext
-            await _unitOfWork.CommitAsync(ct);
+                var newAccount = new Account
+                {
+                    Email = email,
+                    FullName = dto.FullName,
+                    RoleId = roleId,
+                    PasswordHash = hashedPassword,
+                    Status = AccountStatus.Active,
+                    IsMfaEnabled = false
+                };
 
-            // Gửi mail mật khẩu khởi tạo (Fire and Forget)
-            _ = _emailService.SendEmailAsync(dto.Email, "Tài khoản HICAS của bạn",
-                $"Tài khoản: {dto.Email}\nMật khẩu tạm thời: {rawPassword}\nVui lòng đổi mật khẩu sau khi đăng nhập.");
+                await _accountRepo.AddAsync(newAccount, innerCt);
+                await _unitOfWork.CommitAsync(innerCt);
 
-            return newAccount.Id;
+                await _emailService.SendEmailAsync(email, "Tai khoan HICAS cua ban",
+                    $"Tai khoan: {email}\nMat khau tam thoi: {rawPassword}\nVui long doi mat khau sau khi dang nhap.");
+                await _unitOfWork.CommitAsync(innerCt);
+
+                return newAccount.Id;
+            }, cancellationToken: ct);
         }
 
         public async Task ToggleAccountStatusAsync(int accountId, AccountStatus newStatus, CancellationToken ct = default)
         {
-            var account = await _accountRepo.GetByIdAsync(accountId, ct);
-            if (account == null) throw new Exception("Tài khoản không tồn tại.");
-
-            account.Status = newStatus;
-
-            // BẢO MẬT: Nếu khóa tài khoản, lập tức đá văng user bằng cách thu hồi Refresh Token
-            if (newStatus == AccountStatus.Locked || newStatus == AccountStatus.Suspended)
+            await _lockService.GetWithLockAsync($"account_{accountId}", async (innerCt) =>
             {
-                RevokeUserSessions(account);
-            }
+                var account = await _accountRepo.GetByIdAsync(accountId, innerCt);
+                if (account == null) throw new Exception("Tai khoan khong ton tai.");
 
-            await _unitOfWork.CommitAsync(ct);
+                account.Status = newStatus;
+
+                if (newStatus == AccountStatus.Locked || newStatus == AccountStatus.Suspended)
+                {
+                    RevokeUserSessions(account);
+                }
+
+                await _unitOfWork.CommitAsync(innerCt);
+                return true;
+            }, cancellationToken: ct);
         }
 
         public async Task ResetPasswordManuallyAsync(int accountId, CancellationToken ct = default)
         {
-            var account = await _accountRepo.GetByIdAsync(accountId, ct);
-            if (account == null) throw new Exception("Tài khoản không tồn tại.");
+            await _lockService.GetWithLockAsync($"account_{accountId}", async (innerCt) =>
+            {
+                var account = await _accountRepo.GetByIdAsync(accountId, innerCt);
+                if (account == null) throw new Exception("Tai khoan khong ton tai.");
 
-            string newRawPassword = GenerateSecurePassword();
-            account.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newRawPassword);
+                string newRawPassword = GenerateSecurePassword();
+                account.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newRawPassword);
+                RevokeUserSessions(account);
 
-            // BẢO MẬT: Bắt buộc đăng nhập lại sau khi Admin đổi mật khẩu
-            RevokeUserSessions(account);
+                await _unitOfWork.CommitAsync(innerCt);
 
-            await _unitOfWork.CommitAsync(ct);
-
-            _ = _emailService.SendEmailAsync(account.Email, "Mật khẩu HICAS đã được cấp lại",
-                $"Mật khẩu mới của bạn là: {newRawPassword}");
+                await _emailService.SendEmailAsync(account.Email, "Mat khau HICAS da duoc cap lai",
+                    $"Mat khau moi cua ban la: {newRawPassword}");
+                await _unitOfWork.CommitAsync(innerCt);
+                return true;
+            }, cancellationToken: ct);
         }
 
         public async Task UpdateAccountRoleAsync(int accountId, int newRoleId, CancellationToken ct = default)
         {
-            var account = await _accountRepo.GetByIdAsync(accountId, ct);
-            if (account == null) throw new Exception("Tài khoản không tồn tại.");
-
-            // Gán Role mới
-            account.RoleId = newRoleId;
-
-            // MyDbContext sẽ tự động log lại việc đổi Role này
-            await _unitOfWork.CommitAsync(ct);
-        }
-
-        // --- HÀM HỖ TRỢ NỘI BỘ ---
-
-        private string GenerateSecurePassword()
-        {
-            // Sinh mật khẩu ngẫu nhiên 8 ký tự an toàn
-            return Guid.NewGuid().ToString("N").Substring(0, 8) + "@Hicas!";
-        }
-
-        private void RevokeUserSessions(Account account)
-        {
-            // Xóa RefreshToken để khi AccessToken hết hạn (hoặc gọi refresh), user sẽ bị yêu cầu đăng nhập lại
-            account.RefreshToken = null;
-            account.RefreshTokenExpiryTime = DateTime.MinValue;
+            await UpdateAccountRoleAsync(accountId, newRoleId, 0, ct);
         }
 
         public async Task UpdateAccountRoleAsync(int targetAccountId, int newRoleId, int actorId, CancellationToken ct = default)
         {
-            // 1. Kiểm tra tài khoản mục tiêu
-            var targetAccount = await _accountRepo.GetByIdAsync(targetAccountId, ct);
-            if (targetAccount == null) throw new Exception("Tài khoản không tồn tại.");
-
-            // 2. XỬ LÝ KHÉO: Ngăn chặn tự hạ cấp bản thân nếu là Admin
-            if (targetAccountId == actorId && targetAccount.RoleId == 1 && newRoleId != 1)
+            await _lockService.GetWithLockAsync($"account_{targetAccountId}", async (innerCt) =>
             {
-                throw new Exception("Bạn không thể tự hạ cấp quyền Admin của chính mình để tránh mất quyền quản trị.");
-            }
+                var targetAccount = await _accountRepo.GetByIdAsync(targetAccountId, innerCt);
+                if (targetAccount == null) throw new Exception("Tai khoan khong ton tai.");
 
-            // 3. XỬ LÝ KHÉO: Kiểm tra xem có phải là Admin cuối cùng không
-            if (targetAccount.RoleId == 1 && newRoleId != 1)
-            {
-                var adminCount = (await _accountRepo.GetAllAsync(ct)).Count(a => a.RoleId == 1 && a.Status == AccountStatus.Active);
-                if (adminCount <= 1)
+                if (actorId > 0 && targetAccountId == actorId && targetAccount.RoleId == 1 && newRoleId != 1)
+                    throw new Exception("Ban khong the tu ha cap quyen Admin cua chinh minh.");
+
+                if (targetAccount.RoleId == 1 && newRoleId != 1)
                 {
-                    throw new Exception("Hệ thống phải có ít nhất một tài khoản Admin đang hoạt động.");
+                    var adminCount = (await _accountRepo.GetAllAsync(innerCt)).Count(a => a.RoleId == 1 && a.Status == AccountStatus.Active);
+                    if (adminCount <= 1)
+                        throw new Exception("He thong phai co it nhat mot tai khoan Admin dang hoat dong.");
                 }
-            }
 
-            targetAccount.RoleId = newRoleId;
-            await _unitOfWork.CommitAsync(ct);
+                targetAccount.RoleId = newRoleId;
+                await _unitOfWork.CommitAsync(innerCt);
+                return true;
+            }, cancellationToken: ct);
         }
 
         public async Task<IEnumerable<AccountListItemDto>> GetAllAccountsAsync(CancellationToken ct = default)
@@ -154,6 +147,17 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
                 CreatedAt = account.CreatedAt,
                 AvatarUrl = account.AvatarUrl
             });
+        }
+
+        private static string GenerateSecurePassword()
+        {
+            return Guid.NewGuid().ToString("N").Substring(0, 8) + "@Hicas!";
+        }
+
+        private static void RevokeUserSessions(Account account)
+        {
+            account.RefreshToken = null;
+            account.RefreshTokenExpiryTime = DateTime.MinValue;
         }
     }
 }

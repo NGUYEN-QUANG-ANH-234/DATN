@@ -28,32 +28,102 @@ namespace HRM.backend.src.HRM.Core.Enums
         Completed,
         Rejected
     }
+
+    public enum PenaltySourceType
+    {
+        Attendance,
+        Leave,
+        SLA,
+        KPI,
+        Task,
+        Manual
+    }
     // ==========================================
     // MODULE 5: Time & Attendance
     // ==========================================
-    public enum AttendanceStatus { Valid, Invalid, Late, Early }
-    public enum LeaveRequestStatus { Pending, Approved, Rejected, Auto_Approved }
+    public enum AttendanceStatus { Valid, Invalid, Late, Early, OnLeave }
+    public enum LeaveRequestStatus
+    {
+        Pending,
+        Approved,
+        Rejected,
+        Auto_Approved,
+        PendingDept,
+        PendingDirector,
+        RejectedByDept,
+        RejectedByDirector,
+        AutoDeptApproved,
+        AutoFinalApproved
+    }
+    public enum OvertimeRequestStatus
+    {
+        PendingManager = 0,
+        PendingHR = 1,
+        Approved = 2,
+        Rejected = 3,
+        Cancelled = 4,
+        PendingDirector = 5
+    }
 
     // ==========================================
     // MODULE 6: Tasks & Training
     // ==========================================
     public enum ReviewStatus
     {
-        Draft,      // Bản nháp (Vừa import từ Excel, chưa chốt)
-        Approved,   // Đã phê duyệt (Trưởng phòng đã chốt điểm cuối cùng)
-        Rejected    // Bị từ chối (Cần import lại hoặc chỉnh sửa)
+        Draft,
+        PendingEmployeeUpdate,
+        PendingEvaluation,
+        ReworkRequired,
+        Evaluated,
+        AutoEvaluated,
+        Approved,
+        Rejected
     }
 
     // 2. Dùng cho bảng Training (Đào tạo thực tập sinh)
     public enum TrainingStatus
     {
-        InProgress, // Đang trong quá trình đào tạo
-        Completed,  // Đã hoàn thành khóa học (Chờ đánh giá)
-        Overdue,    // Quá hạn
-        Cancelled   // Đã hủy (Thay thế cho Failed, vì việc Đậu/Rớt giờ đã dùng trường IsPassed trong Entity)
+        InProgress,
+        Extended,
+        Completed,
+        PendingEvaluation,
+        Evaluated,
+        AutoCompleted,
+        Failed,
+        Overdue,
+        Cancelled
     }
     public enum TaskType { Project, SelfStudy, Research } // Bỏ dấu gạch ngang của "Self-Study" để hợp lệ C#
-    public enum TaskStatus { Todo, Doing, Done, Overdue }
+    public enum TaskStatus
+    {
+        Todo,
+        Doing,
+        Done,
+        Assigned,
+        InProgress,
+        PendingReview,
+        ReworkRequired,
+        Completed,
+        AutoApproved,
+        Overdue,
+        Cancelled
+    }
+
+    public enum TaskFeedbackType
+    {
+        Comment,
+        ReworkRequest,
+        Approved,
+        Rejected,
+        AutoApproved
+    }
+
+    public enum ImportBatchStatus
+    {
+        Processing,
+        Completed,
+        Failed
+    }
 
 
     // ==========================================
@@ -61,6 +131,8 @@ namespace HRM.backend.src.HRM.Core.Enums
     // ==========================================
     public enum FormulaStatus { Pending, Approved, Rejected }
     public enum PayrollStatus { Draft, Finalized, Paid }
+    public enum SalaryVariableDataType { Number, Money, Hours, Days, Percent }
+    public enum SalaryAggregationType { Latest, Sum, Count, MonthlyTotal, Manual }
 
     // ==========================================
     // MODULE 8: Requests & Handover

@@ -43,9 +43,9 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.System
             return await _dbSet.Where(c => c.ConfigGroup == "SALARY_VARIABLE").ToListAsync(ct);
         }
 
-        public async Task SaveMappingAsync(string code, string tablePath, CancellationToken ct = default)
+        public async Task SaveMappingAsync(string code, string tablePath, string? description = null, CancellationToken ct = default)
         {
-            await UpsertConfigAsync("SALARY_VARIABLE", $"SALARY_VAR_{code.ToUpper()}", tablePath, "Biến lương động", ct);
+            await UpsertConfigAsync("SALARY_VARIABLE", $"SALARY_VAR_{code.ToUpper()}", tablePath, description ?? "Biến lương động", ct);
         }
 
         // ==========================================
@@ -84,6 +84,17 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.System
         {
             var key = templateKey.StartsWith("TEMPLATE_") ? templateKey : $"TEMPLATE_{templateKey.ToUpper()}";
             await UpsertConfigAsync("MAIL_TEMPLATE", key, subjectAndBodyJson, "Mẫu email/thông báo", ct);
+        }
+
+        // ==========================================
+        // 4. DOCUMENT EXPORT TEMPLATE
+        // ==========================================
+        public async Task<IEnumerable<Configuration>> FetchDocumentTemplatesAsync(CancellationToken ct = default)
+        {
+            return await _dbSet
+                .Where(c => c.ConfigGroup == "DOCUMENT_TEMPLATE")
+                .AsNoTracking()
+                .ToListAsync(ct);
         }
     }
 }

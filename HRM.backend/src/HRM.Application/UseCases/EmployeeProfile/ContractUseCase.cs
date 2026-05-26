@@ -1,7 +1,7 @@
 using HRM.backend.src.HRM.Application.DTOs.EmployeeProfile;
-using HRM.backend.src.HRM.Application.DTOs.Events;
 using HRM.backend.src.HRM.Application.Interfaces;
 using HRM.backend.src.HRM.Application.Interfaces.EmployeeProfile.Usecases;
+using HRM.backend.src.HRM.Application.Interfaces.System.Services;
 using HRM.backend.src.HRM.Core.Enums;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.EmployeeProfile;
@@ -18,9 +18,11 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
         private readonly IAuditLogRepository _auditLogRepo;
         private readonly ISlaTrackingService _slaTrackingService;
         private readonly IApprovalWorkflowService _approvalService;
+        private readonly IApprovalConflictGuard _approvalConflictGuard;
         private readonly IAccountRepository _accountRepo;
         private readonly IUnitOfWork _unitOfWork;
-        private readonly IMediator _mediator;
+        private readonly ILockService _lockService;
+        private readonly IIdempotencyService _idempotencyService;
 
         public ContractUseCase(
             IContractRepository contractRepo,
@@ -28,217 +30,265 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
             IAuditLogRepository auditLogRepo,
             ISlaTrackingService slaTrackingService,
             IApprovalWorkflowService approvalService,
+            IApprovalConflictGuard approvalConflictGuard,
             IAccountRepository accountRepo,
             IUnitOfWork unitOfWork,
-            IMediator mediator)
+            IMediator mediator,
+            ILockService lockService,
+            IIdempotencyService idempotencyService)
         {
             _contractRepo = contractRepo;
             _employeeRepo = employeeRepo;
             _auditLogRepo = auditLogRepo;
             _slaTrackingService = slaTrackingService;
             _approvalService = approvalService;
+            _approvalConflictGuard = approvalConflictGuard;
             _accountRepo = accountRepo;
             _unitOfWork = unitOfWork;
-            _mediator = mediator;
+            _lockService = lockService;
+            _idempotencyService = idempotencyService;
         }
 
-        public async Task CreateRequestAsync(int accountId, ContractRequestDto dto, CancellationToken ct)
+        public async Task<int> CreateRequestAsync(int accountId, ContractRequestDto dto, CancellationToken ct, string? idempotencyKey = null)
         {
-            int contractId = 0;
-            int managerAccountId = 0;
+            var existingResourceId = string.IsNullOrWhiteSpace(idempotencyKey)
+                ? null
+                : await _idempotencyService.FindResourceIdAsync("CONTRACT_REQUEST_CREATE", idempotencyKey, ct);
+            if (existingResourceId.HasValue)
+                return existingResourceId.Value;
 
-            await _unitOfWork.ExecuteTransactionAsync(async () =>
+            var emp = await _employeeRepo.GetByAccountIdAsync(accountId, ct);
+            if (emp == null)
+                throw new ArgumentException("Khong tim thay ho so nhan vien.");
+            if (!emp.DeptId.HasValue)
+                throw new ArgumentException("Nhan vien chua duoc phan phong ban, khong the yeu cau hop dong.");
+
+            return await _lockService.GetWithLockAsync($"contract_request_create_{emp.Id}", async (innerCt) =>
             {
-                var emp = await _employeeRepo.GetByAccountIdAsync(accountId, ct);
-                if (emp == null) throw new ArgumentException("Không tìm thấy hồ sơ nhân viên.");
-                if (!emp.DeptId.HasValue) throw new ArgumentException("Nhân viên chưa được phân phòng ban, không thể yêu cầu.");
+                int contractId = 0;
+                int? reviewerAccountId = null;
 
-                var managerAccountIds = await _accountRepo.GetAccountIdsByRoleAsync("Manager", ct);
-                var managerEmployee = (await _employeeRepo.FindAsync(
-                    e => e.DeptId == emp.DeptId.Value &&
-                         e.AccountId.HasValue &&
-                         managerAccountIds.Contains(e.AccountId.Value), ct)).FirstOrDefault();
-
-                if (managerEmployee?.AccountId == null)
-                    throw new ArgumentException("Phòng ban của bạn hiện chưa có Trưởng phòng để duyệt hợp đồng.");
-
-                var contract = new Core.Entities.EmployeeProfile.Contract
+                await _unitOfWork.ExecuteTransactionAsync(async () =>
                 {
-                    EmployeeId = emp.Id,
-                    ContractNumber = $"TEMP-{DateTime.UtcNow:yyyyMMddHHmmss}",
-                    Status = ContractStatus.PendingDept,
-                    NegotiationNote = dto.Note
-                };
+                    var targetRoleName = await _approvalConflictGuard.GetEmployeeRoleNameAsync(emp.Id, innerCt);
+                    var skipsDepartmentStep =
+                        IsHr(targetRoleName) ||
+                        IsManager(targetRoleName);
 
-                await _contractRepo.AddAsync(contract, ct);
-                await _auditLogRepo.LogSystemEventAsync("CONTRACT_REQUESTED", accountId, "contract", "Gửi yêu cầu hợp đồng mới");
-                await _unitOfWork.CommitAsync(ct);
+                    var managerAccountIds = skipsDepartmentStep
+                        ? new List<int>()
+                        : await _accountRepo.GetAccountIdsByRoleAsync("Manager", innerCt);
 
-                contractId = contract.Id;
-                managerAccountId = managerEmployee.AccountId.Value;
-            }, ct);
+                    var managerEmployee = skipsDepartmentStep ? null : (await _employeeRepo.FindAsync(
+                        e => e.DeptId == emp.DeptId.Value &&
+                             e.AccountId.HasValue &&
+                             managerAccountIds.Contains(e.AccountId.Value), innerCt)).FirstOrDefault();
 
-            await _approvalService.CreateWorkflowAsync("CONTRACT_DEPT", contractId, new List<int> { managerAccountId }, ct);
+                    if (!skipsDepartmentStep && managerEmployee?.AccountId == null)
+                        throw new ArgumentException("Phong ban cua ban hien chua co Truong phong de duyet hop dong.");
+
+                    var contract = new Core.Entities.EmployeeProfile.Contract
+                    {
+                        EmployeeId = emp.Id,
+                        ContractNumber = $"TEMP-{DateTime.UtcNow:yyyyMMddHHmmss}",
+                        Status = skipsDepartmentStep ? ContractStatus.PendingHR : ContractStatus.PendingDept,
+                        NegotiationNote = dto.Note
+                    };
+
+                    await _contractRepo.AddAsync(contract, innerCt);
+                    await _auditLogRepo.LogSystemEventAsync("CONTRACT_REQUESTED", accountId, "contract", "Gui yeu cau hop dong moi");
+                    await _unitOfWork.CommitAsync(innerCt);
+
+                    contractId = contract.Id;
+                    reviewerAccountId = skipsDepartmentStep ? null : managerEmployee!.AccountId!.Value;
+                }, innerCt);
+
+                if (reviewerAccountId.HasValue)
+                    await _approvalService.CreateWorkflowAsync("CONTRACT_DEPT", contractId, new List<int> { reviewerAccountId.Value }, innerCt);
+                await _idempotencyService.SaveAsync("CONTRACT_REQUEST_CREATE", idempotencyKey ?? string.Empty, "Contract", contractId, accountId, innerCt);
+                await _unitOfWork.CommitAsync(innerCt);
+                return contractId;
+            }, cancellationToken: ct);
         }
 
-        public async Task DeptReviewAsync(int contractId, ReviewContractDto dto, CancellationToken ct)
+        public async Task DeptReviewAsync(int contractId, int approverAccountId, string actorRoleName, ReviewContractDto dto, CancellationToken ct)
         {
-            await _unitOfWork.ExecuteTransactionAsync(async () =>
+            await _lockService.GetWithLockAsync($"contract_{contractId}", async (innerCt) =>
             {
-                var contract = await _contractRepo.GetByIdAsync(contractId, ct);
+                var contract = await _contractRepo.GetByIdAsync(contractId, innerCt);
                 if (contract == null || contract.Status != ContractStatus.PendingDept)
-                    throw new InvalidOperationException("Hợp đồng không hợp lệ hoặc không ở trạng thái chờ Trưởng phòng.");
+                    throw new InvalidOperationException("Hop dong khong hop le hoac khong o trang thai cho Truong phong.");
+                if (!contract.EmployeeId.HasValue)
+                    throw new InvalidOperationException("Hop dong chua gan nhan vien.");
 
-                contract.Status = dto.IsApproved ? ContractStatus.PendingHR : ContractStatus.Rejected;
-                if (!dto.IsApproved)
-                {
-                    contract.NegotiationNote = string.IsNullOrWhiteSpace(dto.RejectReason)
-                        ? "Trưởng phòng từ chối yêu cầu."
+                await _approvalConflictGuard.EnsureNotSelfApprovalForEmployeeAsync(contract.EmployeeId.Value, approverAccountId, innerCt);
+
+                var note = dto.IsApproved
+                    ? "Truong phong xac nhan yeu cau hop dong."
+                    : string.IsNullOrWhiteSpace(dto.RejectReason)
+                        ? "Truong phong tu choi yeu cau hop dong."
                         : dto.RejectReason;
-                }
 
-                await _contractRepo.UpdateAsync(contract, ct);
-                await _auditLogRepo.LogSystemEventAsync(
-                    dto.IsApproved ? "CONTRACT_DEPT_APPROVED" : "CONTRACT_DEPT_REJECTED",
-                    0,
-                    "contract",
-                    dto.IsApproved
-                        ? $"Trưởng phòng chuyển hợp đồng ID {contractId} sang HR."
-                        : $"Trưởng phòng từ chối hợp đồng ID {contractId}: {contract.NegotiationNote}");
-                await _unitOfWork.CommitAsync(ct);
-            }, ct);
+                await _approvalService.ProcessStepAsync(
+                    "CONTRACT_DEPT",
+                    contractId,
+                    approverAccountId,
+                    actorRoleName,
+                    dto.IsApproved,
+                    note,
+                    innerCt);
+                return true;
+            }, cancellationToken: ct);
         }
 
-        public async Task HrCreateDraftAsync(int contractId, CreateDraftDto dto, CancellationToken ct)
+        public async Task HrCreateDraftAsync(int contractId, int actorAccountId, string actorRoleName, CreateDraftDto dto, CancellationToken ct)
         {
-            await _unitOfWork.ExecuteTransactionAsync(async () =>
+            await _lockService.GetWithLockAsync($"contract_{contractId}", async (innerCt) =>
             {
-                var contract = await _contractRepo.GetByIdAsync(contractId, ct);
-                if (contract == null ||
-                    (contract.Status != ContractStatus.PendingHR && contract.Status != ContractStatus.Negotiating))
-                    throw new InvalidOperationException("Hợp đồng không hợp lệ hoặc không ở trạng thái HR có thể soạn thảo.");
+                await _unitOfWork.ExecuteTransactionAsync(async () =>
+                {
+                    var contract = await _contractRepo.GetByIdAsync(contractId, innerCt);
+                    if (contract == null ||
+                        (contract.Status != ContractStatus.PendingHR && contract.Status != ContractStatus.Negotiating))
+                        throw new InvalidOperationException("Hop dong khong hop le hoac khong o trang thai HR co the soan thao.");
+                    if (!contract.EmployeeId.HasValue)
+                        throw new InvalidOperationException("Hop dong chua gan nhan vien.");
 
-                bool isNegotiationUpdate = contract.Status == ContractStatus.Negotiating;
-                ApplyDraft(contract, dto, isNegotiationUpdate);
+                    EnsureHrDirectorOrAdmin(actorRoleName);
+                    if (!IsDirector(actorRoleName) && !IsAdmin(actorRoleName))
+                        await _approvalConflictGuard.EnsureNotSelfApprovalForEmployeeAsync(contract.EmployeeId.Value, actorAccountId, innerCt);
 
-                await _contractRepo.UpdateAsync(contract, ct);
-                await _slaTrackingService.CreateTaskAsync(SlaModuleType.ContractRenewal, contract.Id, ct);
-                await _auditLogRepo.LogSystemEventAsync(
-                    isNegotiationUpdate ? "CONTRACT_DRAFT_UPDATED" : "CONTRACT_DRAFT_CREATED",
-                    0,
-                    "contract",
-                    $"HR {(isNegotiationUpdate ? "cập nhật" : "tạo")} bản nháp hợp đồng ID {contractId}, phiên bản v{contract.Version}");
-                await _unitOfWork.CommitAsync(ct);
-            }, ct);
+                    bool isNegotiationUpdate = contract.Status == ContractStatus.Negotiating;
+                    ApplyDraft(contract, dto, isNegotiationUpdate);
+
+                    await _contractRepo.UpdateAsync(contract, innerCt);
+                    await _slaTrackingService.CreateTaskAsync(SlaModuleType.ContractRenewal, contract.Id, innerCt);
+                    await _auditLogRepo.LogSystemEventAsync(
+                        isNegotiationUpdate ? "CONTRACT_DRAFT_UPDATED" : "CONTRACT_DRAFT_CREATED",
+                        actorAccountId,
+                        "contract",
+                        $"HR {(isNegotiationUpdate ? "cap nhat" : "tao")} ban nhap hop dong ID {contractId}, phien ban v{contract.Version}");
+                    await _unitOfWork.CommitAsync(innerCt);
+                }, innerCt);
+                return true;
+            }, cancellationToken: ct);
         }
 
-        public async Task HrRejectAsync(int contractId, string reason, CancellationToken ct)
+        public async Task HrRejectAsync(int contractId, int actorAccountId, string actorRoleName, string reason, CancellationToken ct)
         {
-            await _unitOfWork.ExecuteTransactionAsync(async () =>
+            await _lockService.GetWithLockAsync($"contract_{contractId}", async (innerCt) =>
             {
-                var contract = await _contractRepo.GetByIdAsync(contractId, ct);
-                if (contract == null ||
-                    (contract.Status != ContractStatus.PendingHR && contract.Status != ContractStatus.Negotiating))
-                    throw new InvalidOperationException("Hợp đồng không hợp lệ hoặc không ở trạng thái chờ HR.");
+                await _unitOfWork.ExecuteTransactionAsync(async () =>
+                {
+                    var contract = await _contractRepo.GetByIdAsync(contractId, innerCt);
+                    if (contract == null ||
+                        (contract.Status != ContractStatus.PendingHR && contract.Status != ContractStatus.Negotiating))
+                        throw new InvalidOperationException("Hop dong khong hop le hoac khong o trang thai cho HR.");
+                    if (!contract.EmployeeId.HasValue)
+                        throw new InvalidOperationException("Hop dong chua gan nhan vien.");
 
-                contract.Status = ContractStatus.Rejected;
-                contract.NegotiationNote = reason;
+                    EnsureHrDirectorOrAdmin(actorRoleName);
+                    if (!IsDirector(actorRoleName) && !IsAdmin(actorRoleName))
+                        await _approvalConflictGuard.EnsureNotSelfApprovalForEmployeeAsync(contract.EmployeeId.Value, actorAccountId, innerCt);
 
-                await _contractRepo.UpdateAsync(contract, ct);
-                await _slaTrackingService.ResolveTaskAsync(SlaModuleType.ContractRenewal, contractId, ct);
-                await _auditLogRepo.LogSystemEventAsync("CONTRACT_HR_REJECTED", 0, "contract", $"HR từ chối hợp đồng ID {contractId}: {reason}");
-                await _unitOfWork.CommitAsync(ct);
-            }, ct);
+                    contract.Status = ContractStatus.Rejected;
+                    contract.NegotiationNote = reason;
+
+                    await _contractRepo.UpdateAsync(contract, innerCt);
+                    await _slaTrackingService.ResolveTaskAsync(SlaModuleType.ContractRenewal, contractId, innerCt);
+                    await _auditLogRepo.LogSystemEventAsync("CONTRACT_HR_REJECTED", actorAccountId, "contract", $"HR tu choi hop dong ID {contractId}: {reason}");
+                    await _unitOfWork.CommitAsync(innerCt);
+                }, innerCt);
+                return true;
+            }, cancellationToken: ct);
         }
 
-        public async Task NegotiateAsync(int contractId, NegotiateDto dto, CancellationToken ct)
+        public async Task NegotiateAsync(int contractId, int actorAccountId, NegotiateDto dto, CancellationToken ct)
         {
             if (string.IsNullOrWhiteSpace(dto.NegotiationNote))
-                throw new ArgumentException("Nội dung thương lượng không được để trống.");
+                throw new ArgumentException("Noi dung thuong luong khong duoc de trong.");
 
-            await _unitOfWork.ExecuteTransactionAsync(async () =>
+            await _lockService.GetWithLockAsync($"contract_{contractId}", async (innerCt) =>
             {
-                var contract = await _contractRepo.GetByIdAsync(contractId, ct);
-                if (contract == null || contract.Status != ContractStatus.Draft)
-                    throw new InvalidOperationException("Không thể thương lượng lúc này.");
+                await _unitOfWork.ExecuteTransactionAsync(async () =>
+                {
+                    var contract = await _contractRepo.GetByIdAsync(contractId, innerCt);
+                    if (contract == null || contract.Status != ContractStatus.Draft)
+                        throw new InvalidOperationException("Khong the thuong luong luc nay.");
+                    await EnsureEmployeeOwnsContractAsync(contract, actorAccountId, innerCt);
 
-                contract.Status = ContractStatus.Negotiating;
-                contract.NegotiationNote = dto.NegotiationNote.Trim();
+                    contract.Status = ContractStatus.Negotiating;
+                    contract.NegotiationNote = dto.NegotiationNote.Trim();
 
-                await _contractRepo.UpdateAsync(contract, ct);
-                await _slaTrackingService.ResolveTaskAsync(SlaModuleType.ContractRenewal, contractId, ct);
-                await _auditLogRepo.LogSystemEventAsync("CONTRACT_NEGOTIATED", 0, "contract", $"Nhân viên yêu cầu điều chỉnh hợp đồng ID {contractId}");
-                await _unitOfWork.CommitAsync(ct);
-            }, ct);
+                    await _contractRepo.UpdateAsync(contract, innerCt);
+                    await _slaTrackingService.ResolveTaskAsync(SlaModuleType.ContractRenewal, contractId, innerCt);
+                    await _auditLogRepo.LogSystemEventAsync("CONTRACT_NEGOTIATED", actorAccountId, "contract", $"Nhan vien yeu cau dieu chinh hop dong ID {contractId}");
+                    await _unitOfWork.CommitAsync(innerCt);
+                }, innerCt);
+                return true;
+            }, cancellationToken: ct);
         }
 
-        public async Task EmployeeAcceptAsync(int contractId, CancellationToken ct)
+        public async Task EmployeeAcceptAsync(int contractId, int actorAccountId, CancellationToken ct)
         {
             int directorId = 0;
 
-            await _unitOfWork.ExecuteTransactionAsync(async () =>
+            await _lockService.GetWithLockAsync($"contract_{contractId}", async (innerCt) =>
             {
-                var contract = await _contractRepo.GetByIdAsync(contractId, ct);
-                if (contract == null || contract.Status != ContractStatus.Draft)
-                    throw new InvalidOperationException("Hợp đồng không hợp lệ.");
+                await _unitOfWork.ExecuteTransactionAsync(async () =>
+                {
+                    var contract = await _contractRepo.GetByIdAsync(contractId, innerCt);
+                    if (contract == null || contract.Status != ContractStatus.Draft)
+                        throw new InvalidOperationException("Hop dong khong hop le.");
+                    await EnsureEmployeeOwnsContractAsync(contract, actorAccountId, innerCt);
 
-                var directorIds = await _accountRepo.GetAccountIdsByRoleAsync("Director", ct);
-                directorId = directorIds.FirstOrDefault();
-                if (directorId == 0) throw new InvalidOperationException("Hệ thống chưa có Giám đốc để duyệt hợp đồng.");
+                    var directorIds = await _accountRepo.GetAccountIdsByRoleAsync("Director", innerCt);
+                    directorId = directorIds.FirstOrDefault();
+                    if (directorId == 0)
+                        throw new InvalidOperationException("He thong chua co Giam doc de duyet hop dong.");
 
-                contract.Status = ContractStatus.PendingDirector;
+                    contract.Status = ContractStatus.PendingDirector;
 
-                await _contractRepo.UpdateAsync(contract, ct);
-                await _slaTrackingService.ResolveTaskAsync(SlaModuleType.ContractRenewal, contractId, ct);
-                await _slaTrackingService.CreateTaskAsync(SlaModuleType.DirectorContractApproval, contract.Id, ct);
-                await _auditLogRepo.LogSystemEventAsync("CONTRACT_ACCEPTED", 0, "contract", $"Nhân viên đồng ý bản nháp hợp đồng ID {contractId}");
-                await _unitOfWork.CommitAsync(ct);
-            }, ct);
+                    await _contractRepo.UpdateAsync(contract, innerCt);
+                    await _slaTrackingService.ResolveTaskAsync(SlaModuleType.ContractRenewal, contractId, innerCt);
+                    await _slaTrackingService.CreateTaskAsync(SlaModuleType.DirectorContractApproval, contract.Id, innerCt);
+                    await _auditLogRepo.LogSystemEventAsync("CONTRACT_ACCEPTED", actorAccountId, "contract", $"Nhan vien dong y ban nhap hop dong ID {contractId}");
+                    await _unitOfWork.CommitAsync(innerCt);
+                }, innerCt);
+                return true;
+            }, cancellationToken: ct);
 
             await _approvalService.CreateWorkflowAsync("CONTRACT_DIRECTOR", contractId, new List<int> { directorId }, ct);
         }
 
-        public async Task DirectorReviewAsync(int contractId, ReviewContractDto dto, CancellationToken ct)
+        public async Task DirectorReviewAsync(int contractId, int approverAccountId, string actorRoleName, ReviewContractDto dto, CancellationToken ct)
         {
-            await _unitOfWork.ExecuteTransactionAsync(async () =>
+            await _lockService.GetWithLockAsync($"contract_{contractId}", async (innerCt) =>
             {
-                var contract = await _contractRepo.GetByIdAsync(contractId, ct);
+                var contract = await _contractRepo.GetByIdAsync(contractId, innerCt);
                 if (contract == null || contract.Status != ContractStatus.PendingDirector)
-                    throw new InvalidOperationException("Hợp đồng không hợp lệ hoặc không ở trạng thái chờ Giám đốc.");
+                    throw new InvalidOperationException("Hop dong khong hop le hoac khong o trang thai cho Giam doc.");
                 if (!contract.EmployeeId.HasValue)
-                    throw new InvalidOperationException("Hợp đồng chưa gắn với nhân viên.");
+                    throw new InvalidOperationException("Hop dong chua gan nhan vien.");
 
-                if (dto.IsApproved)
-                {
-                    contract.Status = ContractStatus.Active;
-                    await _contractRepo.UpdateAsync(contract, ct);
-                    await _mediator.Publish(new ContractActivatedEvent
-                    {
-                        ContractId = contract.Id,
-                        EmployeeId = contract.EmployeeId.Value,
-                        BasicSalary = contract.BasicSalary,
-                        StartDate = contract.StartDate
-                    }, ct);
-                }
-                else
-                {
-                    contract.Status = ContractStatus.Rejected;
-                    contract.NegotiationNote = string.IsNullOrWhiteSpace(dto.RejectReason)
-                        ? "Giám đốc từ chối phê duyệt."
+                await _approvalConflictGuard.EnsureNotSelfApprovalForEmployeeAsync(contract.EmployeeId.Value, approverAccountId, innerCt);
+
+                var note = dto.IsApproved
+                    ? "Giam doc phe duyet hop dong."
+                    : string.IsNullOrWhiteSpace(dto.RejectReason)
+                        ? "Giam doc tu choi phe duyet hop dong."
                         : dto.RejectReason;
-                    await _contractRepo.UpdateAsync(contract, ct);
-                }
 
-                await _slaTrackingService.ResolveTaskAsync(SlaModuleType.DirectorContractApproval, contractId, ct);
-                await _auditLogRepo.LogSystemEventAsync(
-                    dto.IsApproved ? "CONTRACT_DIRECTOR_APPROVED" : "CONTRACT_DIRECTOR_REJECTED",
-                    0,
-                    "contract",
-                    dto.IsApproved
-                        ? $"Giám đốc phê duyệt hợp đồng ID {contractId}."
-                        : $"Giám đốc từ chối hợp đồng ID {contractId}: {contract.NegotiationNote}");
-                await _unitOfWork.CommitAsync(ct);
-            }, ct);
+                await _approvalService.ProcessStepAsync(
+                    "CONTRACT_DIRECTOR",
+                    contractId,
+                    approverAccountId,
+                    actorRoleName,
+                    dto.IsApproved,
+                    note,
+                    innerCt);
+                return true;
+            }, cancellationToken: ct);
         }
 
         public async Task<IEnumerable<ContractResponseDto>> GetMyContractsAsync(int accountId, CancellationToken ct)
@@ -297,11 +347,34 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                 return ContractType.Definite;
             if (Enum.TryParse<ContractType>(contractType, true, out var parsed))
                 return parsed;
-            throw new ArgumentException("Loại hợp đồng không hợp lệ.");
+            throw new ArgumentException("Loai hop dong khong hop le.");
         }
 
         private static string ToContractTypeDto(ContractType contractType) =>
             contractType == ContractType.Definite ? "FixedTerm" : contractType.ToString();
+
+        private async Task EnsureEmployeeOwnsContractAsync(Core.Entities.EmployeeProfile.Contract contract, int actorAccountId, CancellationToken ct)
+        {
+            if (!contract.EmployeeId.HasValue)
+                throw new InvalidOperationException("Hop dong chua gan nhan vien.");
+
+            var employee = await _employeeRepo.GetProfileByIdAsync(contract.EmployeeId.Value, ct)
+                ?? throw new InvalidOperationException("Khong tim thay nhan vien cua hop dong.");
+
+            if (!employee.AccountId.HasValue || employee.AccountId.Value != actorAccountId)
+                throw new UnauthorizedAccessException("Chi nguoi lao dong cua hop dong moi duoc xac nhan dieu khoan.");
+        }
+
+        private static void EnsureHrDirectorOrAdmin(string actorRoleName)
+        {
+            if (!IsHr(actorRoleName) && !IsDirector(actorRoleName) && !IsAdmin(actorRoleName))
+                throw new UnauthorizedAccessException("Chi HR, Giam doc hoac Admin duoc xu ly ban nhap hop dong.");
+        }
+
+        private static bool IsHr(string? role) => string.Equals(role, "HR", StringComparison.OrdinalIgnoreCase);
+        private static bool IsManager(string? role) => string.Equals(role, "Manager", StringComparison.OrdinalIgnoreCase);
+        private static bool IsDirector(string? role) => string.Equals(role, "Director", StringComparison.OrdinalIgnoreCase);
+        private static bool IsAdmin(string? role) => string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase);
 
         private static ContractResponseDto MapToDto(Core.Entities.EmployeeProfile.Contract c) => new()
         {

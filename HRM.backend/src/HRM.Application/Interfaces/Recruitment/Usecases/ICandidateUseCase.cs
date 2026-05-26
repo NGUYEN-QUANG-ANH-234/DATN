@@ -4,7 +4,7 @@ namespace HRM.backend.src.HRM.Application.Interfaces.Recruitment.Usecases
 {
     public interface ICandidateUseCase
     {
-        Task<ApplyJobResultDto> ApplyForJobAsync(ApplyJobDto dto, CancellationToken ct = default);
+        Task<ApplyJobResultDto> ApplyForJobAsync(ApplyJobDto dto, CancellationToken ct = default, string? idempotencyKey = null);
         Task<IEnumerable<CandidateHistoryDto>> GetMyApplicationsAsync(string email, string trackingCode, CancellationToken ct = default);
         Task<IEnumerable<CandidateHistoryDto>> GetAllCandidatesAsync(int userId, string actorRoleName, CancellationToken ct = default);
         Task<bool> HrApproveAsync(int candidateId, int actorId, string actorRoleName, CancellationToken ct = default);

@@ -17,25 +17,32 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
         private readonly IAuditLogRepository _auditLogRepo;
         private readonly IUnitOfWork _unitOfWork;
         private readonly ILockService _lockService;
+        private readonly IAppCache _cache;
+        private const string DepartmentTreeCacheKey = "department_tree_active";
 
         public OrgTreeUseCase(
             IDepartmentRepository deptRepo,
             IEmployeeRepository employeeRepo,
             IAuditLogRepository auditLogRepo,
             IUnitOfWork unitOfWork,
-            ILockService lockService)
+            ILockService lockService,
+            IAppCache cache)
         {
             _deptRepo = deptRepo;
             _employeeRepo = employeeRepo;
             _auditLogRepo = auditLogRepo;
             _unitOfWork = unitOfWork;
             _lockService = lockService;
+            _cache = cache;
         }
 
         public async Task<List<DepartmentTreeDto>> GetOrganizationTreeAsync(CancellationToken ct = default)
         {
-            // 1. fetchAllActiveDepartments
-            var allDepts = await _deptRepo.GetAllActiveAsync(ct);
+            return await _cache.GetOrSetWithLockAsync(
+                DepartmentTreeCacheKey,
+                async (innerCt) =>
+                {
+            var allDepts = await _deptRepo.GetAllActiveAsync(innerCt);
 
             // 2. buildTreeStructure (O(N) Complexity)
             var lookup = allDepts.ToDictionary(d => d.Id, d => new DepartmentTreeDto
@@ -63,6 +70,10 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
             }
 
             return rootNodes;
+                },
+                TimeSpan.FromHours(12),
+                _lockService,
+                ct: ct);
         }
 
         public async Task<bool> UpdateDepartmentNodeAsync(int deptId, UpdateDeptStructureDto dto, int actorId, CancellationToken ct = default)
@@ -104,6 +115,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
 
                 // 4. commitAsync
                 await _unitOfWork.CommitAsync(innerCt);
+                await _cache.RemoveAsync(DepartmentTreeCacheKey, innerCt);
 
                 return true;
             }, TimeSpan.FromSeconds(10), ct);
@@ -145,6 +157,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
 
                 // 4. commitAsync
                 await _unitOfWork.CommitAsync(innerCt);
+                await _cache.RemoveAsync(DepartmentTreeCacheKey, innerCt);
 
                 return true;
             }, TimeSpan.FromSeconds(10), ct);
@@ -178,6 +191,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
             );
 
             await _unitOfWork.CommitAsync(ct);
+            await _cache.RemoveAsync(DepartmentTreeCacheKey, ct);
 
             return newDept.Id;
         }

@@ -62,6 +62,7 @@ namespace HRM.backend.src.HRM.Application.Handlers
                     <p>Please follow up with the employee and create a new request if needed.</p>";
 
                 await _emailService.SendEmailAsync(hrEmail, subject, body);
+                await _unitOfWork.CommitAsync(ct);
                 return;
             }
 
@@ -83,6 +84,7 @@ namespace HRM.backend.src.HRM.Application.Handlers
 
             await _emailService.SendEmailAsync(directorEmail, alertSubject, alertBody);
             await _emailService.SendEmailAsync(hrEmail, alertSubject, alertBody);
+            await _unitOfWork.CommitAsync(ct);
         }
     }
 }

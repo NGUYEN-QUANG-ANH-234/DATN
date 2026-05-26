@@ -39,6 +39,15 @@ namespace HRM.backend.src.HRM.API.Controllers.EmployeeProfile
             }
         }
 
+        [HttpGet("pending")]
+        [Authorize]
+        [RequirePermission("ONBOARDING_REVIEW", GroupName = SystemModules.ProfileContract, Description = "Xem hồ sơ nhân viên mới chờ duyệt")]
+        public async Task<IActionResult> GetPending(CancellationToken ct)
+        {
+            var data = await _useCase.GetPendingRequestsAsync(ct);
+            return Ok(new { Success = true, Data = data });
+        }
+
         [HttpPatch("{id}/hr-review")]
         [Authorize]
         [RequirePermission("ONBOARDING_REVIEW", GroupName = SystemModules.ProfileContract, Description = "Duyệt hồ sơ nhân viên mới")]

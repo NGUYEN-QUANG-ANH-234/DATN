@@ -13,6 +13,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
         private readonly IUnitOfWork _unitOfWork;
         private readonly IAppCache _cache;
         private readonly IRoleRepository _roleRepo;
+        private readonly ILockService _lockService;
 
         private const string CACHE_KEY = "RBAC_Matrix_Cache";
         private const string ALL_PERMISSIONS_CACHE_KEY = "All_Permissions_Cache";
@@ -21,30 +22,36 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
             IRbacRepository rbacRepo,
             IUnitOfWork unitOfWork,
             IAppCache cache,
-            IRoleRepository roleRepo)
+            IRoleRepository roleRepo,
+            ILockService lockService)
         {
             _rbacRepo = rbacRepo;
             _unitOfWork = unitOfWork;
             _cache = cache;
             _roleRepo = roleRepo;
+            _lockService = lockService;
         }
 
         public async Task<IEnumerable<RoleWithPermissionsDto>> GetAllRolesAndPermissionsAsync(CancellationToken ct = default)
         {
-            var cachedMatrix = await _cache.GetAsync<IEnumerable<RoleWithPermissionsDto>>(CACHE_KEY);
-            if (cachedMatrix != null) return cachedMatrix;
+            return await _cache.GetOrSetWithLockAsync(
+                CACHE_KEY,
+                async (innerCt) =>
+                {
+                    var matrix = (await _rbacRepo.FetchRolesWithPermissionsAsync(innerCt)).ToList();
+                    var allPermissionCodes = (await _rbacRepo.GetAllPermissionCodesAsync(innerCt)).ToList();
+                    var adminRole = matrix.FirstOrDefault(r => r.RoleId == 1);
 
-            var matrix = (await _rbacRepo.FetchRolesWithPermissionsAsync(ct)).ToList();
-            var allPermissionCodes = (await _rbacRepo.GetAllPermissionCodesAsync(ct)).ToList();
-            var adminRole = matrix.FirstOrDefault(r => r.RoleId == 1);
+                    if (adminRole != null)
+                    {
+                        adminRole.Permissions = allPermissionCodes;
+                    }
 
-            if (adminRole != null)
-            {
-                adminRole.Permissions = allPermissionCodes;
-            }
-
-            await _cache.SetAsync(CACHE_KEY, matrix, TimeSpan.FromHours(24), null, ct);
-            return matrix;
+                    return matrix;
+                },
+                TimeSpan.FromHours(24),
+                _lockService,
+                ct: ct);
         }
 
         public async Task<bool> UpdateRolePermissionsAsync(UpdateRolePermissionsDto dto, int adminId, CancellationToken ct = default)
@@ -54,15 +61,18 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
 
             bool isSuccess = false;
 
-            await _unitOfWork.ExecuteTransactionAsync(async () =>
+            await _lockService.GetWithLockAsync($"rbac_role_{dto.RoleId}", async (innerCt) =>
             {
-                await _rbacRepo.UpdateRolePermissionsAsync(dto.RoleId, dto.PermissionCodes, ct);
+                await _unitOfWork.ExecuteTransactionAsync(async () =>
+                {
+                    await _rbacRepo.UpdateRolePermissionsAsync(dto.RoleId, dto.PermissionCodes, innerCt);
 
-                // Ghi log đã được chuyển giao cho DbContext Hook lo liệu
+                    await _unitOfWork.CommitAsync(innerCt);
+                    isSuccess = true;
+                }, innerCt);
 
-                await _unitOfWork.CommitAsync(ct);
-                isSuccess = true;
-            }, ct);
+                return true;
+            }, cancellationToken: ct);
 
             if (isSuccess)
             {
@@ -74,13 +84,12 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
 
         public async Task<IEnumerable<PermissionGroupDto>> GetAllAvailablePermissionsAsync(CancellationToken ct = default)
         {
-            var cachedPermissions = await _cache.GetAsync<IEnumerable<PermissionGroupDto>>(ALL_PERMISSIONS_CACHE_KEY);
-            if (cachedPermissions != null) return cachedPermissions;
-
-            var permissions = await _rbacRepo.GetGroupedPermissionsAsync(ct);
-            await _cache.SetAsync(ALL_PERMISSIONS_CACHE_KEY, permissions, TimeSpan.FromHours(24), null, ct);
-
-            return permissions;
+            return await _cache.GetOrSetWithLockAsync(
+                ALL_PERMISSIONS_CACHE_KEY,
+                async (innerCt) => await _rbacRepo.GetGroupedPermissionsAsync(innerCt),
+                TimeSpan.FromHours(24),
+                _lockService,
+                ct: ct);
         }
 
         public async Task<IEnumerable<RoleDto>> GetSystemRolesAsync(CancellationToken ct = default)

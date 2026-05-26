@@ -63,6 +63,8 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
         public DbSet<SlaTrackingTask> SlaTrackingTasks { get; set; }
         public DbSet<ApprovalRequest> ApprovalRequests { get; set; }
         public DbSet<ApprovalStep> ApprovalSteps { get; set; }
+        public DbSet<IdempotencyRecord> IdempotencyRecords { get; set; }
+        public DbSet<OutboxMessage> OutboxMessages { get; set; }
 
         // 2. Organization
         public DbSet<Department> Departments { get; set; }
@@ -83,14 +85,20 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
         // 5. Time & Attendance
         public DbSet<WorkShift> WorkShifts { get; set; }
         public DbSet<AttendanceLog> AttendanceLogs { get; set; }
+        public DbSet<AttendanceSummary> AttendanceSummaries { get; set; }
         public DbSet<LeaveType> LeaveTypes { get; set; }
         public DbSet<LeaveBalance> LeaveBalances { get; set; }
         public DbSet<LeaveRequest> LeaveRequests { get; set; }
+        public DbSet<OvertimeRequest> OvertimeRequests { get; set; }
 
         // 6. Tasks & Training
+        public DbSet<KpiImportBatch> KpiImportBatches { get; set; }
         public DbSet<PerformanceDetail> PerformanceDetails { get; set; }
+        public DbSet<PenaltyRule> PenaltyRules { get; set; }
+        public DbSet<PenaltyRecord> PenaltyRecords { get; set; }
         public DbSet<WorkTask> Tasks { get; set; }
         public DbSet<PerformanceReview> PerformanceReviews { get; set; }
+        public DbSet<TaskProgress> TaskProgresses { get; set; }
         public DbSet<TaskFeedback> TaskFeedbacks { get; set; }
         public DbSet<Training> Trainings { get; set; }
 
@@ -126,17 +134,36 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
             modelBuilder.Entity<Account>().HasIndex(a => a.Email).IsUnique();
             modelBuilder.Entity<Role>().HasIndex(r => r.RoleName).IsUnique();
             modelBuilder.Entity<Permission>().HasIndex(p => p.PermissionCode).IsUnique();
+            modelBuilder.Entity<Configuration>().HasIndex(c => new { c.ConfigGroup, c.ParamKey }).IsUnique();
+            modelBuilder.Entity<SourceCatalog>().HasIndex(s => s.SourcePath).IsUnique();
+            modelBuilder.Entity<IdempotencyRecord>().HasIndex(i => new { i.Scope, i.IdempotencyKey }).IsUnique();
+            modelBuilder.Entity<OutboxMessage>().HasIndex(o => new { o.Status, o.CreatedAt });
             modelBuilder.Entity<Department>().HasIndex(d => d.DeptCode).IsUnique();
             modelBuilder.Entity<Position>().HasIndex(p => p.Title).IsUnique();
             modelBuilder.Entity<Contract>().HasIndex(c => c.ContractNumber).IsUnique();
             modelBuilder.Entity<ContractAddendum>().HasIndex(ca => ca.AddendumNumber).IsUnique();
             modelBuilder.Entity<ContractAddendum>().HasIndex(ca => new { ca.ContractId, ca.Status });
+            modelBuilder.Entity<WorkShift>().HasIndex(s => s.DeptId).IsUnique().HasDatabaseName("UX_work_shifts_DeptId");
+            modelBuilder.Entity<LeaveRequest>().HasIndex(l => new { l.EmployeeId, l.LeaveTypeId, l.StartDate, l.EndDate }).IsUnique().HasDatabaseName("UX_leave_requests_EmployeeId_LeaveTypeId_StartDate_EndDate");
+            modelBuilder.Entity<OvertimeRequest>().HasIndex(o => new { o.EmployeeId, o.WorkDate, o.StartTime, o.EndTime }).IsUnique().HasDatabaseName("UX_overtime_requests_EmployeeId_WorkDate_StartTime_EndTime");
+            modelBuilder.Entity<Candidate>().HasIndex(c => new { c.RecruitmentRequestId, c.Email }).IsUnique().HasDatabaseName("UX_candidates_RecruitmentRequestId_Email");
+            modelBuilder.Entity<Candidate>().HasIndex(c => c.TrackingCode).IsUnique();
             modelBuilder.Entity<Employee>().HasIndex(e => e.EmployeeCode).IsUnique();
             modelBuilder.Entity<Employee>().HasIndex(e => e.AccountId).IsUnique();
             modelBuilder.Entity<Employee>().HasIndex(e => e.CandidateId).IsUnique();
             modelBuilder.Entity<Employee>().HasIndex(e => e.IdentityNumber).IsUnique();
             modelBuilder.Entity<Employee>().HasIndex(e => e.TaxCode).IsUnique();
             modelBuilder.Entity<Employee>().HasIndex(e => e.SocialInsCode).IsUnique();
+            modelBuilder.Entity<PerformanceReview>().HasIndex(p => new { p.EmployeeId, p.Period }).IsUnique().HasDatabaseName("UX_performance_reviews_EmployeeId_Period");
+            modelBuilder.Entity<PerformanceReview>().HasIndex(p => new { p.DeptId, p.Period, p.Status });
+            modelBuilder.Entity<PerformanceDetail>().HasIndex(p => new { p.ReviewId, p.KpiCode }).IsUnique().HasDatabaseName("UX_performance_details_ReviewId_KpiCode");
+            modelBuilder.Entity<PenaltyRule>().HasIndex(p => new { p.SourceType, p.RuleCode }).IsUnique().HasDatabaseName("UX_penalty_rules_SourceType_RuleCode");
+            modelBuilder.Entity<PenaltyRecord>().HasIndex(p => new { p.EmployeeId, p.Period, p.SourceType });
+            modelBuilder.Entity<PenaltyRecord>().HasIndex(p => new { p.SourceType, p.ReferenceId, p.RuleCode }).HasDatabaseName("IX_penalty_records_Source_Reference_Rule");
+            modelBuilder.Entity<WorkTask>().HasIndex(t => new { t.AssignedTo, t.Status, t.Deadline });
+            modelBuilder.Entity<TaskProgress>().HasIndex(t => new { t.TaskId, t.SubmittedAt });
+            modelBuilder.Entity<Training>().HasIndex(t => new { t.EmployeeId, t.Status });
+            modelBuilder.Entity<Training>().HasIndex(t => new { t.ManagerId, t.EvaluationDeadline, t.Status });
 
             // ==========================================
             // 3. QUAN HỆ (RELATIONSHIPS) & CHỐNG LỖI CASCADE
@@ -181,26 +208,143 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
                 .OnDelete(DeleteBehavior.Restrict);
 
             // --- TASKS & TRAINING ---
-            // 1. Mối quan hệ Employee 1-N PerformanceReview
+            modelBuilder.Entity<KpiImportBatch>()
+                .HasOne(b => b.Department)
+                .WithMany()
+                .HasForeignKey(b => b.DeptId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<KpiImportBatch>()
+                .HasOne(b => b.ImportedByAccount)
+                .WithMany()
+                .HasForeignKey(b => b.ImportedByAccountId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             modelBuilder.Entity<PerformanceReview>()
                 .HasOne(pr => pr.Employee)
                 .WithMany()
                 .HasForeignKey(pr => pr.EmployeeId)
                 .OnDelete(DeleteBehavior.Restrict); // Không cho phép xóa Employee nếu đã có điểm đánh giá (Nên dùng soft-delete cho nhân viên)
 
-            // 2. Mối quan hệ PerformanceReview 1-N PerformanceDetail
+            modelBuilder.Entity<PerformanceReview>()
+                .HasOne(pr => pr.Department)
+                .WithMany()
+                .HasForeignKey(pr => pr.DeptId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<PerformanceReview>()
+                .HasOne(pr => pr.ImportBatch)
+                .WithMany(b => b.Reviews)
+                .HasForeignKey(pr => pr.ImportBatchId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<PerformanceReview>()
+                .HasOne(pr => pr.CreatedByAccount)
+                .WithMany()
+                .HasForeignKey(pr => pr.CreatedByAccountId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<PerformanceReview>()
+                .HasOne(pr => pr.ReviewerAccount)
+                .WithMany()
+                .HasForeignKey(pr => pr.ReviewerAccountId)
+                .OnDelete(DeleteBehavior.SetNull);
+
             modelBuilder.Entity<PerformanceReview>()
                 .HasMany(pr => pr.Details)
                 .WithOne(pd => pd.Review)
                 .HasForeignKey(pd => pd.ReviewId)
                 .OnDelete(DeleteBehavior.Cascade); // Xóa phiếu đánh giá thì xóa luôn các dòng chi tiết KPI
 
-            // 3. Mối quan hệ Employee 1-N Training
+            modelBuilder.Entity<PenaltyRecord>()
+                .HasOne(pr => pr.Employee)
+                .WithMany()
+                .HasForeignKey(pr => pr.EmployeeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<PenaltyRecord>()
+                .HasOne(pr => pr.CreatedByAccount)
+                .WithMany()
+                .HasForeignKey(pr => pr.CreatedByAccountId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<PenaltyRecord>()
+                .HasOne(pr => pr.PerformanceReview)
+                .WithMany()
+                .HasForeignKey(pr => pr.PerformanceReviewId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<WorkTask>()
+                .HasOne(t => t.Department)
+                .WithMany()
+                .HasForeignKey(t => t.DeptId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<WorkTask>()
+                .HasOne(t => t.Assignee)
+                .WithMany()
+                .HasForeignKey(t => t.AssignedTo)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<WorkTask>()
+                .HasOne(t => t.CreatedByAccount)
+                .WithMany()
+                .HasForeignKey(t => t.CreatedByAccountId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<WorkTask>()
+                .HasOne(t => t.Training)
+                .WithMany(t => t.Tasks)
+                .HasForeignKey(t => t.TrainingId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<WorkTask>()
+                .HasMany(t => t.Progresses)
+                .WithOne(p => p.Task)
+                .HasForeignKey(p => p.TaskId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<WorkTask>()
+                .HasMany(t => t.Feedbacks)
+                .WithOne(f => f.Task)
+                .HasForeignKey(f => f.TaskId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<TaskProgress>()
+                .HasOne(p => p.Employee)
+                .WithMany()
+                .HasForeignKey(p => p.EmployeeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<TaskProgress>()
+                .HasMany(p => p.Feedbacks)
+                .WithOne(f => f.Progress)
+                .HasForeignKey(f => f.ProgressId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<TaskFeedback>()
+                .HasOne(f => f.Reviewer)
+                .WithMany()
+                .HasForeignKey(f => f.ReviewerId)
+                .OnDelete(DeleteBehavior.SetNull);
+
             modelBuilder.Entity<Training>()
                 .HasOne(t => t.Employee)
                 .WithMany()
                 .HasForeignKey(t => t.EmployeeId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Training>()
+                .HasOne(t => t.Department)
+                .WithMany()
+                .HasForeignKey(t => t.DeptId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Training>()
+                .HasOne(t => t.Manager)
+                .WithMany()
+                .HasForeignKey(t => t.ManagerId)
+                .OnDelete(DeleteBehavior.SetNull);
 
             // --- REQUESTS & HANDOVER ---
             modelBuilder.Entity<HandoverRequest>()
@@ -224,6 +368,22 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
             modelBuilder.Entity<Employee>()
                 .HasIndex(e => e.CandidateId)
                 .IsUnique();
+
+            modelBuilder.Entity<OvertimeRequest>()
+                .HasOne(o => o.Employee)
+                .WithMany()
+                .HasForeignKey(o => o.EmployeeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<AttendanceSummary>()
+                .HasIndex(s => new { s.EmployeeId, s.Month, s.Year })
+                .IsUnique();
+
+            modelBuilder.Entity<AttendanceSummary>()
+                .HasOne(s => s.Employee)
+                .WithMany()
+                .HasForeignKey(s => s.EmployeeId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             // Tự động chuyển đổi Enum thành String khi lưu vào DB
             foreach (var entityType in modelBuilder.Model.GetEntityTypes())
@@ -331,7 +491,45 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
                 await AuditLogs.AddRangeAsync(auditEntries, cancellationToken);
             }
 
+            await NormalizeAuditLogAccountIdsAsync(cancellationToken);
+
             return await base.SaveChangesAsync(cancellationToken);
+        }
+
+        private async Task NormalizeAuditLogAccountIdsAsync(CancellationToken cancellationToken)
+        {
+            var auditLogEntries = ChangeTracker.Entries<AuditLog>()
+                .Where(e => e.State == EntityState.Added || e.State == EntityState.Modified)
+                .ToList();
+
+            if (!auditLogEntries.Any())
+                return;
+
+            foreach (var entry in auditLogEntries.Where(e => e.Entity.AccountId.HasValue && e.Entity.AccountId.Value <= 0))
+            {
+                entry.Entity.AccountId = null;
+            }
+
+            var accountIds = auditLogEntries
+                .Select(e => e.Entity.AccountId)
+                .Where(id => id.HasValue && id.Value > 0)
+                .Select(id => id!.Value)
+                .Distinct()
+                .ToList();
+
+            if (!accountIds.Any())
+                return;
+
+            var existingAccountIds = await Accounts
+                .Where(a => accountIds.Contains(a.Id))
+                .Select(a => a.Id)
+                .ToListAsync(cancellationToken);
+
+            var existingSet = existingAccountIds.ToHashSet();
+            foreach (var entry in auditLogEntries.Where(e => e.Entity.AccountId.HasValue && !existingSet.Contains(e.Entity.AccountId.Value)))
+            {
+                entry.Entity.AccountId = null;
+            }
         }
     }
 }

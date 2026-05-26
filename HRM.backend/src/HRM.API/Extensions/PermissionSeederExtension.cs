@@ -63,11 +63,43 @@ namespace HRM.backend.src.HRM.API.Extensions
                 }
             }
 
-            // 4. Chỉ gọi SaveChanges khi thực sự có thay đổi
+            // 4. Chỉ gọi SaveChanges khi thực sự có thay đổi để các quyền mới có Id thật trước khi gán cho Admin
             if (hasChanges)
             {
                 await context.SaveChangesAsync();
             }
+
+            // 5. Admin luôn phải có toàn bộ quyền thật trong DB.
+            // UI có thể lock role Admin, nhưng bảng role_permissions vẫn cần được cập nhật
+            // để token, policy, report và các use case về sau đều nhìn thấy Admin là full quyền.
+            var adminRole = await context.Set<Role>()
+                .FirstOrDefaultAsync(r => r.Id == 1 || r.RoleName == "Admin");
+
+            if (adminRole == null) return;
+
+            var allPermissionIds = await context.Set<Permission>()
+                .Select(p => p.Id)
+                .ToListAsync();
+
+            var currentAdminPermissionIds = await context.Set<RolePermission>()
+                .Where(rp => rp.RoleId == adminRole.Id)
+                .Select(rp => rp.PermissionId)
+                .ToListAsync();
+
+            var missingPermissionIds = allPermissionIds
+                .Except(currentAdminPermissionIds)
+                .ToList();
+
+            if (!missingPermissionIds.Any()) return;
+
+            var missingMappings = missingPermissionIds.Select(permissionId => new RolePermission
+            {
+                RoleId = adminRole.Id,
+                PermissionId = permissionId
+            });
+
+            await context.Set<RolePermission>().AddRangeAsync(missingMappings);
+            await context.SaveChangesAsync();
         }        
     }
 }

@@ -14,10 +14,11 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.System
 
         public async Task LogSystemEventAsync(string actionType, int? accountId, string module, string? message = null)
         {
+            var safeAccountId = await NormalizeAccountIdAsync(accountId);
             var log = new AuditLog
             {
                 ActionType = actionType,
-                AccountId = accountId,
+                AccountId = safeAccountId,
                 TableName = module,
                 NewValues = message != null ? $"{{\"Message\": \"{message}\"}}" : null,
                 AffectedColumns = "[]",
@@ -25,6 +26,15 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.System
             };
 
             await _dbSet.AddAsync(log);
+        }
+
+        private async Task<int?> NormalizeAccountIdAsync(int? accountId)
+        {
+            if (!accountId.HasValue || accountId.Value <= 0)
+                return null;
+
+            var exists = await _context.Accounts.AnyAsync(a => a.Id == accountId.Value);
+            return exists ? accountId.Value : null;
         }
 
         public async Task<IEnumerable<AuditLog>> FetchLogsWithDetailAsync(

@@ -6,11 +6,15 @@ using HRM.backend.src.HRM.Application.Interfaces.Services;
 using HRM.backend.src.HRM.Application.Interfaces.System;
 using HRM.backend.src.HRM.Application.Interfaces.System.Services;
 using HRM.backend.src.HRM.Application.Interfaces.System.UseCases;
+using HRM.backend.src.HRM.Application.Interfaces.TasksTraining.Services;
+using HRM.backend.src.HRM.Application.Interfaces.TasksTraining.Usecases;
 using HRM.backend.src.HRM.Application.Interfaces.TimeAttendance.Usecases;
 using HRM.backend.src.HRM.Application.Services.System;
+using HRM.backend.src.HRM.Application.Services.TasksTraining;
 using HRM.backend.src.HRM.Application.UseCases.EmployeeProfile;
 using HRM.backend.src.HRM.Application.UseCases.Recruitment;
 using HRM.backend.src.HRM.Application.UseCases.System;
+using HRM.backend.src.HRM.Application.UseCases.TasksTraining;
 using HRM.backend.src.HRM.Application.UseCases.TimeAttendance;
 using HRM.backend.src.HRM.Core.Entities.System;
 using HRM.backend.src.HRM.Infrastructure.ExternalServices;
@@ -34,7 +38,10 @@ namespace HRM.backend.src.HRM.Infrastructure.Configurations
             services.AddScoped<IAccountManagementUseCase, AccountManagementUseCase>();
             services.AddScoped<IAttendanceConfigUseCase, AttendanceConfigUseCase>();
             services.AddScoped<ILeaveTypeUseCase, LeaveTypeUseCase>();
+            services.AddScoped<IDocumentExportUseCase, DocumentExportUseCase>();
             services.AddScoped<ISlaTrackingService, SlaTrackingService>();
+            services.AddScoped<IApprovalConflictGuard, ApprovalConflictGuard>();
+            services.AddScoped<IIdempotencyService, IdempotencyService>();
             
 
             // Module: Department
@@ -43,6 +50,16 @@ namespace HRM.backend.src.HRM.Infrastructure.Configurations
             // Module: TimeAttendance
             services.AddScoped<IShiftManagementUseCase, ShiftManagementUseCase>();
             services.AddScoped<IAttendanceUseCase, AttendanceUseCase>();
+            services.AddScoped<IAttendanceSummaryUseCase, AttendanceSummaryUseCase>();
+            services.AddScoped<IOvertimeRequestUseCase, OvertimeRequestUseCase>();
+            services.AddScoped<ILeaveRequestUseCase, LeaveRequestUseCase>();
+
+            // Module: Performance & Training
+            services.AddScoped<IKpiManagementUseCase, KpiManagementUseCase>();
+            services.AddScoped<ITaskManagementUseCase, TaskManagementUseCase>();
+            services.AddScoped<IPerformanceEvaluationUseCase, PerformanceEvaluationUseCase>();
+            services.AddScoped<ITrainingUseCase, TrainingUseCase>();
+            services.AddScoped<IExcelKpiParserService, ExcelKpiParserService>();
 
             // Module: Profile
             services.AddScoped<IManageProfileUseCase, ManageProfileUseCase>();
@@ -64,6 +81,7 @@ namespace HRM.backend.src.HRM.Infrastructure.Configurations
 
             services.Configure<EmailSettings>(configuration.GetSection("EmailSettings"));
             services.AddScoped<IEmailService, EmailService>();
+            services.AddScoped<INotificationTemplateRenderer, NotificationTemplateRenderer>();
 
 
             // MfaService thuần tính toán (stateless) -> Transient hoặc Singleton đều được
@@ -74,6 +92,8 @@ namespace HRM.backend.src.HRM.Infrastructure.Configurations
 
             // Đăng ký Worker chạy ngầm
             services.AddHostedService<CentralSlaWorker>();
+            services.AddHostedService<TaskSlaWorker>();
+            services.AddHostedService<TrainingSlaWorker>();
 
             // Đăng ký Event
             // Đăng ký MediatR (Tự động quét và đăng ký tất cả các Event Handler trong Assembly)            

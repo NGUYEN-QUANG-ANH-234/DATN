@@ -54,7 +54,8 @@ namespace HRM.backend.src.HRM.Application.Handlers
                             <p>Vui lòng đăng nhập hệ thống HRM và truy cập <b>Hộp thư phê duyệt</b> để hoàn tất xử lý.</p>
                             <br/>
                             <p>Trân trọng,<br/>Bộ phận Tuyển dụng HICAS</p>";
-                        _ = _emailService.SendEmailAsync(directorAccount.Email, subject, body);
+                        await _emailService.SendEmailAsync(directorAccount.Email, subject, body);
+                        await _unitOfWork.CommitAsync(ct);
                     }
                 }
             }

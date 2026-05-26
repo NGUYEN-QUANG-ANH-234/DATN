@@ -33,6 +33,18 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.TimeAttend
                 .ToListAsync();
         }
 
+        public async Task<List<AttendanceLog>> FetchLogsByPeriodAsync(DateTime startDate, DateTime endDate, CancellationToken ct = default)
+        {
+            return await _dbSet
+                .Include(l => l.Employee)
+                .ThenInclude(e => e!.Department)
+                .Include(l => l.WorkShift)
+                .Where(l => l.EmployeeId.HasValue &&
+                            l.CheckIn >= startDate &&
+                            l.CheckIn < endDate)
+                .ToListAsync(ct);
+        }
+
         public async Task BulkUpdateLogStatusesAsync(IEnumerable<AttendanceLog> logs)
         {
             _dbSet.UpdateRange(logs);
@@ -41,12 +53,36 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.TimeAttend
 
         public async Task SyncLeaveToAttendanceAsync(int empId, List<DateTime> dates, AttendanceStatus status)
         {
-            var logs = dates.Select(date => new AttendanceLog
+            var normalizedDates = dates.Select(d => d.Date).Distinct().ToList();
+            var end = normalizedDates.Count == 0 ? DateTime.MinValue : normalizedDates.Max().AddDays(1);
+            var start = normalizedDates.Count == 0 ? DateTime.MinValue : normalizedDates.Min();
+
+            var existingLogs = await _dbSet
+                .Where(l => l.EmployeeId == empId &&
+                            l.CheckIn.HasValue &&
+                            l.CheckIn >= start &&
+                            l.CheckIn < end)
+                .ToListAsync();
+
+            foreach (var log in existingLogs.Where(l => normalizedDates.Contains(l.CheckIn!.Value.Date)))
+            {
+                log.Status = status;
+            }
+
+            var existingDates = existingLogs
+                .Where(l => l.CheckIn.HasValue)
+                .Select(l => l.CheckIn!.Value.Date)
+                .ToHashSet();
+
+            var logs = normalizedDates
+                .Where(date => !existingDates.Contains(date))
+                .Select(date => new AttendanceLog
             {
                 EmployeeId = empId,
                 CheckIn = date, // Dùng CheckIn làm mốc ngày nghỉ
                 Status = status
             });
+
             await _dbSet.AddRangeAsync(logs);
         }
     }

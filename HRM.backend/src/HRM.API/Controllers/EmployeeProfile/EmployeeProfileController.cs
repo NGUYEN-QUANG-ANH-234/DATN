@@ -57,6 +57,10 @@ namespace HRM.backend.src.HRM.API.Controllers.EmployeeProfile
             {
                 return BadRequest(new { Success = false, Message = ex.Message });
             }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, new { Success = false, Message = ex.Message });
+            }
             catch (Exception ex)
             {
                 return StatusCode(500, new { Success = false, Message = "Lỗi xử lý hệ thống: " + ex.Message });
@@ -114,7 +118,7 @@ namespace HRM.backend.src.HRM.API.Controllers.EmployeeProfile
                 int hrAccountId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
 
                 // TRỌNG TÂM: Lấy RoleName từ Token người dùng (ví dụ: "HR")
-                string actorRoleName = User.FindFirst(ClaimTypes.Role)!.Value;
+                string actorRoleName = GetRole();
 
                 // Truyền thêm actorRoleName xuống tầng UseCase
                 await _useCase.ReviewProfileUpdateAsync(id, hrAccountId, actorRoleName, dto, ct);
@@ -141,13 +145,23 @@ namespace HRM.backend.src.HRM.API.Controllers.EmployeeProfile
         {
             try
             {
-                var requests = await _useCase.GetPendingProfileRequestsAsync(ct);
+                var requests = await _useCase.GetPendingProfileRequestsAsync(GetAccountId(), GetRole(), ct);
                 return Ok(new { Success = true, Data = requests });
             }
             catch (Exception ex)
             {
                 return StatusCode(500, new { Success = false, Message = "Lỗi hệ thống: " + ex.Message });
             }
+        }
+
+        private string GetRole()
+        {
+            return User.FindFirst("role")?.Value ?? User.FindFirst(ClaimTypes.Role)?.Value ?? string.Empty;
+        }
+
+        private int GetAccountId()
+        {
+            return int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
         }
     }
 }

@@ -1,6 +1,9 @@
 ﻿using HRM.backend.src.HRM.Application.DTOs.System;
 using HRM.backend.src.HRM.Application.Interfaces;
 using HRM.backend.src.HRM.Application.Interfaces.System.UseCases;
+using HRM.backend.src.HRM.Core.Entities.System;
+using HRM.backend.src.HRM.Core.Enums;
+using HRM.backend.src.HRM.Core.Interfaces.Repositories;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.System;
 
 namespace HRM.backend.src.HRM.Application.UseCases.System
@@ -9,45 +12,91 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
     {
         private readonly ISourceCatalogRepository _repository;
         private readonly IAppCache _cache;
+        private readonly IUnitOfWork _unitOfWork;
+        private readonly ILockService _lockService;
 
         private const string CACHE_KEY = "SourceCatalogListCache";
 
-        public SourceCatalogUseCase(ISourceCatalogRepository repository, IAppCache cache)
+        public SourceCatalogUseCase(ISourceCatalogRepository repository, IAppCache cache, IUnitOfWork unitOfWork, ILockService lockService)
         {
             _repository = repository;
             _cache = cache;
+            _unitOfWork = unitOfWork;
+            _lockService = lockService;
         }
 
         public async Task<IEnumerable<SourceCatalogDto>> GetAllSourceCatalogsAsync(CancellationToken ct = default)
         {
-            // 1. Thử lấy từ Cache
-            var cachedCatalogs = await _cache.GetAsync<IEnumerable<SourceCatalogDto>>(CACHE_KEY);
-            if (cachedCatalogs != null)
+            return await _cache.GetOrSetWithLockAsync(
+                CACHE_KEY,
+                async (innerCt) =>
+                {
+                    await _repository.EnsureDefaultPayrollCatalogsAsync(innerCt);
+                    await _unitOfWork.CommitAsync(innerCt);
+
+                    var catalogs = await _repository.GetOrderedCatalogsAsync(innerCt);
+                    return catalogs.Select(x => new SourceCatalogDto
+                    {
+                        Id = x.Id,
+                        DisplayName = x.DisplayName,
+                        SourcePath = x.SourcePath,
+                        Module = x.Module,
+                        DataType = x.DataType.ToString(),
+                        AggregationType = x.AggregationType.ToString(),
+                        IsPeriodBased = x.IsPeriodBased,
+                        IsActive = x.IsActive
+                    }).ToList();
+                },
+                TimeSpan.FromHours(24),
+                _lockService,
+                ct: ct);
+        }
+
+        public async Task<SourceCatalogDto> CreateSourceCatalogAsync(CreateSourceCatalogDto dto, CancellationToken ct = default)
+        {
+            if (string.IsNullOrWhiteSpace(dto.DisplayName))
+                throw new ArgumentException("Tên nguồn dữ liệu không được để trống.");
+            if (string.IsNullOrWhiteSpace(dto.SourcePath))
+                throw new ArgumentException("SourcePath không được để trống.");
+
+            var normalizedSourcePath = dto.SourcePath.Trim();
+
+            return await _lockService.GetWithLockAsync($"source_catalog_{normalizedSourcePath.ToLowerInvariant()}", async (innerCt) =>
             {
-                return cachedCatalogs;
-            }
+            if (await _repository.GetActiveBySourcePathAsync(normalizedSourcePath, innerCt) != null)
+                throw new ArgumentException("SourcePath đã tồn tại trong danh mục đang hoạt động.");
+            if (!Enum.TryParse<SalaryVariableDataType>(dto.DataType, true, out var dataType))
+                throw new ArgumentException("DataType không hợp lệ.");
+            if (!Enum.TryParse<SalaryAggregationType>(dto.AggregationType, true, out var aggregationType))
+                throw new ArgumentException("AggregationType không hợp lệ.");
 
-            // 2. Nếu Cache trống, truy vấn DB
-            var catalogs = await _repository.GetOrderedCatalogsAsync(ct);
-
-            var catalogDtos = catalogs.Select(x => new SourceCatalogDto
+            var entity = new SourceCatalog
             {
-                Id = x.Id,
-                DisplayName = x.DisplayName,
-                SourcePath = x.SourcePath,
-                Module = x.Module
-            }).ToList(); // Dùng ToList() để đánh giá câu lệnh LINQ ngay lập tức, phục vụ việc Serialize
+                DisplayName = dto.DisplayName.Trim(),
+                SourcePath = normalizedSourcePath,
+                Module = dto.Module.Trim(),
+                DataType = dataType,
+                AggregationType = aggregationType,
+                IsPeriodBased = dto.IsPeriodBased,
+                IsActive = dto.IsActive
+            };
 
-            // 3. Lưu vào Cache với thời gian sống là 24 giờ
-            await _cache.SetAsync(
-                key: CACHE_KEY,
-                data: catalogDtos,
-                absoluteExpireTime: TimeSpan.FromHours(24),
-                unusedExpireTime: null,
-                ct: ct
-            );
+            await _repository.AddAsync(entity, innerCt);
+            await _unitOfWork.CommitAsync(innerCt);
+            await _cache.RemoveAsync(CACHE_KEY, innerCt);
 
-            return catalogDtos;
+            return new SourceCatalogDto
+            {
+                Id = entity.Id,
+                DisplayName = entity.DisplayName,
+                SourcePath = entity.SourcePath,
+                Module = entity.Module,
+                DataType = entity.DataType.ToString(),
+                AggregationType = entity.AggregationType.ToString(),
+                IsPeriodBased = entity.IsPeriodBased,
+                IsActive = entity.IsActive
+            };
+            }, cancellationToken: ct);
         }
     }
 }

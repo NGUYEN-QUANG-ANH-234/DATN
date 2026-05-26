@@ -27,6 +27,8 @@ namespace HRM.backend.src.HRM.Application.UseCases.Recruitment
         private readonly IAccountRepository _accountRepo;
         private readonly IEmailService _emailService;
         private readonly IUnitOfWork _unitOfWork;
+        private readonly ILockService _lockService;
+        private readonly IIdempotencyService _idempotencyService;
 
         public CandidateUseCase(
             ICandidateRepository candidateRepo,
@@ -39,7 +41,9 @@ namespace HRM.backend.src.HRM.Application.UseCases.Recruitment
             IApprovalWorkflowService approvalService,
             IAccountRepository accountRepo,
             IEmailService emailService,
-            IUnitOfWork unitOfWork)
+            IUnitOfWork unitOfWork,
+            ILockService lockService,
+            IIdempotencyService idempotencyService)
         {
             _candidateRepo = candidateRepo;
             _reqRepo = reqRepo;
@@ -52,10 +56,22 @@ namespace HRM.backend.src.HRM.Application.UseCases.Recruitment
             _accountRepo = accountRepo;
             _emailService = emailService;
             _unitOfWork = unitOfWork;
+            _lockService = lockService;
+            _idempotencyService = idempotencyService;
         }
 
-        public async Task<ApplyJobResultDto> ApplyForJobAsync(ApplyJobDto dto, CancellationToken ct = default)
+        public async Task<ApplyJobResultDto> ApplyForJobAsync(ApplyJobDto dto, CancellationToken ct = default, string? idempotencyKey = null)
         {
+            var existingResourceId = string.IsNullOrWhiteSpace(idempotencyKey)
+                ? null
+                : await _idempotencyService.FindResourceIdAsync("CANDIDATE_APPLY", idempotencyKey, ct);
+            if (existingResourceId.HasValue)
+            {
+                var existing = await _candidateRepo.GetByIdAsync(existingResourceId.Value, ct);
+                if (existing != null)
+                    return new ApplyJobResultDto { CandidateId = existing.Id, TrackingCode = existing.TrackingCode ?? string.Empty };
+            }
+
             // 1. Kiểm tra nghiệp vụ: Tin tuyển dụng
             var job = await _reqRepo.GetByIdAsync(dto.RecruitmentRequestId, ct);
             if (job == null)
@@ -68,12 +84,15 @@ namespace HRM.backend.src.HRM.Application.UseCases.Recruitment
                 throw new InvalidOperationException("Tin tuyển dụng này đã hết hạn nộp hồ sơ.");
 
             // 2. Tìm kiếm ứng viên theo Email và Job
+            var normalizedEmail = dto.Email.Trim().ToLowerInvariant();
+            return await _lockService.GetWithLockAsync($"candidate_apply_{dto.RecruitmentRequestId}_{normalizedEmail}", async (innerCt) =>
+            {
             var existingCandidate = (await _candidateRepo.FindAsync(c =>
                 c.RecruitmentRequestId == dto.RecruitmentRequestId &&
-                c.Email != null && c.Email.ToLower() == dto.Email.ToLower(), ct)).FirstOrDefault();
+                c.Email != null && c.Email.ToLower() == normalizedEmail, innerCt)).FirstOrDefault();
 
             // 3. Upload CV mới
-            string newCvUrl = await _storageService.UploadFileAsync(dto.CvFile, "cvs", ct);
+            string newCvUrl = await _storageService.UploadFileAsync(dto.CvFile, "cvs", innerCt);
 
             string generatedTrackingCode = Guid.NewGuid().ToString("N").Substring(0, 8).ToUpper();
 
@@ -91,8 +110,10 @@ namespace HRM.backend.src.HRM.Application.UseCases.Recruitment
                 existingCandidate.AppliedDate = DateTime.UtcNow.Date;
                 existingCandidate.TrackingCode = generatedTrackingCode;
 
-                await _candidateRepo.UpdateAsync(existingCandidate, ct);
-                await _unitOfWork.CommitAsync(ct);
+                await _candidateRepo.UpdateAsync(existingCandidate, innerCt);
+                await _unitOfWork.CommitAsync(innerCt);
+                await _idempotencyService.SaveAsync("CANDIDATE_APPLY", idempotencyKey ?? string.Empty, "Candidate", existingCandidate.Id, null, innerCt);
+                await _unitOfWork.CommitAsync(innerCt);
 
                 return new ApplyJobResultDto { CandidateId = existingCandidate.Id, TrackingCode = generatedTrackingCode };
             }
@@ -110,11 +131,14 @@ namespace HRM.backend.src.HRM.Application.UseCases.Recruitment
                     AppliedDate = DateTime.UtcNow.Date
                 };
 
-                await _candidateRepo.AddAsync(newCandidate, ct);
-                await _unitOfWork.CommitAsync(ct);
+                await _candidateRepo.AddAsync(newCandidate, innerCt);
+                await _unitOfWork.CommitAsync(innerCt);
+                await _idempotencyService.SaveAsync("CANDIDATE_APPLY", idempotencyKey ?? string.Empty, "Candidate", newCandidate.Id, null, innerCt);
+                await _unitOfWork.CommitAsync(innerCt);
 
                 return new ApplyJobResultDto { CandidateId = newCandidate.Id, TrackingCode = generatedTrackingCode };
             }
+            }, cancellationToken: ct);
         }
 
         public async Task<IEnumerable<CandidateHistoryDto>> GetMyApplicationsAsync(string email, string? trackingCode, CancellationToken ct = default)
@@ -186,6 +210,8 @@ namespace HRM.backend.src.HRM.Application.UseCases.Recruitment
 
         public async Task<bool> HrApproveAsync(int candidateId, int actorId, string actorRoleName, CancellationToken ct = default)
         {
+            return await _lockService.GetWithLockAsync($"candidate_{candidateId}", async (innerCt) =>
+            {
             var candidate = await _candidateRepo.GetByIdAsync(candidateId, ct);
             if (candidate == null) throw new InvalidOperationException("Không tìm thấy ứng viên.");
             if (candidate.Status != CandidateStatus.New) throw new InvalidOperationException("Hồ sơ đã được xử lý trước đó.");
@@ -226,26 +252,32 @@ namespace HRM.backend.src.HRM.Application.UseCases.Recruitment
                         <p>Vui lòng đăng nhập vào hệ thống HRM và truy cập <b>Hộp thư phê duyệt</b> để thực hiện xử lý.</p>
                         <br/>
                         <p>Trân trọng,<br/>Bộ phận Tuyển dụng HICAS</p>";
-                    _ = _emailService.SendEmailAsync(managerAccount.Email, subject, body);
+                    await _emailService.SendEmailAsync(managerAccount.Email, subject, body);
                 }
             }
 
             await _unitOfWork.CommitAsync(ct);
             return true;
+            }, cancellationToken: ct);
         }
 
         public async Task<bool> ConfirmByDepartmentAsync(int candidateId, int approverId, string actorRoleName, CancellationToken ct = default)
         {
+            return await _lockService.GetWithLockAsync($"candidate_{candidateId}", async (innerCt) =>
+            {
             var candidate = await _candidateRepo.GetByIdAsync(candidateId, ct);
             if (candidate == null) throw new InvalidOperationException("Không tìm thấy ứng viên.");
             await EnsureManagerCanAccessCandidateAsync(candidate, approverId, actorRoleName, ct);
             
             await _approvalService.ProcessStepAsync("CANDIDATE", candidateId, approverId, actorRoleName, true, "Department Approved", ct);
             return true;
+            }, cancellationToken: ct);
         }
 
         public async Task<bool> FinalApproveAsync(int candidateId, int approverId, string actorRoleName, CancellationToken ct = default)
         {
+            return await _lockService.GetWithLockAsync($"candidate_{candidateId}", async (innerCt) =>
+            {
             var candidate = await _candidateRepo.GetByIdAsync(candidateId, ct);
             if (candidate == null) throw new InvalidOperationException("Không tìm thấy ứng viên.");
             await EnsureManagerCanAccessCandidateAsync(candidate, approverId, actorRoleName, ct);
@@ -267,10 +299,13 @@ namespace HRM.backend.src.HRM.Application.UseCases.Recruitment
             // Đẩy luồng duyệt đi tiếp (Sẽ kích hoạt CandidateApprovalCompletedHandler)
             await _approvalService.ProcessStepAsync("CANDIDATE", candidateId, approverId, actorRoleName, true, "Director Final Approved", ct);
             return true;
+            }, cancellationToken: ct);
         }
 
         public async Task<bool> RejectAsync(int candidateId, int actorId, string actorRoleName, CancellationToken ct = default)
         {
+            return await _lockService.GetWithLockAsync($"candidate_{candidateId}", async (innerCt) =>
+            {
             var candidate = await _candidateRepo.GetByIdAsync(candidateId, ct);
             if (candidate == null) throw new InvalidOperationException("Không tìm thấy ứng viên.");
             await EnsureManagerCanAccessCandidateAsync(candidate, actorId, actorRoleName, ct);
@@ -296,6 +331,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.Recruitment
 
             await _unitOfWork.CommitAsync(ct);
             return true;
+            }, cancellationToken: ct);
         }
 
         private async Task EnsureManagerCanAccessCandidateAsync(Candidate candidate, int actorId, string actorRoleName, CancellationToken ct)

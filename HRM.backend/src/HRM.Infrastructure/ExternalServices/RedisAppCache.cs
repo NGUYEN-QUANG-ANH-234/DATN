@@ -25,5 +25,33 @@ public class RedisAppCache : IAppCache
         await _cache.SetStringAsync(key, jsonData, options);
     }
 
+    public async Task<T> GetOrSetWithLockAsync<T>(
+        string key,
+        Func<CancellationToken, Task<T>> factory,
+        TimeSpan ttl,
+        ILockService lockService,
+        TimeSpan? acquireTimeout = null,
+        CancellationToken ct = default)
+    {
+        var cached = await GetAsync<T>(key);
+        if (cached is not null)
+            return cached;
+
+        return await lockService.GetWithLockAsync(
+            $"cache_{key}",
+            async (innerCt) =>
+            {
+                var cachedAgain = await GetAsync<T>(key);
+                if (cachedAgain is not null)
+                    return cachedAgain;
+
+                var data = await factory(innerCt);
+                await SetAsync(key, data, ttl, null, innerCt);
+                return data;
+            },
+            acquireTimeout ?? TimeSpan.FromSeconds(10),
+            ct);
+    }
+
     public async Task RemoveAsync(string key, CancellationToken ct = default) => await _cache.RemoveAsync(key, ct);
 }

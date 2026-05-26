@@ -46,6 +46,7 @@ namespace HRM.backend.src.HRM.Application.Handlers
                     <p>Vui lòng đăng nhập vào hệ thống, kiểm tra lại luồng phê duyệt và tiến hành xử lý thủ công.</p>";
 
                 await _emailService.SendEmailAsync(hrEmail, subject, body);
+                await _unitOfWork.CommitAsync(ct);
             }
         }
     }

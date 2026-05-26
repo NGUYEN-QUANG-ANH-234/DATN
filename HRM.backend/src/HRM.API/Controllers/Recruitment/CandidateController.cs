@@ -43,7 +43,7 @@ namespace HRM.backend.src.HRM.API.Controllers.Recruitment
             // 2. Chuyển UseCase xử lý nghiệp vụ
             try
             {
-                var result = await _useCase.ApplyForJobAsync(dto, ct);
+                var result = await _useCase.ApplyForJobAsync(dto, ct, GetIdempotencyKey());
                 return Ok(new { Success = true, Message = "Nộp hồ sơ thành công! Bộ phận nhân sự sẽ liên hệ với bạn sớm nhất.", Data = result });
             }
             catch (InvalidOperationException ex) // Bắt lỗi Business Rules
@@ -58,6 +58,16 @@ namespace HRM.backend.src.HRM.API.Controllers.Recruitment
             {
                 return StatusCode(500, new { Success = false, Message = "Lỗi hệ thống: " + ex.Message });
             }
+        }
+
+        private string? GetIdempotencyKey()
+        {
+            return Request.Headers["Idempotency-Key"].FirstOrDefault();
+        }
+
+        private string GetRole()
+        {
+            return User.FindFirst("role")?.Value ?? User.FindFirst(ClaimTypes.Role)?.Value ?? string.Empty;
         }
 
         [HttpGet("my-applications")]
@@ -82,7 +92,7 @@ namespace HRM.backend.src.HRM.API.Controllers.Recruitment
             try
             {
                 int userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-                string actorRoleName = User.FindFirst(ClaimTypes.Role)!.Value;
+                string actorRoleName = GetRole();
 
                 var result = await _useCase.GetAllCandidatesAsync(userId, actorRoleName, ct);
                 return Ok(new { Success = true, Data = result });
@@ -104,7 +114,7 @@ namespace HRM.backend.src.HRM.API.Controllers.Recruitment
             try
             {
                 int userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-                string actorRoleName = User.FindFirst(ClaimTypes.Role)!.Value;
+                string actorRoleName = GetRole();
 
                 await _useCase.HrApproveAsync(id, userId, actorRoleName, ct);
                 return Ok(new { Success = true, Message = "Đã duyệt và chuyển hồ sơ sang vòng phỏng vấn." });
@@ -130,7 +140,7 @@ namespace HRM.backend.src.HRM.API.Controllers.Recruitment
             try
             {
                 int userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-                string actorRoleName = User.FindFirst(ClaimTypes.Role)!.Value;
+                string actorRoleName = GetRole();
 
                 await _useCase.ConfirmByDepartmentAsync(id, userId, actorRoleName, ct);
                 return Ok(new { Success = true, Message = "Xác nhận ứng viên đạt yêu cầu. Hồ sơ đã chuyển lên Giám đốc (SLA 15 ngày)." });
@@ -157,7 +167,7 @@ namespace HRM.backend.src.HRM.API.Controllers.Recruitment
             {
                 // THÊM 2 DÒNG NÀY
                 int userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-                string actorRoleName = User.FindFirst(ClaimTypes.Role)!.Value;
+                string actorRoleName = GetRole();
 
                 await _useCase.FinalApproveAsync(id, userId, actorRoleName, ct); // TRUYỀN THÊM THAM SỐ
                 return Ok(new { Success = true, Message = "Giám đốc đã chốt tuyển dụng thành công." });
@@ -183,7 +193,7 @@ namespace HRM.backend.src.HRM.API.Controllers.Recruitment
             try
             {
                 int userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-                string actorRoleName = User.FindFirst(ClaimTypes.Role)!.Value;
+                string actorRoleName = GetRole();
 
                 await _useCase.RejectAsync(id, userId, actorRoleName, ct);
                 return Ok(new { Success = true, Message = "Đã từ chối hồ sơ ứng viên thành công." });

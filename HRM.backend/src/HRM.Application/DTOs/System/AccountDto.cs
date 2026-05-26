@@ -15,8 +15,10 @@ namespace HRM.backend.src.HRM.Application.DTOs
         [Required]
         public string FullName { get; set; } = string.Empty;
 
-        [Required]
-        public int RoleId { get; set; }
+        public int RoleId { get; set; } = 8;
+
+        [StringLength(100, MinimumLength = 8)]
+        public string? Password { get; set; }
     }
 
     public class ToggleStatusDto

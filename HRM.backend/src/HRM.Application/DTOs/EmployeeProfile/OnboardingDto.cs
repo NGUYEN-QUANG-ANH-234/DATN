@@ -35,4 +35,13 @@
         public string? RejectReason { get; set; }
         public int? RoleId { get; set; }
     }
+
+    public class PendingOnboardingRequestDto
+    {
+        public int Id { get; set; }
+        public int CandidateId { get; set; }
+        public string RequestedDataJson { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
+        public DateTime CreatedAt { get; set; }
+    }
 }

@@ -79,6 +79,71 @@ public static class DbInitializer
         };
         context.AllowanceTypes.AddRange(allowanceTypes);
 
+        var penaltyRules = new List<PenaltyRule>
+        {
+            new PenaltyRule
+            {
+                SourceType = PenaltySourceType.Attendance,
+                RuleCode = "ATTENDANCE_LATE_MONTHLY",
+                RuleName = "Di muon vuot nguong trong ky",
+                Description = "Dung cho worker tong hop cham cong khi so lan/phut di muon vuot nguong cau hinh.",
+                ThresholdValue = 3,
+                ThresholdUnit = "times/month",
+                PenaltyPoint = 1
+            },
+            new PenaltyRule
+            {
+                SourceType = PenaltySourceType.Leave,
+                RuleCode = "LEAVE_OVER_BALANCE",
+                RuleName = "Nghi vuot quy phep",
+                Description = "Dung cho worker nghi phep khi nhan vien nghi vuot quy phep duoc cap.",
+                ThresholdValue = 0,
+                ThresholdUnit = "day",
+                PenaltyPoint = 1
+            },
+            new PenaltyRule
+            {
+                SourceType = PenaltySourceType.SLA,
+                RuleCode = "SLA_APPROVAL_VIOLATION",
+                RuleName = "Cham xu ly phe duyet SLA",
+                Description = "Dung cho cac workflow co SLA khi nguoi xu ly duoi cap giam doc bi qua han.",
+                ThresholdValue = 1,
+                ThresholdUnit = "violation",
+                PenaltyPoint = 1
+            },
+            new PenaltyRule
+            {
+                SourceType = PenaltySourceType.Task,
+                RuleCode = "TASK_SUBMISSION_OVERDUE",
+                RuleName = "Tre han nop cong viec",
+                Description = "Dung cho TaskSlaWorker khi nhan vien tre han nop tien do/minh chung.",
+                ThresholdValue = 1,
+                ThresholdUnit = "violation",
+                PenaltyPoint = 1
+            },
+            new PenaltyRule
+            {
+                SourceType = PenaltySourceType.SLA,
+                RuleCode = "TASK_REVIEW_SLA_VIOLATION",
+                RuleName = "Cham duyet cong viec",
+                Description = "Dung cho TaskSlaWorker khi truong phong cham duyet task.",
+                ThresholdValue = 1,
+                ThresholdUnit = "violation",
+                PenaltyPoint = 1
+            },
+            new PenaltyRule
+            {
+                SourceType = PenaltySourceType.SLA,
+                RuleCode = "TRAINING_EVAL_SLA_VIOLATION",
+                RuleName = "Cham danh gia dao tao",
+                Description = "Dung cho TrainingSlaWorker khi truong phong cham danh gia thuc tap sinh/nhan su dao tao.",
+                ThresholdValue = 1,
+                ThresholdUnit = "violation",
+                PenaltyPoint = 1
+            }
+        };
+        context.PenaltyRules.AddRange(penaltyRules);
+
         await context.SaveChangesAsync();
 
         // ======================================================
@@ -204,6 +269,7 @@ public static class DbInitializer
                 context.PerformanceDetails.Add(new PerformanceDetail
                 {
                     ReviewId = review.Id,
+                    KpiCode = $"KPI-{review.Id}-{Array.IndexOf(kpiNames, kpi) + 1}",
                     KpiName = kpi,
                     WeightPercent = 33,
                     AchievedPercent = faker.Random.Decimal(80, 100),

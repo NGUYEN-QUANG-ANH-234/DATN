@@ -104,6 +104,7 @@ namespace HRM.backend.src.HRM.Application.DTOs.EmployeeProfile
         public string EmployeeName { get; set; } = string.Empty;
         public string EmployeeCode { get; set; } = string.Empty;
         public string RequestedDataJson { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
         public DateTime DeadlineSLA { get; set; }
     }

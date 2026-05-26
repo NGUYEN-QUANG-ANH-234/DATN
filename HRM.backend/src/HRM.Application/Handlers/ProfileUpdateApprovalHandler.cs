@@ -48,7 +48,7 @@ namespace HRM.backend.src.HRM.Application.Handlers
             {
                 requestEntity.Status = RequestStatus.Approved;
 
-                var employee = await _employeeRepo.GetProfileByIdAsync(requestEntity.EmployeeId, ct);
+                var employee = await _employeeRepo.GetByIdAsync(requestEntity.EmployeeId, ct);
                 if (employee != null)
                 {
                     // Ghi đè dữ liệu từ JSON nháp sang Entity chính thức
@@ -84,7 +84,6 @@ namespace HRM.backend.src.HRM.Application.Handlers
                         if (updateData.ContainsKey("IdentityBackUrl")) employee.IdentityBackUrl = updateData["IdentityBackUrl"].GetString();
                         if (updateData.ContainsKey("CertificateUrl")) employee.CertificateUrl = updateData["CertificateUrl"].GetString();
                     }
-                    await _employeeRepo.UpdateAsync(employee, ct);
                 }
 
                 await _auditLogRepo.LogSystemEventAsync("PROFILE_UPDATE_APPROVED", requestEntity.EmployeeId, "employee_profile", $"Hồ sơ ID {requestEntity.Id} đã được duyệt và cập nhật.");

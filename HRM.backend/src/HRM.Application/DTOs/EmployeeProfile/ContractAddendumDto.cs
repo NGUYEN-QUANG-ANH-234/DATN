@@ -12,6 +12,7 @@ namespace HRM.backend.src.HRM.Application.DTOs.EmployeeProfile
 
     public class ReviewContractAddendumDto
     {
+        public bool IsApproved { get; set; }
         public string? RejectReason { get; set; }
     }
 

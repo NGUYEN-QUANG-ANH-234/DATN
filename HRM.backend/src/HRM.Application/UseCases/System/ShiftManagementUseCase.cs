@@ -41,6 +41,10 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
             {
                 throw new ArgumentException("Giờ kết thúc ca phải lớn hơn giờ bắt đầu ca.");
             }
+            if (dto.LateThresholdMins < 0 || dto.EarlyLeaveThresholdMins < 0)
+            {
+                throw new ArgumentException("Ngưỡng đi muộn/về sớm không được nhỏ hơn 0.");
+            }
 
             if (dto.BreakStartTime.HasValue && dto.BreakEndTime.HasValue)
             {

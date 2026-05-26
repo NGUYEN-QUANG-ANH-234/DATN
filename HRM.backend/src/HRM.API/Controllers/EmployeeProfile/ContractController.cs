@@ -21,92 +21,78 @@ namespace HRM.backend.src.HRM.API.Controllers.EmployeeProfile
         [HttpPost("requests")]
         public async Task<IActionResult> CreateRequest([FromBody] ContractRequestDto dto, CancellationToken ct)
         {
-            int accountId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-            await _useCase.CreateRequestAsync(accountId, dto, ct);
-            return Created("", new { Success = true, Message = "Đã gửi yêu cầu ký kết/gia hạn hợp đồng." });
+            var id = await _useCase.CreateRequestAsync(GetAccountId(), dto, ct, GetIdempotencyKey());
+            return Created($"/api/v1/contracts/{id}", new { Success = true, Data = id, Message = "Da gui yeu cau ky ket/gia han hop dong." });
         }
 
         [HttpPatch("requests/{id}/dept-review")]
         public async Task<IActionResult> DeptReview(int id, [FromBody] ReviewContractDto dto, CancellationToken ct)
         {
-            await _useCase.DeptReviewAsync(id, dto, ct);
-            return Ok(new
-            {
-                Success = true,
-                Message = dto.IsApproved
-                    ? "Đã chuyển yêu cầu sang bộ phận HR."
-                    : "Đã từ chối yêu cầu hợp đồng."
-            });
+            await _useCase.DeptReviewAsync(id, GetAccountId(), GetRole(), dto, ct);
+            return Ok(new { Success = true, Message = dto.IsApproved ? "Da chuyen yeu cau sang HR." : "Da tu choi yeu cau hop dong." });
         }
 
         [HttpPatch("requests/{id}/dept-confirm")]
         public async Task<IActionResult> DeptConfirm(int id, CancellationToken ct)
         {
-            await _useCase.DeptReviewAsync(id, new ReviewContractDto { IsApproved = true }, ct);
-            return Ok(new { Success = true, Message = "Đã chuyển yêu cầu sang bộ phận HR." });
+            await _useCase.DeptReviewAsync(id, GetAccountId(), GetRole(), new ReviewContractDto { IsApproved = true }, ct);
+            return Ok(new { Success = true, Message = "Da chuyen yeu cau sang HR." });
         }
 
         [HttpPatch("requests/{id}/dept-reject")]
         public async Task<IActionResult> DeptReject(int id, [FromBody] ReviewContractDto dto, CancellationToken ct)
         {
             dto.IsApproved = false;
-            await _useCase.DeptReviewAsync(id, dto, ct);
-            return Ok(new { Success = true, Message = "Đã từ chối yêu cầu hợp đồng." });
+            await _useCase.DeptReviewAsync(id, GetAccountId(), GetRole(), dto, ct);
+            return Ok(new { Success = true, Message = "Da tu choi yeu cau hop dong." });
         }
 
         [HttpPost("requests/{id}/hr-draft")]
         public async Task<IActionResult> HrCreateDraft(int id, [FromBody] CreateDraftDto dto, CancellationToken ct)
         {
-            await _useCase.HrCreateDraftAsync(id, dto, ct);
-            return Ok(new { Success = true, Message = "Bản nháp hợp đồng đã sẵn sàng, chờ nhân viên phản hồi." });
+            await _useCase.HrCreateDraftAsync(id, GetAccountId(), GetRole(), dto, ct);
+            return Ok(new { Success = true, Message = "Ban nhap hop dong da san sang." });
         }
 
         [HttpPatch("{id}/update-draft")]
         public async Task<IActionResult> UpdateDraft(int id, [FromBody] CreateDraftDto dto, CancellationToken ct)
         {
-            await _useCase.HrCreateDraftAsync(id, dto, ct);
-            return Ok(new { Success = true, Message = "Bản nháp hợp đồng đã được cập nhật." });
+            await _useCase.HrCreateDraftAsync(id, GetAccountId(), GetRole(), dto, ct);
+            return Ok(new { Success = true, Message = "Ban nhap hop dong da duoc cap nhat." });
         }
 
         [HttpPatch("requests/{id}/hr-reject")]
         public async Task<IActionResult> HrReject(int id, [FromBody] ReviewContractDto dto, CancellationToken ct)
         {
-            await _useCase.HrRejectAsync(id, dto.RejectReason ?? "Không đáp ứng chính sách.", ct);
-            return Ok(new { Success = true, Message = "Đã từ chối hợp đồng." });
+            await _useCase.HrRejectAsync(id, GetAccountId(), GetRole(), dto.RejectReason ?? "Khong dap ung chinh sach.", ct);
+            return Ok(new { Success = true, Message = "Da tu choi hop dong." });
         }
 
         [HttpPut("{id}/negotiate")]
         public async Task<IActionResult> Negotiate(int id, [FromBody] NegotiateDto dto, CancellationToken ct)
         {
-            await _useCase.NegotiateAsync(id, dto, ct);
-            return Ok(new { Success = true, Message = "Đã chuyển ý kiến thương lượng tới HR." });
+            await _useCase.NegotiateAsync(id, GetAccountId(), dto, ct);
+            return Ok(new { Success = true, Message = "Da chuyen y kien thuong luong toi HR." });
         }
 
         [HttpPatch("{id}/emp-accept")]
         public async Task<IActionResult> EmployeeAccept(int id, CancellationToken ct)
         {
-            await _useCase.EmployeeAcceptAsync(id, ct);
-            return Ok(new { Success = true, Message = "Đã xác nhận điều khoản, chờ Giám đốc duyệt." });
+            await _useCase.EmployeeAcceptAsync(id, GetAccountId(), ct);
+            return Ok(new { Success = true, Message = "Da xac nhan dieu khoan, cho Giam doc duyet." });
         }
 
         [HttpPatch("{id}/director-approve")]
         public async Task<IActionResult> DirectorApprove(int id, [FromBody] ReviewContractDto dto, CancellationToken ct)
         {
-            await _useCase.DirectorReviewAsync(id, dto, ct);
-            return Ok(new
-            {
-                Success = true,
-                Message = dto.IsApproved
-                    ? "Hợp đồng chính thức có hiệu lực."
-                    : "Giám đốc đã từ chối phê duyệt hợp đồng."
-            });
+            await _useCase.DirectorReviewAsync(id, GetAccountId(), GetRole(), dto, ct);
+            return Ok(new { Success = true, Message = dto.IsApproved ? "Hop dong chinh thuc co hieu luc." : "Giam doc da tu choi hop dong." });
         }
 
         [HttpGet("my-contracts")]
         public async Task<IActionResult> GetMyContracts(CancellationToken ct)
         {
-            int accountId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-            var result = await _useCase.GetMyContractsAsync(accountId, ct);
+            var result = await _useCase.GetMyContractsAsync(GetAccountId(), ct);
             return Ok(new { Success = true, Data = result });
         }
 
@@ -136,6 +122,21 @@ namespace HRM.backend.src.HRM.API.Controllers.EmployeeProfile
         {
             var result = await _useCase.GetPendingDirectorAsync(ct);
             return Ok(new { Success = true, Data = result });
+        }
+
+        private int GetAccountId()
+        {
+            return int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        }
+
+        private string GetRole()
+        {
+            return User.FindFirst("role")?.Value ?? User.FindFirst(ClaimTypes.Role)?.Value ?? string.Empty;
+        }
+
+        private string? GetIdempotencyKey()
+        {
+            return Request.Headers["Idempotency-Key"].FirstOrDefault();
         }
     }
 }

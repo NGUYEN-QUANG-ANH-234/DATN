@@ -9,6 +9,25 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.TimeAttend
     {
         public LeaveBalanceRepository(MyDbContext context) : base(context) { }
 
+        public async Task<LeaveBalance?> GetBalanceAsync(int employeeId, int leaveTypeId, short year, CancellationToken ct = default)
+        {
+            return await _dbSet
+                .Include(b => b.LeaveType)
+                .FirstOrDefaultAsync(b =>
+                    b.EmployeeId == employeeId &&
+                    b.LeaveTypeId == leaveTypeId &&
+                    b.Year == year, ct);
+        }
+
+        public async Task DeductAsync(int employeeId, int leaveTypeId, short year, decimal days, CancellationToken ct = default)
+        {
+            var balance = await GetBalanceAsync(employeeId, leaveTypeId, year, ct);
+            if (balance == null)
+                throw new InvalidOperationException("Không tìm thấy quỹ phép của nhân viên trong kỳ này.");
+
+            balance.UsedDays = (balance.UsedDays ?? 0) + days;
+        }
+
         public async Task UpdateDeptAllocatedDaysAsync(int deptId, int leaveTypeId, short year, decimal totalDays, CancellationToken ct = default)
         {
             // Lấy danh sách ID của tất cả nhân viên thuộc phòng ban và chưa nghỉ việc

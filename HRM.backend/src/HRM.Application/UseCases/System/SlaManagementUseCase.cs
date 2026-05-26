@@ -11,35 +11,39 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
         private readonly IConfigurationRepository _configRepo;
         private readonly IUnitOfWork _unitOfWork;
         private readonly IAppCache _cache;
+        private readonly ILockService _lockService;
 
         private const string CACHE_KEY = "SLA_Config_Cache";
 
         public SlaManagementUseCase(
             IConfigurationRepository configRepo,
             IUnitOfWork unitOfWork,
-            IAppCache cache)
+            IAppCache cache,
+            ILockService lockService)
         {
             _configRepo = configRepo;
             _unitOfWork = unitOfWork;
             _cache = cache;
+            _lockService = lockService;
         }
 
         public async Task<IEnumerable<SlaDto>> GetSLAConfigsAsync(CancellationToken ct = default)
         {
-            var cachedSlas = await _cache.GetAsync<IEnumerable<SlaDto>>(CACHE_KEY);
-            if (cachedSlas != null) return cachedSlas;
-
-            var configs = await _configRepo.FetchSLAByModuleAsync(ct);
-            var slas = configs.Select(c => new SlaDto
-            {
-                ModuleCode = c.ParamKey.Replace("SLA_", ""),
-                Value = c.ParamValue,
-                Unit = c.Description?.Replace("Unit: ", "") ?? "HOURS"
-            }).ToList();
-
-            await _cache.SetAsync(CACHE_KEY, slas, TimeSpan.FromHours(24), null, ct);
-
-            return slas;
+            return await _cache.GetOrSetWithLockAsync(
+                CACHE_KEY,
+                async (innerCt) =>
+                {
+                    var configs = await _configRepo.FetchSLAByModuleAsync(innerCt);
+                    return configs.Select(c => new SlaDto
+                    {
+                        ModuleCode = c.ParamKey.Replace("SLA_", ""),
+                        Value = c.ParamValue,
+                        Unit = c.Description?.Replace("Unit: ", "") ?? "HOURS"
+                    }).ToList();
+                },
+                TimeSpan.FromHours(24),
+                _lockService,
+                ct: ct);
         }
 
         public async Task<bool> UpdateSLAParameterAsync(SlaDto dto, int adminId, CancellationToken ct = default)
@@ -52,15 +56,18 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
 
             bool isSuccess = false;
 
-            await _unitOfWork.ExecuteTransactionAsync(async () =>
+            await _lockService.GetWithLockAsync($"sla_config_{dto.ModuleCode}", async (innerCt) =>
             {
-                await _configRepo.UpdateSLAConfigAsync(dto.ModuleCode, dto.Value, dto.Unit.ToUpper(), ct);
+                await _unitOfWork.ExecuteTransactionAsync(async () =>
+                {
+                    await _configRepo.UpdateSLAConfigAsync(dto.ModuleCode, dto.Value, dto.Unit.ToUpper(), innerCt);
 
-                // Ghi log đã được chuyển giao cho DbContext Hook lo liệu
+                    await _unitOfWork.CommitAsync(innerCt);
+                    isSuccess = true;
+                }, innerCt);
 
-                await _unitOfWork.CommitAsync(ct);
-                isSuccess = true;
-            }, ct);
+                return true;
+            }, cancellationToken: ct);
 
             if (isSuccess)
             {

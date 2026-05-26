@@ -5,7 +5,7 @@ namespace HRM.backend.src.HRM.Application.Interfaces.Recruitment.Usecases
 {
     public interface IRecruitmentUseCase
     {
-        Task<int> CreateRequestAsync(CreateRecruitmentDto dto, int creatorId, string actorRoleName, CancellationToken ct = default);
+        Task<int> CreateRequestAsync(CreateRecruitmentDto dto, int creatorId, string actorRoleName, CancellationToken ct = default, string? idempotencyKey = null);
         Task<bool> ReviewRequestAsync(
             int requestId,
             int approverId,

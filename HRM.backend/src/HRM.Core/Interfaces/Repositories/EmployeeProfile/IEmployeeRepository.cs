@@ -9,5 +9,7 @@ namespace HRM.backend.src.HRM.Core.Interfaces.Repositories.EmployeeProfile
         Task<bool> CheckIdentityNumberExistsAsync(string identityNumber, int excludeEmployeeId, CancellationToken ct = default);
         Task<Employee?> GetProfileByIdAsync(int id, CancellationToken ct = default);
         Task<Employee?> GetByAccountIdAsync(int accountId, CancellationToken ct = default);
+        Task<List<Employee>> GetActiveByDeptWithDepartmentAsync(int deptId, int? excludeEmployeeId = null, CancellationToken ct = default);
+        Task<List<Employee>> GetActiveWithDepartmentAsync(CancellationToken ct = default);
     }
 }

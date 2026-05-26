@@ -13,6 +13,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
         private readonly IConfigurationRepository _configRepo;
         private readonly IUnitOfWork _unitOfWork;
         private readonly IAppCache _cache;
+        private readonly ILockService _lockService;
 
         private const string CACHE_KEY = "Notification_Template_Cache";
 
@@ -20,46 +21,55 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
         {
             { "PROMOTION", new List<string> { "{name}", "{position}", "{date}" } },
             { "NEW_TASK", new List<string> { "{name}", "{task_name}", "{deadline}" } },
-            { "SLA_WARNING", new List<string> { "{name}", "{module}", "{hours_left}" } }
+            { "SLA_WARNING", new List<string> { "{name}", "{module}", "{hours_left}" } },
+            { "LEAVE_REQUEST_CREATED", new List<string> { "{name}", "{leave_type}", "{start_date}", "{end_date}", "{days}", "{status}" } },
+            { "LEAVE_REQUEST_APPROVED", new List<string> { "{name}", "{leave_type}", "{start_date}", "{end_date}", "{days}", "{status}" } },
+            { "LEAVE_REQUEST_REJECTED", new List<string> { "{name}", "{leave_type}", "{start_date}", "{end_date}", "{days}", "{status}", "{reason}" } }
         };
 
         public TemplateManagementUseCase(
             IConfigurationRepository configRepo,
             IUnitOfWork unitOfWork,
-            IAppCache cache)
+            IAppCache cache,
+            ILockService lockService)
         {
             _configRepo = configRepo;
             _unitOfWork = unitOfWork;
             _cache = cache;
+            _lockService = lockService;
         }
 
         public async Task<IEnumerable<TemplateDto>> GetTemplatesAsync(CancellationToken ct = default)
         {
-            var cachedTemplates = await _cache.GetAsync<IEnumerable<TemplateDto>>(CACHE_KEY);
-            if (cachedTemplates != null) return cachedTemplates;
-
-            var configs = await _configRepo.FetchAllTemplatesAsync(ct);
-            var templates = new List<TemplateDto>();
-
-            foreach (var c in configs)
-            {
-                try
+            return await _cache.GetOrSetWithLockAsync(
+                CACHE_KEY,
+                async (innerCt) =>
                 {
-                    var parsed = JsonSerializer.Deserialize<TemplateDto>(c.ParamValue);
-                    if (parsed != null)
+                    var configs = await _configRepo.FetchAllTemplatesAsync(innerCt);
+                    var templates = new List<TemplateDto>();
+
+                    foreach (var c in configs)
                     {
-                        parsed.TemplateKey = c.ParamKey.Replace("TEMPLATE_", "");
-                        templates.Add(parsed);
+                        try
+                        {
+                            var parsed = JsonSerializer.Deserialize<TemplateDto>(c.ParamValue);
+                            if (parsed != null)
+                            {
+                                parsed.TemplateKey = c.ParamKey.Replace("TEMPLATE_", "");
+                                templates.Add(parsed);
+                            }
+                        }
+                        catch
+                        {
+                            // Bỏ qua lỗi Deserialize
+                        }
                     }
-                }
-                catch
-                {
-                    // Bỏ qua lỗi Deserialize
-                }
-            }
 
-            await _cache.SetAsync(CACHE_KEY, templates, TimeSpan.FromHours(24), null, ct);
-            return templates;
+                    return templates;
+                },
+                TimeSpan.FromHours(24),
+                _lockService,
+                ct: ct);
         }
 
         public async Task<bool> UpdateTemplateAsync(TemplateDto dto, int adminId, CancellationToken ct = default)
@@ -77,18 +87,25 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
 
             bool isSuccess = false;
 
-            await _unitOfWork.ExecuteTransactionAsync(async () =>
+            await _lockService.GetWithLockAsync($"notification_template_{rawKey}", async (innerCt) =>
             {
-                var jsonContent = JsonSerializer.Serialize(new { dto.Subject, dto.BodyHtml });
-                await _configRepo.UpdateTemplateContentAsync(rawKey, jsonContent, ct);
+                await _unitOfWork.ExecuteTransactionAsync(async () =>
+                {
+                    var jsonContent = JsonSerializer.Serialize(new { dto.Subject, dto.BodyHtml });
+                    await _configRepo.UpdateTemplateContentAsync(rawKey, jsonContent, innerCt);
 
-                // Ghi log đã được chuyển giao cho DbContext Hook lo liệu
+                    await _unitOfWork.CommitAsync(innerCt);
+                    isSuccess = true;
+                }, innerCt);
 
-                await _unitOfWork.CommitAsync(ct);
-                isSuccess = true;
-            }, ct);
+                return true;
+            }, cancellationToken: ct);
 
-            if (isSuccess) await _cache.RemoveAsync(CACHE_KEY, ct);
+            if (isSuccess)
+            {
+                await _cache.RemoveAsync(CACHE_KEY, ct);
+                await _cache.RemoveAsync($"Notification_Template_Render_{rawKey}", ct);
+            }
 
             return isSuccess;
         }

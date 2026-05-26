@@ -15,6 +15,7 @@ namespace HRM.backend.src.HRM.Core.Interfaces.Repositories.System
         Task UpdateStatusAsync(int id, AccountStatus status, CancellationToken ct = default); // status: Active/Inactive
         Task UpdateHashedPasswordAsync(int id, string hashedPassword, CancellationToken ct = default);
         Task<Account?> GetByEmailAsync(string email, CancellationToken ct = default);
+        Task<Account?> GetByIdWithRoleAsync(int id, CancellationToken ct = default);
         Task<List<Account>> GetAllWithRoleAsync(CancellationToken ct = default);
         Task<List<int>> GetAccountIdsByRoleAsync(string roleName, CancellationToken ct = default);
     }

@@ -24,6 +24,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
         private readonly IConfigurationRepository _configRepo;
         private readonly IAppCache _cache;
         private readonly IUnitOfWork _unitOfWork;
+        private readonly ILockService _lockService;
 
         public AttendanceUseCase(
             IEmployeeRepository employeeRepo,
@@ -31,7 +32,8 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
             IWorkShiftRepository workShiftRepo,
             IConfigurationRepository configRepo,
             IAppCache cache,
-            IUnitOfWork unitOfWork)
+            IUnitOfWork unitOfWork,
+            ILockService lockService)
         {
             _employeeRepo = employeeRepo;
             _attendanceRepo = attendanceRepo;
@@ -39,6 +41,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
             _configRepo = configRepo;
             _cache = cache;
             _unitOfWork = unitOfWork;
+            _lockService = lockService;
         }
 
         public async Task<AttendanceTodayStatusDto> GetTodayStatusAsync(
@@ -66,6 +69,9 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
                 BreakEndTime = FormatTime(shift?.BreakEndTime),
                 CheckIn = todayLog?.CheckIn,
                 CheckOut = todayLog?.CheckOut,
+                LateMinutes = CalculateLateMinutes(todayLog?.CheckIn, shift),
+                EarlyLeaveMinutes = CalculateEarlyLeaveMinutes(todayLog?.CheckOut, shift),
+                OvertimeMinutes = CalculateOvertimeMinutes(todayLog?.CheckOut, shift),
                 NextAction = nextAction,
                 Message = BuildTodayMessage(nextAction, shift)
             };
@@ -80,8 +86,21 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
             var employee = await GetEmployeeByAccountAsync(accountId, ct);
 
             var config = await GetSecurityConfigAsync(ct);
-            ValidateSecurity(clientIp, config);
+            ValidateSecurity(clientIp, dto, config);
 
+            return await _lockService.GetWithLockAsync(
+                $"attendance_{employee.Id}_{DateTime.Now:yyyyMMdd}",
+                async (innerCt) =>
+                    await VerifyAndRecordCoreAsync(employee, clientIp, dto, innerCt),
+                cancellationToken: ct);
+        }
+
+        private async Task<AttendanceLogResponseDto> VerifyAndRecordCoreAsync(
+            Employee employee,
+            string clientIp,
+            AttendanceGpsDto dto,
+            CancellationToken ct)
+        {
             var now = DateTime.Now;
             var todayLog = await _attendanceRepo.GetTodayLogAsync(employee.Id, now, ct);
             var shift = await GetEmployeeShiftAsync(employee, ct);
@@ -110,6 +129,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
                     CheckOut = log.CheckOut,
                     IpAddress = clientIp,
                     Status = log.Status.ToString(),
+                    LateMinutes = CalculateLateMinutes(log.CheckIn, shift),
                     Message = $"Chấm công vào thành công lúc {now:HH:mm}."
                 };
             }
@@ -133,6 +153,9 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
                 CheckOut = todayLog.CheckOut,
                 IpAddress = clientIp,
                 Status = todayLog.Status.ToString(),
+                LateMinutes = CalculateLateMinutes(todayLog.CheckIn, shift),
+                EarlyLeaveMinutes = CalculateEarlyLeaveMinutes(todayLog.CheckOut, shift),
+                OvertimeMinutes = CalculateOvertimeMinutes(todayLog.CheckOut, shift),
                 Message = $"Chấm công ra thành công lúc {now:HH:mm}."
             };
         }
@@ -150,13 +173,39 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
 
         private async Task<WorkShift?> GetEmployeeShiftAsync(Employee employee, CancellationToken ct)
         {
-            return employee.DeptId.HasValue
-                ? await _workShiftRepo.GetByDeptIdAsync(employee.DeptId.Value, ct)
-                : null;
+            if (!employee.DeptId.HasValue)
+                return null;
+
+            return await _cache.GetOrSetWithLockAsync(
+                $"shift_config_dept_{employee.DeptId.Value}",
+                async (innerCt) => await _workShiftRepo.GetByDeptIdAsync(employee.DeptId.Value, innerCt),
+                TimeSpan.FromHours(12),
+                _lockService,
+                ct: ct);
         }
 
         private async Task<AttendanceConfigDto> GetSecurityConfigAsync(CancellationToken ct)
         {
+            return await _cache.GetOrSetWithLockAsync(
+                CacheKey,
+                async (innerCt) =>
+                {
+                    var configs = await _configRepo.FetchLatestConfigAsync(innerCt);
+                    var rawConfig = configs.FirstOrDefault(c => c.ConfigGroup == "ATTENDANCE_PARAM")?.ParamValue;
+                    if (string.IsNullOrWhiteSpace(rawConfig))
+                        throw new InvalidOperationException("Chua cau hinh tham so bao mat cham cong.");
+
+                    var config = JsonSerializer.Deserialize<AttendanceConfigDto>(rawConfig);
+                    if (config == null)
+                        throw new InvalidOperationException("Cau hinh cham cong khong hop le.");
+
+                    return config;
+                },
+                TimeSpan.FromHours(2),
+                _lockService,
+                ct: ct);
+
+#pragma warning disable CS0162
             var cachedConfig = await _cache.GetAsync<AttendanceConfigDto>(CacheKey);
             if (cachedConfig != null)
                 return cachedConfig;
@@ -172,15 +221,41 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
 
             await _cache.SetAsync(CacheKey, config, TimeSpan.FromHours(2), null, ct);
             return config;
+#pragma warning restore CS0162
         }
 
-        private static void ValidateSecurity(string clientIp, AttendanceConfigDto config)
+        private static void ValidateSecurity(string clientIp, AttendanceGpsDto gpsDto, AttendanceConfigDto config)
         {
-            if (config.AllowedIpRanges.Count == 0)
-                throw new InvalidOperationException("Chưa cấu hình dải IP văn phòng cho chấm công.");
+            var offices = GetConfiguredOffices(config).Where(x => x.IsActive).ToList();
+            if (offices.Count == 0)
+                throw new InvalidOperationException("Chưa cấu hình cơ sở chấm công.");
 
-            if (!IsIpAllowed(clientIp, config.AllowedIpRanges))
+            if (!offices.Any(office => IsIpAllowed(clientIp, office.AllowedIpRanges)))
                 throw new UnauthorizedAccessException("Bạn phải dùng mạng công ty để chấm công.");
+
+            var lat = Convert.ToDouble(gpsDto.Latitude);
+            var lng = Convert.ToDouble(gpsDto.Longitude);
+            if (!offices.Any(office => IsWithinRadius(lat, lng, office.Latitude, office.Longitude, office.RadiusInMeters)))
+                throw new UnauthorizedAccessException("Thiết bị không nằm trong vùng GPS của các cơ sở được phép chấm công.");
+        }
+
+        private static List<AttendanceOfficeLocationDto> GetConfiguredOffices(AttendanceConfigDto config)
+        {
+            if (config.OfficeLocations.Count > 0)
+                return config.OfficeLocations;
+
+            return new List<AttendanceOfficeLocationDto>
+            {
+                new()
+                {
+                    Name = "Cơ sở chính",
+                    Latitude = config.Latitude,
+                    Longitude = config.Longitude,
+                    RadiusInMeters = config.RadiusInMeters,
+                    AllowedIpRanges = config.AllowedIpRanges,
+                    IsActive = true
+                }
+            };
         }
 
         private static bool IsIpAllowed(string clientIp, IEnumerable<string> allowedRanges)
@@ -230,6 +305,25 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
             return ipAddress.IsIPv4MappedToIPv6 ? ipAddress.MapToIPv4() : ipAddress;
         }
 
+        private static bool IsWithinRadius(double lat, double lng, double officeLat, double officeLng, int radiusInMeters)
+        {
+            const double earthRadiusMeters = 6371000;
+
+            static double ToRadians(double degrees) => degrees * Math.PI / 180d;
+
+            var dLat = ToRadians(officeLat - lat);
+            var dLng = ToRadians(officeLng - lng);
+            var lat1 = ToRadians(lat);
+            var lat2 = ToRadians(officeLat);
+
+            var a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2) +
+                    Math.Cos(lat1) * Math.Cos(lat2) *
+                    Math.Sin(dLng / 2) * Math.Sin(dLng / 2);
+            var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
+
+            return earthRadiusMeters * c <= radiusInMeters;
+        }
+
         private static string? FormatTime(TimeSpan? value)
         {
             return value?.ToString(@"hh\:mm");
@@ -251,9 +345,41 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
 
             var earliestValidCheckOut = shift.EndTime.Value.Subtract(TimeSpan.FromMinutes(shift.EarlyLeaveThresholdMins));
             if (now.TimeOfDay < earliestValidCheckOut)
-                return AttendanceStatus.Early;
+                return currentStatus == AttendanceStatus.Valid ? AttendanceStatus.Early : currentStatus;
 
             return currentStatus;
+        }
+
+        private static int CalculateLateMinutes(DateTime? checkIn, WorkShift? shift)
+        {
+            if (!checkIn.HasValue || shift?.StartTime == null)
+                return 0;
+
+            var latestValidCheckIn = shift.StartTime.Value.Add(TimeSpan.FromMinutes(shift.LateThresholdMins));
+            return CalculateMinutesAfter(checkIn.Value.TimeOfDay, latestValidCheckIn);
+        }
+
+        private static int CalculateEarlyLeaveMinutes(DateTime? checkOut, WorkShift? shift)
+        {
+            if (!checkOut.HasValue || shift?.EndTime == null)
+                return 0;
+
+            var earliestValidCheckOut = shift.EndTime.Value.Subtract(TimeSpan.FromMinutes(shift.EarlyLeaveThresholdMins));
+            return CalculateMinutesAfter(earliestValidCheckOut, checkOut.Value.TimeOfDay);
+        }
+
+        private static int CalculateOvertimeMinutes(DateTime? checkOut, WorkShift? shift)
+        {
+            if (!checkOut.HasValue || shift?.EndTime == null)
+                return 0;
+
+            return CalculateMinutesAfter(checkOut.Value.TimeOfDay, shift.EndTime.Value);
+        }
+
+        private static int CalculateMinutesAfter(TimeSpan later, TimeSpan earlier)
+        {
+            var minutes = (later - earlier).TotalMinutes;
+            return minutes > 0 ? (int)Math.Ceiling(minutes) : 0;
         }
 
         private static string BuildTodayMessage(string nextAction, WorkShift? shift)

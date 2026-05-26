@@ -9,6 +9,7 @@ using HRM.backend.src.HRM.Core.Interfaces.Repositories.Organization;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.Recruitment;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.System;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.System.HRM.backend.src.HRM.Infrastructure.Repositories.Interfaces.System;
+using HRM.backend.src.HRM.Core.Interfaces.Repositories.TasksTraining;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.TimeAttendance;
 using HRM.backend.src.HRM.Infrastructure.ExternalServices;
 using HRM.backend.src.HRM.Infrastructure.Persistence.Repositories;
@@ -16,6 +17,7 @@ using HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.EmployeeProfil
 using HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.Organization;
 using HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.Recruitment;
 using HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.System;
+using HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.TasksTraining;
 using HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.TimeAttendance;
 
 namespace HRM.backend.src.HRM.Infrastructure.Configurations
@@ -58,7 +60,10 @@ namespace HRM.backend.src.HRM.Infrastructure.Configurations
             // Attendence
             services.AddScoped<IWorkShiftRepository, WorkShiftRepository>();
             services.AddScoped<IAttendanceRepository, AttendanceRepository>();
+            services.AddScoped<IAttendanceSummaryRepository, AttendanceSummaryRepository>();
+            services.AddScoped<IOvertimeRequestRepository, OvertimeRequestRepository>();
             services.AddScoped<ILeaveBalanceRepository, LeaveBalanceRepository>();
+            services.AddScoped<ILeaveRequestRepository, LeaveRequestRepository>();
 
             // Profile
             services.AddScoped<IEmployeeRepository, EmployeeRepository>();
@@ -70,6 +75,17 @@ namespace HRM.backend.src.HRM.Infrastructure.Configurations
             services.AddScoped<IRecruitmentRequestRepository, RecruitmentRequestRepository>();
             services.AddScoped<IPositionRepository, PositionRepository>();
             services.AddScoped<ICandidateRepository, CandidateRepository>();
+
+            // Tasks & Training
+            services.AddScoped<IKpiImportBatchRepository, KpiImportBatchRepository>();
+            services.AddScoped<IPerformanceReviewRepository, PerformanceReviewRepository>();
+            services.AddScoped<IPerformanceDetailRepository, PerformanceDetailRepository>();
+            services.AddScoped<IPenaltyRuleRepository, PenaltyRuleRepository>();
+            services.AddScoped<IPenaltyRecordRepository, PenaltyRecordRepository>();
+            services.AddScoped<ITaskRepository, TaskRepository>();
+            services.AddScoped<ITaskProgressRepository, TaskProgressRepository>();
+            services.AddScoped<ITaskFeedbackRepository, TaskFeedbackRepository>();
+            services.AddScoped<ITrainingRepository, TrainingRepository>();
 
 
             return services;

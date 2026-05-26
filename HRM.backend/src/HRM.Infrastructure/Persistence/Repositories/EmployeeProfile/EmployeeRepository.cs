@@ -29,7 +29,29 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.EmployeePr
 
         public async Task<Employee?> GetByAccountIdAsync(int accountId, CancellationToken ct = default)
         {
-            return await _dbSet.FirstOrDefaultAsync(e => e.AccountId == accountId, ct);
+            return await _dbSet
+                .Include(e => e.Account)
+                .FirstOrDefaultAsync(e => e.AccountId == accountId, ct);
+        }
+
+        public async Task<List<Employee>> GetActiveByDeptWithDepartmentAsync(int deptId, int? excludeEmployeeId = null, CancellationToken ct = default)
+        {
+            return await _dbSet
+                .Include(e => e.Department)
+                .Where(e => e.DeptId == deptId &&
+                            e.Status != EmployeeStatus.Terminated &&
+                            (!excludeEmployeeId.HasValue || e.Id != excludeEmployeeId.Value))
+                .AsNoTracking()
+                .ToListAsync(ct);
+        }
+
+        public async Task<List<Employee>> GetActiveWithDepartmentAsync(CancellationToken ct = default)
+        {
+            return await _dbSet
+                .Include(e => e.Department)
+                .Where(e => e.Status != EmployeeStatus.Terminated)
+                .AsNoTracking()
+                .ToListAsync(ct);
         }
     }
 }
