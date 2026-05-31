@@ -102,7 +102,7 @@ namespace HRM.backend.src.HRM.API.Controllers.TasksTraining
             }
         }
 
-        private int GetAccountId() => int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        private int GetAccountId() => User.GetAccountIdOrThrow();
         private string GetRole() => User.FindFirst("role")?.Value ?? User.FindFirst(ClaimTypes.Role)?.Value ?? string.Empty;
     }
 }

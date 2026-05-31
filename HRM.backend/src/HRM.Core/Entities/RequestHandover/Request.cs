@@ -29,7 +29,5 @@ namespace HRM.backend.src.HRM.Core.Entities.RequestHandover
         public int? CurrentApproverId { get; set; }
         public DateTime? DeadlineAt { get; set; }
 
-         //Navigation Property: 1 Request có thể phát sinh nhiều HandoverRequest
-        public virtual ICollection<HandoverRequest> HandoverRequests { get; set; } = new List<HandoverRequest>();
     }
 }

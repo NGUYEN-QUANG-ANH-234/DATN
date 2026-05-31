@@ -45,6 +45,9 @@ namespace HRM.backend.Migrations
                         .IsRequired()
                         .HasColumnType("VARCHAR(50)");
 
+                    b.Property<decimal?>("DailyRate")
+                        .HasColumnType("DECIMAL(15,2)");
+
                     b.Property<DateTime?>("DirectorDeadline")
                         .HasColumnType("datetime(6)");
 
@@ -57,12 +60,26 @@ namespace HRM.backend.Migrations
                     b.Property<DateTime?>("EndDate")
                         .HasColumnType("datetime(6)");
 
+                    b.Property<decimal?>("HourlyRate")
+                        .HasColumnType("DECIMAL(15,2)");
+
                     b.Property<decimal>("InsuranceSalary")
                         .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<bool>("IsInsuranceEligible")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(true);
 
                     b.Property<string>("NegotiationNote")
                         .HasMaxLength(1000)
                         .HasColumnType("varchar(1000)");
+
+                    b.Property<string>("PayBasis")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("VARCHAR(50)")
+                        .HasDefaultValue("Monthly");
 
                     b.Property<int?>("PayrollFormulaId")
                         .HasColumnType("int");
@@ -70,11 +87,24 @@ namespace HRM.backend.Migrations
                     b.Property<decimal>("SalaryPercentage")
                         .HasColumnType("DECIMAL(15,2)");
 
+                    b.Property<decimal>("StandardHoursPerDaySnapshot")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("DECIMAL(15,2)")
+                        .HasDefaultValue(8m);
+
+                    b.Property<decimal>("StandardWorkdaysSnapshot")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("DECIMAL(15,2)")
+                        .HasDefaultValue(22m);
+
                     b.Property<DateTime>("StartDate")
                         .HasColumnType("datetime(6)");
 
                     b.Property<string>("Status")
                         .IsRequired()
+                        .HasColumnType("VARCHAR(50)");
+
+                    b.Property<string>("TaxMethodOverride")
                         .HasColumnType("VARCHAR(50)");
 
                     b.Property<int>("Version")
@@ -85,11 +115,12 @@ namespace HRM.backend.Migrations
                     b.HasIndex("ContractNumber")
                         .IsUnique();
 
-                    b.HasIndex("EmployeeId");
-
                     b.HasIndex("PayrollFormulaId");
 
-                    b.ToTable("contracts", (string)null);
+                    b.HasIndex("EmployeeId", "Status", "StartDate")
+                        .HasDatabaseName("IX_contracts_Employee_Status_StartDate");
+
+                    b.ToTable("contracts");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.ContractAddendum", b =>
@@ -145,7 +176,48 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("ContractId", "Status");
 
-                    b.ToTable("contract_addendums", (string)null);
+                    b.ToTable("contract_addendums");
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.ContractAddendumDetail", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ContractAddendumId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("FieldName")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("varchar(120)");
+
+                    b.Property<string>("NewValue")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<string>("OldValue")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("ValueType")
+                        .IsRequired()
+                        .HasColumnType("VARCHAR(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ContractAddendumId", "FieldName")
+                        .HasDatabaseName("IX_contract_addendum_details_Addendum_Field");
+
+                    b.ToTable("contract_addendum_details");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.Dependent", b =>
@@ -159,8 +231,14 @@ namespace HRM.backend.Migrations
                     b.Property<DateTime?>("BirthDate")
                         .HasColumnType("datetime(6)");
 
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
                     b.Property<int?>("EmployeeId")
                         .HasColumnType("int");
+
+                    b.Property<string>("EvidenceUrl")
+                        .HasColumnType("longtext");
 
                     b.Property<string>("FullName")
                         .IsRequired()
@@ -174,6 +252,9 @@ namespace HRM.backend.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("tinyint(1)");
 
+                    b.Property<string>("Note")
+                        .HasColumnType("longtext");
+
                     b.Property<string>("Relationship")
                         .IsRequired()
                         .HasColumnType("VARCHAR(50)");
@@ -181,6 +262,9 @@ namespace HRM.backend.Migrations
                     b.Property<string>("TaxDependentCode")
                         .HasMaxLength(20)
                         .HasColumnType("varchar(20)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
 
                     b.Property<DateTime>("ValidFrom")
                         .HasColumnType("datetime(6)");
@@ -190,9 +274,60 @@ namespace HRM.backend.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("EmployeeId");
+                    b.HasIndex("EmployeeId", "TaxDependentCode");
 
-                    b.ToTable("dependents", (string)null);
+                    b.ToTable("dependents");
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.DependentUpdateRequest", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ActionType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int?>("DependentId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("EmployeeId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("EvidenceUrl")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("RejectReason")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("RequestedDataJson")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<DateTime?>("ReviewedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int?>("ReviewerAccountId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("VARCHAR(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DependentId");
+
+                    b.HasIndex("EmployeeId", "Status");
+
+                    b.ToTable("dependent_update_requests");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.Employee", b =>
@@ -276,6 +411,9 @@ namespace HRM.backend.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("varchar(100)");
 
+                    b.Property<int?>("JobLevelId")
+                        .HasColumnType("int");
+
                     b.Property<DateTime?>("JoinedDate")
                         .HasColumnType("datetime(6)");
 
@@ -294,6 +432,12 @@ namespace HRM.backend.Migrations
                     b.Property<int?>("PositionId")
                         .HasColumnType("int");
 
+                    b.Property<string>("ResidenceStatus")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("VARCHAR(50)")
+                        .HasDefaultValue("Resident");
+
                     b.Property<string>("SocialInsCode")
                         .HasMaxLength(20)
                         .HasColumnType("varchar(20)");
@@ -308,6 +452,12 @@ namespace HRM.backend.Migrations
                     b.Property<string>("TaxCode")
                         .HasMaxLength(20)
                         .HasColumnType("varchar(20)");
+
+                    b.Property<string>("TaxCodeStatus")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("VARCHAR(50)")
+                        .HasDefaultValue("Unknown");
 
                     b.Property<string>("Type")
                         .IsRequired()
@@ -329,6 +479,8 @@ namespace HRM.backend.Migrations
                     b.HasIndex("IdentityNumber")
                         .IsUnique();
 
+                    b.HasIndex("JobLevelId");
+
                     b.HasIndex("PositionId");
 
                     b.HasIndex("SocialInsCode")
@@ -337,7 +489,228 @@ namespace HRM.backend.Migrations
                     b.HasIndex("TaxCode")
                         .IsUnique();
 
-                    b.ToTable("employees", (string)null);
+                    b.ToTable("employees");
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.EmploymentServicePeriod", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("EmployeeId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActualWorkingTime")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("IsExcludedFromSeverance")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("IsJobLossPaid")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("IsSeverancePaid")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("IsSocialInsuranceContributed")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("IsUnemploymentInsuranceContributed")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
+
+                    b.Property<DateTime>("PeriodEnd")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime>("PeriodStart")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("PeriodType")
+                        .IsRequired()
+                        .HasColumnType("VARCHAR(50)");
+
+                    b.Property<int?>("SourceId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("SourceType")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EmployeeId", "PeriodStart", "PeriodEnd")
+                        .HasDatabaseName("IX_employment_service_periods_Employee_Range");
+
+                    b.ToTable("employment_service_periods");
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.FinalSettlement", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("ApprovedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int?>("ApprovedByAccountId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("AssetCompensation")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<string>("CalculationSnapshotJson")
+                        .HasColumnType("longtext");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("EmployeeId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("FinalNetAmount")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<decimal>("HalfMonthSalaryCompensation")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<decimal>("InsufficientNoticeCompensation")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<decimal>("InsuranceAmount")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<decimal>("JobLossAllowanceAmount")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<DateTime>("LastWorkingDate")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("LockedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int?>("LockedByAccountId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
+
+                    b.Property<decimal>("OtherDeductions")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<DateTime?>("PaidAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<decimal>("SeveranceAllowanceAmount")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("VARCHAR(50)");
+
+                    b.Property<decimal>("TaxAmount")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<int?>("TerminationRequestId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("TerminationType")
+                        .IsRequired()
+                        .HasColumnType("VARCHAR(50)");
+
+                    b.Property<decimal>("TrainingCostCompensation")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<decimal>("UnpaidSalaryAmount")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<decimal>("UnusedAnnualLeaveAmount")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<decimal>("UnusedAnnualLeaveDays")
+                        .HasColumnType("DECIMAL(5,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApprovedByAccountId");
+
+                    b.HasIndex("LockedByAccountId");
+
+                    b.HasIndex("TerminationRequestId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_final_settlements_TerminationRequest");
+
+                    b.HasIndex("EmployeeId", "Status")
+                        .HasDatabaseName("IX_final_settlements_Employee_Status");
+
+                    b.ToTable("final_settlements");
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.MaternityLeave", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("ActualReturnDate")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("ApprovedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int?>("ApprovedByAccountId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("EmployeeId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("EndDate")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("ExpectedReturnDate")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int?>("LeaveRequestId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
+
+                    b.Property<DateTime>("StartDate")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("VARCHAR(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApprovedByAccountId");
+
+                    b.HasIndex("LeaveRequestId");
+
+                    b.HasIndex("EmployeeId", "Status", "StartDate")
+                        .HasDatabaseName("IX_maternity_leaves_Employee_Status_Start");
+
+                    b.ToTable("maternity_leaves");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.OnboardingRequest", b =>
@@ -369,7 +742,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("CandidateId");
 
-                    b.ToTable("onboarding_requests", (string)null);
+                    b.ToTable("onboarding_requests");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.ProfileUpdateRequest", b =>
@@ -405,7 +778,82 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("EmployeeId");
 
-                    b.ToTable("profile_update_requests", (string)null);
+                    b.ToTable("profile_update_requests");
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.TerminationRequest", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("ActualLastWorkingDate")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("ActualNoticeDays")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("ApprovedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int?>("ApprovedByAccountId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("ApprovedLastWorkingDate")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("EmployeeId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("ExpectedLastWorkingDate")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("LegalStatus")
+                        .IsRequired()
+                        .HasColumnType("VARCHAR(50)");
+
+                    b.Property<int>("MissingNoticeDays")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
+
+                    b.Property<DateTime?>("NoticeDate")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("varchar(2000)");
+
+                    b.Property<DateTime>("RequestDate")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("RequiredNoticeDays")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("VARCHAR(50)");
+
+                    b.Property<string>("TerminationType")
+                        .IsRequired()
+                        .HasColumnType("VARCHAR(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApprovedByAccountId");
+
+                    b.HasIndex("EmployeeId", "Status", "ExpectedLastWorkingDate")
+                        .HasDatabaseName("IX_termination_requests_Employee_Status_LastDate");
+
+                    b.ToTable("termination_requests");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.Organization.Department", b =>
@@ -445,7 +893,121 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("ParentDeptId");
 
-                    b.ToTable("departments", (string)null);
+                    b.ToTable("departments");
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.Organization.JobLevel", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("IsManagementLevel")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<int>("RankOrder")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique()
+                        .HasDatabaseName("UX_job_levels_Code");
+
+                    b.HasIndex("IsActive", "RankOrder")
+                        .HasDatabaseName("IX_job_levels_Active_Rank");
+
+                    b.ToTable("job_levels");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Code = "INTERN",
+                            CreatedAt = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsActive = true,
+                            IsManagementLevel = false,
+                            Name = "Thực tập sinh",
+                            RankOrder = 1
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Code = "JUNIOR",
+                            CreatedAt = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsActive = true,
+                            IsManagementLevel = false,
+                            Name = "Junior",
+                            RankOrder = 2
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Code = "MIDDLE",
+                            CreatedAt = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsActive = true,
+                            IsManagementLevel = false,
+                            Name = "Middle",
+                            RankOrder = 3
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Code = "SENIOR",
+                            CreatedAt = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsActive = true,
+                            IsManagementLevel = false,
+                            Name = "Senior",
+                            RankOrder = 4
+                        },
+                        new
+                        {
+                            Id = 5,
+                            Code = "LEAD",
+                            CreatedAt = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsActive = true,
+                            IsManagementLevel = true,
+                            Name = "Lead",
+                            RankOrder = 5
+                        },
+                        new
+                        {
+                            Id = 6,
+                            Code = "MANAGER",
+                            CreatedAt = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsActive = true,
+                            IsManagementLevel = true,
+                            Name = "Manager",
+                            RankOrder = 6
+                        },
+                        new
+                        {
+                            Id = 7,
+                            Code = "DIRECTOR",
+                            CreatedAt = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsActive = true,
+                            IsManagementLevel = true,
+                            Name = "Director",
+                            RankOrder = 7
+                        });
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.Organization.Position", b =>
@@ -472,7 +1034,68 @@ namespace HRM.backend.Migrations
                     b.HasIndex("Title")
                         .IsUnique();
 
-                    b.ToTable("positions", (string)null);
+                    b.ToTable("positions");
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.Organization.PositionJobLevelPolicy", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal?>("BaseSalaryMax")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<decimal?>("BaseSalaryMin")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime>("EffectiveFrom")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("EffectiveTo")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("IsInsuranceBased")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("IsTaxable")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<int>("JobLevelId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("PositionAllowance")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<int>("PositionId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("ResponsibilityAllowance")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("JobLevelId");
+
+                    b.HasIndex("PositionId", "JobLevelId", "EffectiveFrom")
+                        .IsUnique()
+                        .HasDatabaseName("UX_position_job_level_policies_Position_Level_EffectiveFrom");
+
+                    b.HasIndex("PositionId", "JobLevelId", "IsActive", "EffectiveFrom")
+                        .HasDatabaseName("IX_position_job_level_policies_Lookup");
+
+                    b.ToTable("position_job_level_policies");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.AllowanceType", b =>
@@ -495,7 +1118,7 @@ namespace HRM.backend.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("allowance_types", (string)null);
+                    b.ToTable("allowance_types");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.EmployeeAllowance", b =>
@@ -521,7 +1144,646 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("EmployeeId");
 
-                    b.ToTable("employee_allowances", (string)null);
+                    b.ToTable("employee_allowances");
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.EmployeeSalaryComponent", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime>("EffectiveFrom")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("EffectiveTo")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("EmployeeId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
+
+                    b.Property<int>("SalaryComponentTypeId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("SourceReference")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SalaryComponentTypeId");
+
+                    b.HasIndex("EmployeeId", "SalaryComponentTypeId", "EffectiveFrom")
+                        .HasDatabaseName("IX_employee_salary_components_Employee_Type_EffectiveFrom");
+
+                    b.ToTable("employee_salary_components");
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.ExternalTimesheetImport", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("FileUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<byte>("ImportMonth")
+                        .HasColumnType("tinyint unsigned");
+
+                    b.Property<short>("ImportYear")
+                        .HasColumnType("smallint");
+
+                    b.Property<DateTime>("ImportedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("ImportedByAccountId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
+
+                    b.Property<string>("PayrollPeriod")
+                        .IsRequired()
+                        .HasMaxLength(7)
+                        .HasColumnType("varchar(7)");
+
+                    b.Property<string>("SourceSystem")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("VARCHAR(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ImportedByAccountId");
+
+                    b.HasIndex("SourceSystem", "ImportMonth", "ImportYear", "Status")
+                        .HasDatabaseName("IX_external_timesheet_imports_Source_Period_Status");
+
+                    b.ToTable("external_timesheet_imports");
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.ExternalTimesheetLine", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<decimal>("ApprovedHours")
+                        .HasColumnType("DECIMAL(7,2)");
+
+                    b.Property<string>("CollaboratorCode")
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<int?>("CollaboratorEmployeeId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("HourlyRate")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<int>("ImportId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsPayrollImported")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
+
+                    b.Property<int?>("PayrollId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ProjectCode")
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)");
+
+                    b.Property<string>("TaskCode")
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)");
+
+                    b.Property<DateTime>("WorkDate")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PayrollId");
+
+                    b.HasIndex("CollaboratorEmployeeId", "WorkDate", "IsPayrollImported")
+                        .HasDatabaseName("IX_external_timesheet_lines_Employee_WorkDate_Payroll");
+
+                    b.HasIndex("ImportId", "CollaboratorEmployeeId", "WorkDate")
+                        .HasDatabaseName("IX_external_timesheet_lines_Import_Employee_WorkDate");
+
+                    b.ToTable("external_timesheet_lines");
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.InsuranceConfig", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime>("EffectiveFrom")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("EffectiveTo")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<decimal>("HealthInsuranceEmployeeRate")
+                        .HasColumnType("DECIMAL(7,4)");
+
+                    b.Property<decimal>("HealthInsuranceEmployerRate")
+                        .HasColumnType("DECIMAL(7,4)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<decimal?>("MaxInsuranceSalary")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<int>("MinContractMonthsForContribution")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("MinInsuranceSalary")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
+
+                    b.Property<decimal>("SocialInsuranceEmployeeRate")
+                        .HasColumnType("DECIMAL(7,4)");
+
+                    b.Property<decimal>("SocialInsuranceEmployerRate")
+                        .HasColumnType("DECIMAL(7,4)");
+
+                    b.Property<decimal>("UnemploymentInsuranceEmployeeRate")
+                        .HasColumnType("DECIMAL(7,4)");
+
+                    b.Property<decimal>("UnemploymentInsuranceEmployerRate")
+                        .HasColumnType("DECIMAL(7,4)");
+
+                    b.Property<decimal>("UnionFeeEmployerRate")
+                        .HasColumnType("DECIMAL(7,4)");
+
+                    b.Property<int>("UnpaidLeaveNoContributionThresholdDays")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code", "EffectiveFrom")
+                        .IsUnique()
+                        .HasDatabaseName("UX_insurance_configs_Code_EffectiveFrom");
+
+                    b.ToTable("insurance_configs");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Code = "VN_STANDARD_INSURANCE_2025",
+                            CreatedAt = new DateTime(2025, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            EffectiveFrom = new DateTime(2025, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            HealthInsuranceEmployeeRate = 0.015m,
+                            HealthInsuranceEmployerRate = 0.03m,
+                            IsActive = true,
+                            MinContractMonthsForContribution = 1,
+                            Name = "Cấu hình bảo hiểm Việt Nam",
+                            Note = "Baseline insurance config for payroll engine. Salary caps should be updated by policy version when needed.",
+                            SocialInsuranceEmployeeRate = 0.08m,
+                            SocialInsuranceEmployerRate = 0.175m,
+                            UnemploymentInsuranceEmployeeRate = 0.01m,
+                            UnemploymentInsuranceEmployerRate = 0.01m,
+                            UnionFeeEmployerRate = 0.02m,
+                            UnpaidLeaveNoContributionThresholdDays = 14,
+                            Version = 1
+                        });
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.MonthlyInsuranceStatus", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ConfigSnapshotJson")
+                        .HasColumnType("longtext");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("EmployeeId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("EmployeeInsuranceAmount")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<decimal>("EmployerContributionAmount")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<decimal>("InsuranceSalary")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<bool>("IsSocialInsuranceContributed")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("IsUnemploymentInsuranceContributed")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(true);
+
+                    b.Property<decimal>("MaternityLeaveDays")
+                        .HasColumnType("DECIMAL(5,2)");
+
+                    b.Property<byte>("Month")
+                        .HasColumnType("tinyint unsigned");
+
+                    b.Property<string>("NonContributionReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<decimal>("OfficialContractWorkingDays")
+                        .HasColumnType("DECIMAL(5,2)");
+
+                    b.Property<string>("PayrollPeriod")
+                        .IsRequired()
+                        .HasMaxLength(7)
+                        .HasColumnType("varchar(7)");
+
+                    b.Property<decimal>("SickLeaveDays")
+                        .HasColumnType("DECIMAL(5,2)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("VARCHAR(50)");
+
+                    b.Property<decimal>("UnemploymentInsuranceAmount")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<decimal>("UnpaidLeaveWorkingDays")
+                        .HasColumnType("DECIMAL(5,2)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<short>("Year")
+                        .HasColumnType("smallint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EmployeeId", "Month", "Year")
+                        .IsUnique()
+                        .HasDatabaseName("UX_monthly_insurance_statuses_Employee_Period");
+
+                    b.ToTable("monthly_insurance_statuses");
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.OvertimeRateConfig", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("BaseMultiplier")
+                        .HasColumnType("DECIMAL(7,4)");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime>("EffectiveFrom")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("EffectiveTo")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<decimal>("NightAllowanceRate")
+                        .HasColumnType("DECIMAL(7,4)");
+
+                    b.Property<decimal>("NightOvertimeExtraRate")
+                        .HasColumnType("DECIMAL(7,4)");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
+
+                    b.Property<string>("OvertimeType")
+                        .IsRequired()
+                        .HasColumnType("VARCHAR(50)");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code", "EffectiveFrom")
+                        .IsUnique()
+                        .HasDatabaseName("UX_overtime_rate_configs_Code_EffectiveFrom");
+
+                    b.HasIndex("OvertimeType", "IsActive", "EffectiveFrom")
+                        .HasDatabaseName("IX_overtime_rate_configs_Type_Active_EffectiveFrom");
+
+                    b.ToTable("overtime_rate_configs");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            BaseMultiplier = 1.5m,
+                            Code = "VN_OT_WEEKDAY_2020",
+                            CreatedAt = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            EffectiveFrom = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsActive = true,
+                            NightAllowanceRate = 0m,
+                            NightOvertimeExtraRate = 0m,
+                            Note = "Baseline weekday OT multiplier.",
+                            OvertimeType = "Weekday",
+                            Version = 1
+                        },
+                        new
+                        {
+                            Id = 2,
+                            BaseMultiplier = 2.0m,
+                            Code = "VN_OT_WEEKEND_2020",
+                            CreatedAt = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            EffectiveFrom = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsActive = true,
+                            NightAllowanceRate = 0m,
+                            NightOvertimeExtraRate = 0m,
+                            Note = "Baseline weekly rest day OT multiplier.",
+                            OvertimeType = "Weekend",
+                            Version = 1
+                        },
+                        new
+                        {
+                            Id = 3,
+                            BaseMultiplier = 3.0m,
+                            Code = "VN_OT_HOLIDAY_2020",
+                            CreatedAt = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            EffectiveFrom = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsActive = true,
+                            NightAllowanceRate = 0m,
+                            NightOvertimeExtraRate = 0m,
+                            Note = "Baseline public holiday OT multiplier.",
+                            OvertimeType = "Holiday",
+                            Version = 1
+                        },
+                        new
+                        {
+                            Id = 4,
+                            BaseMultiplier = 1.5m,
+                            Code = "VN_OT_WEEKDAY_NIGHT_2020",
+                            CreatedAt = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            EffectiveFrom = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsActive = true,
+                            NightAllowanceRate = 0.3m,
+                            NightOvertimeExtraRate = 0.2m,
+                            Note = "Baseline weekday night OT config.",
+                            OvertimeType = "WeekdayNight",
+                            Version = 1
+                        },
+                        new
+                        {
+                            Id = 5,
+                            BaseMultiplier = 2.0m,
+                            Code = "VN_OT_WEEKEND_NIGHT_2020",
+                            CreatedAt = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            EffectiveFrom = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsActive = true,
+                            NightAllowanceRate = 0.3m,
+                            NightOvertimeExtraRate = 0.2m,
+                            Note = "Baseline weekend night OT config.",
+                            OvertimeType = "WeekendNight",
+                            Version = 1
+                        },
+                        new
+                        {
+                            Id = 6,
+                            BaseMultiplier = 3.0m,
+                            Code = "VN_OT_HOLIDAY_NIGHT_2020",
+                            CreatedAt = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            EffectiveFrom = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsActive = true,
+                            NightAllowanceRate = 0.3m,
+                            NightOvertimeExtraRate = 0.2m,
+                            Note = "Baseline holiday night OT config.",
+                            OvertimeType = "HolidayNight",
+                            Version = 1
+                        });
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.PITTaxBracket", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime>("EffectiveFrom")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("EffectiveTo")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<int>("Level")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("MaxIncome")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<decimal>("MinIncome")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
+
+                    b.Property<decimal>("QuickDeduction")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<decimal>("TaxRate")
+                        .HasColumnType("DECIMAL(7,4)");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code", "Level", "EffectiveFrom")
+                        .IsUnique()
+                        .HasDatabaseName("UX_pit_tax_brackets_Code_Level_EffectiveFrom");
+
+                    b.ToTable("pit_tax_brackets");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Code = "VN_PROGRESSIVE_PIT_2020",
+                            CreatedAt = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            EffectiveFrom = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsActive = true,
+                            Level = 1,
+                            MaxIncome = 5000000m,
+                            MinIncome = 0m,
+                            QuickDeduction = 0m,
+                            TaxRate = 0.05m,
+                            Version = 1
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Code = "VN_PROGRESSIVE_PIT_2020",
+                            CreatedAt = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            EffectiveFrom = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsActive = true,
+                            Level = 2,
+                            MaxIncome = 10000000m,
+                            MinIncome = 5000000m,
+                            QuickDeduction = 250000m,
+                            TaxRate = 0.10m,
+                            Version = 1
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Code = "VN_PROGRESSIVE_PIT_2020",
+                            CreatedAt = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            EffectiveFrom = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsActive = true,
+                            Level = 3,
+                            MaxIncome = 18000000m,
+                            MinIncome = 10000000m,
+                            QuickDeduction = 750000m,
+                            TaxRate = 0.15m,
+                            Version = 1
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Code = "VN_PROGRESSIVE_PIT_2020",
+                            CreatedAt = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            EffectiveFrom = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsActive = true,
+                            Level = 4,
+                            MaxIncome = 32000000m,
+                            MinIncome = 18000000m,
+                            QuickDeduction = 1650000m,
+                            TaxRate = 0.20m,
+                            Version = 1
+                        },
+                        new
+                        {
+                            Id = 5,
+                            Code = "VN_PROGRESSIVE_PIT_2020",
+                            CreatedAt = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            EffectiveFrom = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsActive = true,
+                            Level = 5,
+                            MaxIncome = 52000000m,
+                            MinIncome = 32000000m,
+                            QuickDeduction = 3250000m,
+                            TaxRate = 0.25m,
+                            Version = 1
+                        },
+                        new
+                        {
+                            Id = 6,
+                            Code = "VN_PROGRESSIVE_PIT_2020",
+                            CreatedAt = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            EffectiveFrom = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsActive = true,
+                            Level = 6,
+                            MaxIncome = 80000000m,
+                            MinIncome = 52000000m,
+                            QuickDeduction = 5850000m,
+                            TaxRate = 0.30m,
+                            Version = 1
+                        },
+                        new
+                        {
+                            Id = 7,
+                            Code = "VN_PROGRESSIVE_PIT_2020",
+                            CreatedAt = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            EffectiveFrom = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsActive = true,
+                            Level = 7,
+                            MinIncome = 80000000m,
+                            QuickDeduction = 9850000m,
+                            TaxRate = 0.35m,
+                            Version = 1
+                        });
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.Payroll", b =>
@@ -532,11 +1794,29 @@ namespace HRM.backend.Migrations
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<int?>("ActualOtMinutes")
+                        .HasColumnType("int");
+
                     b.Property<decimal?>("ActualWorkDays")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<decimal?>("ActualWorkHours")
                         .HasColumnType("DECIMAL(15,2)");
 
                     b.Property<decimal?>("AdvancePayment")
                         .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<decimal?>("BaseSalary")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<decimal?>("BaseSalaryActual")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<DateTime?>("CalculatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int?>("CalculatedByAccountId")
+                        .HasColumnType("int");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime(6)");
@@ -544,11 +1824,32 @@ namespace HRM.backend.Migrations
                     b.Property<int?>("EmployeeId")
                         .HasColumnType("int");
 
+                    b.Property<decimal?>("EmployeeInsuranceAmount")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<decimal?>("EmployerContributionAmount")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<string>("FormulaSnapshotJson")
+                        .HasColumnType("longtext");
+
+                    b.Property<decimal?>("GrossIncome")
+                        .HasColumnType("DECIMAL(15,2)");
+
                     b.Property<decimal?>("GrossSalary")
                         .HasColumnType("DECIMAL(15,2)");
 
                     b.Property<decimal?>("InsuranceDeduction")
                         .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<decimal?>("InsuranceSalary")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<DateTime?>("LockedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int?>("LockedByAccountId")
+                        .HasColumnType("int");
 
                     b.Property<byte?>("Month")
                         .HasColumnType("tinyint unsigned");
@@ -556,8 +1857,18 @@ namespace HRM.backend.Migrations
                     b.Property<decimal?>("NetSalary")
                         .HasColumnType("DECIMAL(15,2)");
 
+                    b.Property<decimal?>("OtherDeductions")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<string>("Period")
+                        .HasMaxLength(7)
+                        .HasColumnType("varchar(7)");
+
                     b.Property<decimal?>("PitAmount")
                         .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<string>("PolicySnapshotJson")
+                        .HasColumnType("longtext");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -569,6 +1880,9 @@ namespace HRM.backend.Migrations
                     b.Property<decimal?>("TaxDeductionPersonal")
                         .HasColumnType("DECIMAL(15,2)");
 
+                    b.Property<decimal?>("TaxableGrossIncome")
+                        .HasColumnType("DECIMAL(15,2)");
+
                     b.Property<decimal?>("TaxableIncome")
                         .HasColumnType("DECIMAL(15,2)");
 
@@ -578,14 +1892,263 @@ namespace HRM.backend.Migrations
                     b.Property<decimal?>("TotalBonus")
                         .HasColumnType("DECIMAL(15,2)");
 
+                    b.Property<decimal?>("TotalCompanyCost")
+                        .HasColumnType("DECIMAL(15,2)");
+
                     b.Property<short?>("Year")
                         .HasColumnType("smallint");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("EmployeeId");
+                    b.HasIndex("CalculatedByAccountId");
 
-                    b.ToTable("payrolls", (string)null);
+                    b.HasIndex("LockedByAccountId");
+
+                    b.HasIndex("EmployeeId", "Month", "Year")
+                        .HasDatabaseName("IX_payrolls_Employee_Period");
+
+                    b.HasIndex("Month", "Year", "Status")
+                        .HasDatabaseName("IX_payrolls_Period_Status");
+
+                    b.ToTable("payrolls");
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.PayrollAdjustment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AdjustmentType")
+                        .IsRequired()
+                        .HasColumnType("VARCHAR(50)");
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<DateTime?>("AppliedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int?>("AppliedPayrollId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("ApprovedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int?>("ApprovedByAccountId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("EffectiveFromMonth")
+                        .HasMaxLength(7)
+                        .HasColumnType("varchar(7)");
+
+                    b.Property<string>("EffectiveToMonth")
+                        .HasMaxLength(7)
+                        .HasColumnType("varchar(7)");
+
+                    b.Property<int>("EmployeeId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsDeduction")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("IsInsuranceBased")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("IsTaxable")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
+
+                    b.Property<byte>("RecognizedMonth")
+                        .HasColumnType("tinyint unsigned");
+
+                    b.Property<string>("RecognizedPayrollPeriod")
+                        .IsRequired()
+                        .HasMaxLength(7)
+                        .HasColumnType("varchar(7)");
+
+                    b.Property<short>("RecognizedYear")
+                        .HasColumnType("smallint");
+
+                    b.Property<int?>("RelatedPayrollId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("VARCHAR(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AppliedPayrollId")
+                        .HasDatabaseName("IX_payroll_adjustments_AppliedPayroll");
+
+                    b.HasIndex("ApprovedByAccountId");
+
+                    b.HasIndex("RelatedPayrollId");
+
+                    b.HasIndex("EmployeeId", "RecognizedMonth", "RecognizedYear", "Status")
+                        .HasDatabaseName("IX_payroll_adjustments_Employee_Recognized_Status");
+
+                    b.ToTable("payroll_adjustments");
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.PayrollContractSegment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("ActualWorkdays")
+                        .HasColumnType("DECIMAL(5,2)");
+
+                    b.Property<decimal>("BaseSalary")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<int>("ContractId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ContractType")
+                        .IsRequired()
+                        .HasColumnType("VARCHAR(50)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("EmployeeId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("EndDate")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<decimal>("InsuranceBaseAmount")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<bool>("IsInsuranceEligible")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("PayBasis")
+                        .IsRequired()
+                        .HasColumnType("VARCHAR(50)");
+
+                    b.Property<int?>("PayrollId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("SalaryAmount")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<decimal>("SalaryPercentage")
+                        .HasColumnType("DECIMAL(5,2)");
+
+                    b.Property<string>("SegmentType")
+                        .IsRequired()
+                        .HasColumnType("VARCHAR(50)");
+
+                    b.Property<string>("SnapshotJson")
+                        .HasColumnType("longtext");
+
+                    b.Property<decimal>("StandardWorkdays")
+                        .HasColumnType("DECIMAL(5,2)");
+
+                    b.Property<DateTime>("StartDate")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("TaxMethod")
+                        .IsRequired()
+                        .HasColumnType("VARCHAR(50)");
+
+                    b.Property<decimal>("TaxableAmount")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ContractId");
+
+                    b.HasIndex("PayrollId")
+                        .HasDatabaseName("IX_payroll_contract_segments_Payroll");
+
+                    b.HasIndex("EmployeeId", "StartDate", "EndDate")
+                        .HasDatabaseName("IX_payroll_contract_segments_Employee_Range");
+
+                    b.ToTable("payroll_contract_segments");
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.PayrollDetail", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<string>("CalculationMethod")
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<string>("ComponentCode")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)");
+
+                    b.Property<string>("ComponentName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<decimal>("InsuranceBaseAmount")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<bool>("IsDeduction")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("IsIncome")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("IsInsuranceBased")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("IsTaxable")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
+
+                    b.Property<int>("PayrollId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ProrationType")
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<string>("SnapshotJson")
+                        .HasColumnType("longtext");
+
+                    b.Property<decimal>("TaxableAmount")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PayrollId", "ComponentCode")
+                        .HasDatabaseName("IX_payroll_details_Payroll_Component");
+
+                    b.ToTable("payroll_details");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.PayrollFormula", b =>
@@ -596,11 +2159,46 @@ namespace HRM.backend.Migrations
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<DateTime?>("ApprovedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int?>("ApprovedByAccountId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ContractType")
+                        .HasColumnType("VARCHAR(50)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime(6)")
+                        .HasDefaultValue(new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified));
+
                     b.Property<DateTime?>("DeadlineAt")
                         .HasColumnType("datetime(6)");
 
+                    b.Property<int?>("DeptId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("EffectiveFrom")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime(6)")
+                        .HasDefaultValue(new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified));
+
+                    b.Property<DateTime?>("EffectiveTo")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("EmployeeType")
+                        .HasColumnType("VARCHAR(50)");
+
                     b.Property<string>("Expression")
                         .HasColumnType("longtext");
+
+                    b.Property<string>("FormulaCode")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)")
+                        .HasDefaultValue("DEFAULT_PAYROLL");
 
                     b.Property<string>("FormulaName")
                         .IsRequired()
@@ -610,13 +2208,567 @@ namespace HRM.backend.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("tinyint(1)");
 
+                    b.Property<int?>("JobLevelId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("PayBasis")
+                        .HasColumnType("VARCHAR(50)");
+
+                    b.Property<int?>("PositionId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("RejectReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("VARCHAR(50)");
 
+                    b.Property<int>("Version")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
+
                     b.HasKey("Id");
 
-                    b.ToTable("payroll_formulas", (string)null);
+                    b.HasIndex("FormulaCode", "Version")
+                        .HasDatabaseName("IX_payroll_formulas_Code_Version");
+
+                    b.HasIndex("Status", "ContractType", "PayBasis", "EmployeeType", "DeptId", "PositionId", "JobLevelId", "EffectiveFrom")
+                        .HasDatabaseName("IX_payroll_formulas_Scope_Lookup");
+
+                    b.ToTable("payroll_formulas");
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.PayrollFormulaLine", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("CalculationOrder")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ComponentCode")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Expression")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<bool>("IsDeduction")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("IsGrossComponent")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("IsInsuranceBased")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("IsSnapshotRequired")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("IsTaxable")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
+
+                    b.Property<int>("PayrollFormulaId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("SalaryComponentTypeId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SalaryComponentTypeId");
+
+                    b.HasIndex("PayrollFormulaId", "CalculationOrder")
+                        .HasDatabaseName("IX_payroll_formula_lines_Formula_Order");
+
+                    b.HasIndex("PayrollFormulaId", "ComponentCode")
+                        .IsUnique()
+                        .HasDatabaseName("UX_payroll_formula_lines_Formula_Component");
+
+                    b.ToTable("payroll_formula_lines");
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.SalaryComponentType", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("CalculationMethod")
+                        .IsRequired()
+                        .HasColumnType("VARCHAR(50)");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)");
+
+                    b.Property<string>("ComponentGroup")
+                        .IsRequired()
+                        .HasColumnType("VARCHAR(50)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime>("EffectiveFrom")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("EffectiveTo")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("IsAllowance")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("IsBonus")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("IsDeduction")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("IsFixed")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("IsIncome")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("IsInsuranceBased")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("IsOvertime")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("IsTaxable")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
+
+                    b.Property<string>("ProrationType")
+                        .IsRequired()
+                        .HasColumnType("VARCHAR(50)");
+
+                    b.Property<decimal?>("TaxExemptCap")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code", "EffectiveFrom")
+                        .IsUnique()
+                        .HasDatabaseName("UX_salary_component_types_Code_EffectiveFrom");
+
+                    b.HasIndex("ComponentGroup", "IsActive", "EffectiveFrom")
+                        .HasDatabaseName("IX_salary_component_types_Group_Active_EffectiveFrom");
+
+                    b.ToTable("salary_component_types");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            CalculationMethod = "Formula",
+                            Code = "BASE_SALARY_ACTUAL",
+                            ComponentGroup = "BaseSalary",
+                            CreatedAt = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            EffectiveFrom = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsActive = true,
+                            IsAllowance = false,
+                            IsBonus = false,
+                            IsDeduction = false,
+                            IsFixed = true,
+                            IsIncome = true,
+                            IsInsuranceBased = true,
+                            IsOvertime = false,
+                            IsTaxable = true,
+                            Name = "Lương cơ bản theo công",
+                            Note = "Base salary prorated by approved workdays.",
+                            ProrationType = "ByWorkingDays",
+                            Version = 1
+                        },
+                        new
+                        {
+                            Id = 2,
+                            CalculationMethod = "FixedAmount",
+                            Code = "POSITION_ALLOWANCE",
+                            ComponentGroup = "Allowance",
+                            CreatedAt = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            EffectiveFrom = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsActive = true,
+                            IsAllowance = true,
+                            IsBonus = false,
+                            IsDeduction = false,
+                            IsFixed = true,
+                            IsIncome = true,
+                            IsInsuranceBased = true,
+                            IsOvertime = false,
+                            IsTaxable = true,
+                            Name = "Phụ cấp chức vụ",
+                            Note = "Configured by PositionJobLevelPolicy when fixed and recurring.",
+                            ProrationType = "ByWorkingDays",
+                            Version = 1
+                        },
+                        new
+                        {
+                            Id = 3,
+                            CalculationMethod = "FixedAmount",
+                            Code = "RESPONSIBILITY_ALLOWANCE",
+                            ComponentGroup = "Allowance",
+                            CreatedAt = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            EffectiveFrom = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsActive = true,
+                            IsAllowance = true,
+                            IsBonus = false,
+                            IsDeduction = false,
+                            IsFixed = true,
+                            IsIncome = true,
+                            IsInsuranceBased = true,
+                            IsOvertime = false,
+                            IsTaxable = true,
+                            Name = "Phụ cấp trách nhiệm",
+                            ProrationType = "ByWorkingDays",
+                            Version = 1
+                        },
+                        new
+                        {
+                            Id = 4,
+                            CalculationMethod = "FixedPerDay",
+                            Code = "MEAL_ALLOWANCE",
+                            ComponentGroup = "Allowance",
+                            CreatedAt = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            EffectiveFrom = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsActive = true,
+                            IsAllowance = true,
+                            IsBonus = false,
+                            IsDeduction = false,
+                            IsFixed = false,
+                            IsIncome = true,
+                            IsInsuranceBased = false,
+                            IsOvertime = false,
+                            IsTaxable = false,
+                            Name = "Phụ cấp ăn ca",
+                            Note = "Tax-exempt cap is stored as policy data and should be versioned when changed.",
+                            ProrationType = "FixedPerDay",
+                            TaxExemptCap = 730000m,
+                            Version = 1
+                        },
+                        new
+                        {
+                            Id = 5,
+                            CalculationMethod = "Formula",
+                            Code = "KPI_BONUS",
+                            ComponentGroup = "Bonus",
+                            CreatedAt = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            EffectiveFrom = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsActive = true,
+                            IsAllowance = false,
+                            IsBonus = true,
+                            IsDeduction = false,
+                            IsFixed = false,
+                            IsIncome = true,
+                            IsInsuranceBased = false,
+                            IsOvertime = false,
+                            IsTaxable = true,
+                            Name = "Thưởng KPI",
+                            ProrationType = "None",
+                            Version = 1
+                        },
+                        new
+                        {
+                            Id = 6,
+                            CalculationMethod = "Formula",
+                            Code = "OT_BASE",
+                            ComponentGroup = "Overtime",
+                            CreatedAt = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            EffectiveFrom = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsActive = true,
+                            IsAllowance = false,
+                            IsBonus = false,
+                            IsDeduction = false,
+                            IsFixed = false,
+                            IsIncome = true,
+                            IsInsuranceBased = false,
+                            IsOvertime = true,
+                            IsTaxable = true,
+                            Name = "OT phần 100% chịu thuế",
+                            ProrationType = "ByHours",
+                            Version = 1
+                        },
+                        new
+                        {
+                            Id = 7,
+                            CalculationMethod = "Formula",
+                            Code = "OT_PREMIUM",
+                            ComponentGroup = "Overtime",
+                            CreatedAt = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            EffectiveFrom = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsActive = true,
+                            IsAllowance = false,
+                            IsBonus = false,
+                            IsDeduction = false,
+                            IsFixed = false,
+                            IsIncome = true,
+                            IsInsuranceBased = false,
+                            IsOvertime = true,
+                            IsTaxable = false,
+                            Name = "OT phần hệ số tăng thêm",
+                            ProrationType = "ByHours",
+                            Version = 1
+                        },
+                        new
+                        {
+                            Id = 8,
+                            CalculationMethod = "Formula",
+                            Code = "EMPLOYEE_INSURANCE",
+                            ComponentGroup = "Insurance",
+                            CreatedAt = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            EffectiveFrom = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsActive = true,
+                            IsAllowance = false,
+                            IsBonus = false,
+                            IsDeduction = true,
+                            IsFixed = false,
+                            IsIncome = false,
+                            IsInsuranceBased = false,
+                            IsOvertime = false,
+                            IsTaxable = false,
+                            Name = "Bảo hiểm người lao động đóng",
+                            ProrationType = "None",
+                            Version = 1
+                        },
+                        new
+                        {
+                            Id = 9,
+                            CalculationMethod = "Formula",
+                            Code = "PIT",
+                            ComponentGroup = "Tax",
+                            CreatedAt = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            EffectiveFrom = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsActive = true,
+                            IsAllowance = false,
+                            IsBonus = false,
+                            IsDeduction = true,
+                            IsFixed = false,
+                            IsIncome = false,
+                            IsInsuranceBased = false,
+                            IsOvertime = false,
+                            IsTaxable = false,
+                            Name = "Thuế thu nhập cá nhân",
+                            ProrationType = "None",
+                            Version = 1
+                        },
+                        new
+                        {
+                            Id = 10,
+                            CalculationMethod = "Formula",
+                            Code = "PAYROLL_ADJUSTMENT_TAXABLE_INSURANCE",
+                            ComponentGroup = "Adjustment",
+                            CreatedAt = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            EffectiveFrom = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsActive = true,
+                            IsAllowance = false,
+                            IsBonus = false,
+                            IsDeduction = false,
+                            IsFixed = false,
+                            IsIncome = true,
+                            IsInsuranceBased = true,
+                            IsOvertime = false,
+                            IsTaxable = true,
+                            Name = "Truy lĩnh chịu thuế và tính bảo hiểm",
+                            ProrationType = "None",
+                            Version = 1
+                        },
+                        new
+                        {
+                            Id = 11,
+                            CalculationMethod = "Formula",
+                            Code = "PAYROLL_ADJUSTMENT_TAXABLE",
+                            ComponentGroup = "Adjustment",
+                            CreatedAt = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            EffectiveFrom = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsActive = true,
+                            IsAllowance = false,
+                            IsBonus = false,
+                            IsDeduction = false,
+                            IsFixed = false,
+                            IsIncome = true,
+                            IsInsuranceBased = false,
+                            IsOvertime = false,
+                            IsTaxable = true,
+                            Name = "Truy lĩnh/truy thu chịu thuế",
+                            ProrationType = "None",
+                            Version = 1
+                        },
+                        new
+                        {
+                            Id = 12,
+                            CalculationMethod = "Formula",
+                            Code = "PAYROLL_ADJUSTMENT_NONTAXABLE",
+                            ComponentGroup = "Adjustment",
+                            CreatedAt = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            EffectiveFrom = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsActive = true,
+                            IsAllowance = false,
+                            IsBonus = false,
+                            IsDeduction = false,
+                            IsFixed = false,
+                            IsIncome = true,
+                            IsInsuranceBased = false,
+                            IsOvertime = false,
+                            IsTaxable = false,
+                            Name = "Truy lĩnh/truy thu không chịu thuế",
+                            ProrationType = "None",
+                            Version = 1
+                        },
+                        new
+                        {
+                            Id = 13,
+                            CalculationMethod = "Formula",
+                            Code = "PAYROLL_ADJUSTMENT_DEDUCTION",
+                            ComponentGroup = "Adjustment",
+                            CreatedAt = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            EffectiveFrom = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsActive = true,
+                            IsAllowance = false,
+                            IsBonus = false,
+                            IsDeduction = true,
+                            IsFixed = false,
+                            IsIncome = false,
+                            IsInsuranceBased = false,
+                            IsOvertime = false,
+                            IsTaxable = false,
+                            Name = "Khoản truy thu/điều chỉnh khấu trừ",
+                            ProrationType = "None",
+                            Version = 1
+                        },
+                        new
+                        {
+                            Id = 14,
+                            CalculationMethod = "Formula",
+                            Code = "EXTERNAL_TIMESHEET_PAY",
+                            ComponentGroup = "BaseSalary",
+                            CreatedAt = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            EffectiveFrom = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsActive = true,
+                            IsAllowance = false,
+                            IsBonus = false,
+                            IsDeduction = false,
+                            IsFixed = false,
+                            IsIncome = true,
+                            IsInsuranceBased = false,
+                            IsOvertime = false,
+                            IsTaxable = true,
+                            Name = "Thu nhập từ timesheet ngoài",
+                            Note = "Used for collaborators/freelancers imported from approved external timesheets.",
+                            ProrationType = "ByHours",
+                            Version = 1
+                        });
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.TaxConfig", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<decimal>("DependentDeduction")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<DateTime>("EffectiveFrom")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("EffectiveTo")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<decimal>("FlatTaxRate")
+                        .HasColumnType("DECIMAL(7,4)");
+
+                    b.Property<decimal>("FlatTaxThreshold")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<decimal>("NonResidentTaxRate")
+                        .HasColumnType("DECIMAL(7,4)");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
+
+                    b.Property<decimal>("PersonalDeduction")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code", "EffectiveFrom")
+                        .IsUnique()
+                        .HasDatabaseName("UX_tax_configs_Code_EffectiveFrom");
+
+                    b.ToTable("tax_configs");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Code = "VN_PERSONAL_INCOME_TAX_2020",
+                            CreatedAt = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            DependentDeduction = 4400000m,
+                            EffectiveFrom = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            FlatTaxRate = 0.10m,
+                            FlatTaxThreshold = 2000000m,
+                            IsActive = true,
+                            Name = "Cấu hình thuế TNCN Việt Nam",
+                            NonResidentTaxRate = 0.20m,
+                            Note = "Baseline PIT config. Update by creating a newer effective version.",
+                            PersonalDeduction = 11000000m,
+                            Version = 1
+                        });
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.Recruitment.Candidate", b =>
@@ -663,7 +2815,7 @@ namespace HRM.backend.Migrations
                         .IsUnique()
                         .HasDatabaseName("UX_candidates_RecruitmentRequestId_Email");
 
-                    b.ToTable("candidates", (string)null);
+                    b.ToTable("candidates");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.Recruitment.RecruitmentRequest", b =>
@@ -705,7 +2857,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("PositionId");
 
-                    b.ToTable("recruitment_requests", (string)null);
+                    b.ToTable("recruitment_requests");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.RequestHandover.EmploymentHistory", b =>
@@ -744,76 +2896,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("EmployeeId");
 
-                    b.ToTable("employment_history", (string)null);
-                });
-
-            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.RequestHandover.HandoverItem", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Description")
-                        .HasColumnType("longtext");
-
-                    b.Property<int?>("HandoverRequestId")
-                        .HasColumnType("int");
-
-                    b.Property<bool>("IsConfirmed")
-                        .HasColumnType("tinyint(1)");
-
-                    b.Property<string>("ItemName")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("varchar(255)");
-
-                    b.Property<int?>("TaskId")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("HandoverRequestId");
-
-                    b.HasIndex("TaskId");
-
-                    b.ToTable("handover_items", (string)null);
-                });
-
-            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.RequestHandover.HandoverRequest", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime?>("DeadlineAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<int?>("ReceiverId")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("RequestId")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("SenderId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("VARCHAR(50)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ReceiverId");
-
-                    b.HasIndex("RequestId");
-
-                    b.HasIndex("SenderId");
-
-                    b.ToTable("handover_requests", (string)null);
+                    b.ToTable("employment_history");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.RequestHandover.Request", b =>
@@ -858,7 +2941,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("TargetPositionId");
 
-                    b.ToTable("requests", (string)null);
+                    b.ToTable("requests");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.System.Account", b =>
@@ -915,7 +2998,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("RoleId");
 
-                    b.ToTable("accounts", (string)null);
+                    b.ToTable("accounts");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.System.ApprovalRequest", b =>
@@ -945,7 +3028,7 @@ namespace HRM.backend.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("approval_requests", (string)null);
+                    b.ToTable("approval_requests");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.System.ApprovalStep", b =>
@@ -984,7 +3067,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("ApprovalRequestId");
 
-                    b.ToTable("approval_steps", (string)null);
+                    b.ToTable("approval_steps");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.System.AuditLog", b =>
@@ -1022,7 +3105,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("AccountId");
 
-                    b.ToTable("audit_logs", (string)null);
+                    b.ToTable("audit_logs");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.System.Configuration", b =>
@@ -1055,7 +3138,7 @@ namespace HRM.backend.Migrations
                     b.HasIndex("ConfigGroup", "ParamKey")
                         .IsUnique();
 
-                    b.ToTable("configurations", (string)null);
+                    b.ToTable("configurations");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.System.IdempotencyRecord", b =>
@@ -1098,7 +3181,7 @@ namespace HRM.backend.Migrations
                     b.HasIndex("Scope", "IdempotencyKey")
                         .IsUnique();
 
-                    b.ToTable("idempotency_records", (string)null);
+                    b.ToTable("idempotency_records");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.System.MfaRecoveryCode", b =>
@@ -1123,7 +3206,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("AccountId");
 
-                    b.ToTable("MfaRecoveryCodes", (string)null);
+                    b.ToTable("MfaRecoveryCodes");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.System.OutboxMessage", b =>
@@ -1174,7 +3257,91 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("Status", "CreatedAt");
 
-                    b.ToTable("outbox_messages", (string)null);
+                    b.ToTable("outbox_messages");
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.System.PayrollPolicy", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal?>("Amount")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int?>("CreatedByAccountId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<DateTime>("EffectiveFrom")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("EffectiveTo")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("FormulaJson")
+                        .HasColumnType("longtext");
+
+                    b.Property<decimal?>("FromAmount")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<string>("PolicyType")
+                        .IsRequired()
+                        .HasColumnType("VARCHAR(50)");
+
+                    b.Property<decimal?>("QuickDeduction")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<decimal?>("RatePercent")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<decimal?>("ToAmount")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int?>("UpdatedByAccountId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ValueType")
+                        .IsRequired()
+                        .HasColumnType("VARCHAR(50)");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PolicyType", "Code", "EffectiveFrom")
+                        .IsUnique()
+                        .HasDatabaseName("UX_payroll_policies_Type_Code_EffectiveFrom");
+
+                    b.HasIndex("PolicyType", "IsActive", "EffectiveFrom")
+                        .HasDatabaseName("IX_payroll_policies_Type_Active_EffectiveFrom");
+
+                    b.ToTable("payroll_policies");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.System.Permission", b =>
@@ -1203,7 +3370,7 @@ namespace HRM.backend.Migrations
                     b.HasIndex("PermissionCode")
                         .IsUnique();
 
-                    b.ToTable("permissions", (string)null);
+                    b.ToTable("permissions");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.System.Role", b =>
@@ -1227,7 +3394,7 @@ namespace HRM.backend.Migrations
                     b.HasIndex("RoleName")
                         .IsUnique();
 
-                    b.ToTable("roles", (string)null);
+                    b.ToTable("roles");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.System.RolePermission", b =>
@@ -1242,7 +3409,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("PermissionId");
 
-                    b.ToTable("role_permissions", (string)null);
+                    b.ToTable("role_permissions");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.System.SlaTrackingTask", b =>
@@ -1275,7 +3442,7 @@ namespace HRM.backend.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("sla_tracking_tasks", (string)null);
+                    b.ToTable("sla_tracking_tasks");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.System.SourceCatalog", b =>
@@ -1320,7 +3487,7 @@ namespace HRM.backend.Migrations
                     b.HasIndex("SourcePath")
                         .IsUnique();
 
-                    b.ToTable("source_catalogs", (string)null);
+                    b.ToTable("source_catalogs");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TasksTraining.KpiImportBatch", b =>
@@ -1368,7 +3535,222 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("ImportedByAccountId");
 
-                    b.ToTable("kpi_import_batches", (string)null);
+                    b.ToTable("kpi_import_batches");
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TasksTraining.PenaltyRecord", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("AffectsAttendance")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("AffectsPerformance")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("AffectsPersonnelDecision")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<DateTime?>("AppliedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int?>("ApprovedByAccountId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("AttendanceAdjustmentLogId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int?>("CreatedByAccountId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("CreatedBySystem")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<int?>("DeductedMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("DeductedWorkday")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<string>("EmployeeExplanation")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
+
+                    b.Property<int>("EmployeeId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("EvidenceFilePath")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<string>("HRNote")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
+
+                    b.Property<string>("ManagerNote")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
+
+                    b.Property<DateTime?>("OccurredAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<decimal>("PenaltyPoint")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<int?>("PerformanceReviewId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Period")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("varchar(10)");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
+
+                    b.Property<int?>("ReferenceId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("ReviewedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("RuleCode")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)");
+
+                    b.Property<string>("Severity")
+                        .IsRequired()
+                        .HasColumnType("VARCHAR(50)");
+
+                    b.Property<string>("SourceType")
+                        .IsRequired()
+                        .HasColumnType("VARCHAR(50)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("VARCHAR(50)");
+
+                    b.Property<string>("ViolationType")
+                        .IsRequired()
+                        .HasColumnType("VARCHAR(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApprovedByAccountId");
+
+                    b.HasIndex("AttendanceAdjustmentLogId");
+
+                    b.HasIndex("CreatedByAccountId");
+
+                    b.HasIndex("PerformanceReviewId");
+
+                    b.HasIndex("EmployeeId", "Period", "SourceType");
+
+                    b.HasIndex("SourceType", "ReferenceId", "RuleCode")
+                        .HasDatabaseName("IX_penalty_records_Source_Reference_Rule");
+
+                    b.HasIndex("Status", "AffectsAttendance", "AffectsPerformance")
+                        .HasDatabaseName("IX_penalty_records_Status_Impact");
+
+                    b.HasIndex("EmployeeId", "AffectsPersonnelDecision", "Severity", "OccurredAt")
+                        .HasDatabaseName("IX_penalty_records_Employee_Personnel_History");
+
+                    b.HasIndex("EmployeeId", "Period", "AffectsPerformance", "Status")
+                        .HasDatabaseName("IX_penalty_records_Employee_Performance_Status");
+
+                    b.ToTable("penalty_records");
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TasksTraining.PenaltyRule", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("AffectsAttendance")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("AffectsPerformance")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("AffectsPersonnelDecision")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("AttendanceAdjustmentType")
+                        .IsRequired()
+                        .HasColumnType("VARCHAR(50)");
+
+                    b.Property<int?>("AttendanceDeductMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("AttendanceDeductWorkday")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<decimal>("PenaltyPoint")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<bool>("RequiresDirectorApproval")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("RequiresEmployeeExplanation")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("RequiresHRApproval")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("RuleCode")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)");
+
+                    b.Property<string>("RuleName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<string>("Severity")
+                        .IsRequired()
+                        .HasColumnType("VARCHAR(50)");
+
+                    b.Property<string>("SourceType")
+                        .IsRequired()
+                        .HasColumnType("VARCHAR(50)");
+
+                    b.Property<string>("ThresholdUnit")
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<decimal?>("ThresholdValue")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SourceType", "RuleCode")
+                        .IsUnique()
+                        .HasDatabaseName("UX_penalty_rules_SourceType_RuleCode");
+
+                    b.ToTable("penalty_rules");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TasksTraining.PerformanceDetail", b =>
@@ -1420,8 +3802,29 @@ namespace HRM.backend.Migrations
                     b.Property<decimal>("ManagerScore")
                         .HasColumnType("DECIMAL(15,2)");
 
+                    b.Property<decimal>("ManualPenaltyPoint")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<string>("ManualPenaltyReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
+
+                    b.Property<decimal>("PenaltyPoint")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<string>("PenaltyReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
                     b.Property<int>("ReviewId")
                         .HasColumnType("int");
+
+                    b.Property<decimal>("SystemPenaltyPoint")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<string>("SystemPenaltyReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
 
                     b.Property<decimal?>("TargetValue")
                         .HasColumnType("DECIMAL(15,2)");
@@ -1439,7 +3842,7 @@ namespace HRM.backend.Migrations
                         .IsUnique()
                         .HasDatabaseName("UX_performance_details_ReviewId_KpiCode");
 
-                    b.ToTable("performance_details", (string)null);
+                    b.ToTable("performance_details");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TasksTraining.PerformanceReview", b =>
@@ -1517,7 +3920,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("DeptId", "Period", "Status");
 
-                    b.ToTable("performance_reviews", (string)null);
+                    b.ToTable("performance_reviews");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TasksTraining.TaskFeedback", b =>
@@ -1555,7 +3958,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("TaskId");
 
-                    b.ToTable("task_feedbacks", (string)null);
+                    b.ToTable("task_feedbacks");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TasksTraining.TaskProgress", b =>
@@ -1592,7 +3995,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("TaskId", "SubmittedAt");
 
-                    b.ToTable("task_progresses", (string)null);
+                    b.ToTable("task_progresses");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TasksTraining.Training", b =>
@@ -1663,7 +4066,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("ManagerId", "EvaluationDeadline", "Status");
 
-                    b.ToTable("trainings", (string)null);
+                    b.ToTable("trainings");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TasksTraining.WorkTask", b =>
@@ -1741,7 +4144,130 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("AssignedTo", "Status", "Deadline");
 
-                    b.ToTable("tasks", (string)null);
+                    b.ToTable("tasks");
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TimeAttendance.AttendanceAdjustmentLog", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("AdjustedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("AdjustedByAccountId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("AttendanceDailySummaryId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("NewValueJson")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("OldValueJson")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AdjustedByAccountId");
+
+                    b.HasIndex("AttendanceDailySummaryId", "AdjustedAt")
+                        .HasDatabaseName("IX_attendance_adjustment_logs_Summary_AdjustedAt");
+
+                    b.ToTable("attendance_adjustment_logs");
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TimeAttendance.AttendanceDailySummary", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("AdjustedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int?>("AdjustedByAccountId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("AdjustmentReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
+
+                    b.Property<string>("ApprovalStatus")
+                        .IsRequired()
+                        .HasColumnType("VARCHAR(50)");
+
+                    b.Property<string>("AttendanceStatus")
+                        .IsRequired()
+                        .HasColumnType("VARCHAR(50)");
+
+                    b.Property<int>("EarlyLeaveMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<int>("EmployeeId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("FirstCheckIn")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime>("GeneratedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<bool>("IsManualAdjusted")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("IsPayrollLocked")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<DateTime?>("LastCheckOut")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("LateMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("LeaveRequestId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("OvertimeMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<string>("PayrollPeriod")
+                        .HasMaxLength(7)
+                        .HasColumnType("varchar(7)");
+
+                    b.Property<DateTime>("WorkDate")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<decimal>("WorkdayValue")
+                        .HasColumnType("DECIMAL(5,2)");
+
+                    b.Property<int>("WorkingMinutes")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AdjustedByAccountId");
+
+                    b.HasIndex("LeaveRequestId");
+
+                    b.HasIndex("ApprovalStatus", "WorkDate")
+                        .HasDatabaseName("IX_attendance_daily_summaries_Status_WorkDate");
+
+                    b.HasIndex("EmployeeId", "WorkDate")
+                        .IsUnique()
+                        .HasDatabaseName("UX_attendance_daily_summaries_Employee_WorkDate");
+
+                    b.ToTable("attendance_daily_summaries");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TimeAttendance.AttendanceLog", b =>
@@ -1778,13 +4304,16 @@ namespace HRM.backend.Migrations
                         .IsRequired()
                         .HasColumnType("VARCHAR(50)");
 
+                    b.Property<DateTime>("WorkDate")
+                        .HasColumnType("datetime(6)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("EmployeeId");
 
                     b.HasIndex("ShiftId");
 
-                    b.ToTable("attendance_logs", (string)null);
+                    b.ToTable("attendance_logs");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TimeAttendance.AttendanceSummary", b =>
@@ -1816,8 +4345,14 @@ namespace HRM.backend.Migrations
                     b.Property<byte>("Month")
                         .HasColumnType("tinyint unsigned");
 
+                    b.Property<decimal>("PayableWorkHours")
+                        .HasColumnType("DECIMAL(15,2)");
+
                     b.Property<decimal>("WorkDays")
                         .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<int>("WorkedMinutes")
+                        .HasColumnType("int");
 
                     b.Property<short>("Year")
                         .HasColumnType("smallint");
@@ -1827,7 +4362,7 @@ namespace HRM.backend.Migrations
                     b.HasIndex("EmployeeId", "Month", "Year")
                         .IsUnique();
 
-                    b.ToTable("attendance_summaries", (string)null);
+                    b.ToTable("attendance_summaries");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TimeAttendance.LeaveBalance", b =>
@@ -1851,7 +4386,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("LeaveTypeId");
 
-                    b.ToTable("leave_balances", (string)null);
+                    b.ToTable("leave_balances");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TimeAttendance.LeaveRequest", b =>
@@ -1892,7 +4427,7 @@ namespace HRM.backend.Migrations
                         .IsUnique()
                         .HasDatabaseName("UX_leave_requests_EmployeeId_LeaveTypeId_StartDate_EndDate");
 
-                    b.ToTable("leave_requests", (string)null);
+                    b.ToTable("leave_requests");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TimeAttendance.LeaveType", b =>
@@ -1903,6 +4438,22 @@ namespace HRM.backend.Migrations
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<bool>("AffectsKpiPenalty")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasColumnType("VARCHAR(50)");
+
+                    b.Property<bool>("CountsAsUnpaidForInsurance")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("CountsAsWorkday")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("DeductAnnualLeave")
+                        .HasColumnType("tinyint(1)");
+
                     b.Property<bool>("IsPaid")
                         .HasColumnType("tinyint(1)");
 
@@ -1912,7 +4463,7 @@ namespace HRM.backend.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("leave_types", (string)null);
+                    b.ToTable("leave_types");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TimeAttendance.OvertimeRequest", b =>
@@ -1932,8 +4483,21 @@ namespace HRM.backend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime(6)");
 
+                    b.Property<string>("DirectorNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<DateTime?>("DirectorReviewedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int?>("DirectorReviewerAccountId")
+                        .HasColumnType("int");
+
                     b.Property<int>("EmployeeId")
                         .HasColumnType("int");
+
+                    b.Property<DateTime>("EndAt")
+                        .HasColumnType("datetime(6)");
 
                     b.Property<TimeSpan>("EndTime")
                         .HasColumnType("time(6)");
@@ -1983,6 +4547,9 @@ namespace HRM.backend.Migrations
                     b.Property<int>("RequestedByAccountId")
                         .HasColumnType("int");
 
+                    b.Property<DateTime>("StartAt")
+                        .HasColumnType("datetime(6)");
+
                     b.Property<TimeSpan>("StartTime")
                         .HasColumnType("time(6)");
 
@@ -1995,11 +4562,123 @@ namespace HRM.backend.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("EmployeeId", "StartAt", "EndAt")
+                        .HasDatabaseName("IX_overtime_requests_EmployeeId_StartAt_EndAt");
+
                     b.HasIndex("EmployeeId", "WorkDate", "StartTime", "EndTime")
                         .IsUnique()
                         .HasDatabaseName("UX_overtime_requests_EmployeeId_WorkDate_StartTime_EndTime");
 
-                    b.ToTable("overtime_requests", (string)null);
+                    b.ToTable("overtime_requests");
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TimeAttendance.OvertimeSegment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("Minutes")
+                        .HasColumnType("int");
+
+                    b.Property<int>("OvertimeRequestId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("OvertimeType")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("VARCHAR(50)")
+                        .HasDefaultValue("Weekday");
+
+                    b.Property<string>("PolicyCode")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)");
+
+                    b.Property<string>("PolicySnapshotJson")
+                        .HasColumnType("longtext");
+
+                    b.Property<decimal>("RateMultiplierSnapshot")
+                        .HasColumnType("DECIMAL(7,4)");
+
+                    b.Property<DateTime>("SegmentEndAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime>("SegmentStartAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<decimal>("TaxExemptAmountSnapshot")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<decimal>("TaxableAmountSnapshot")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OvertimeRequestId", "SegmentStartAt")
+                        .HasDatabaseName("IX_overtime_segments_Request_Start");
+
+                    b.ToTable("overtime_segments");
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TimeAttendance.WorkCalendarConfig", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("DeptId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("HolidayDatesJson")
+                        .HasColumnType("longtext");
+
+                    b.Property<bool>("IncludePaidLeaveInWorkDays")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("IsLocked")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<byte>("Month")
+                        .HasColumnType("tinyint unsigned");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<decimal>("StandardHoursPerDay")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<decimal>("StandardWorkDays")
+                        .HasColumnType("DECIMAL(15,2)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int?>("UpdatedByAccountId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("WorkingDaysOfWeek")
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<short>("Year")
+                        .HasColumnType("smallint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DeptId", "Month", "Year")
+                        .IsUnique()
+                        .HasDatabaseName("UX_work_calendar_configs_DeptId_Month_Year");
+
+                    b.ToTable("work_calendar_configs");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TimeAttendance.WorkShift", b =>
@@ -2045,7 +4724,7 @@ namespace HRM.backend.Migrations
                         .IsUnique()
                         .HasDatabaseName("UX_work_shifts_DeptId");
 
-                    b.ToTable("work_shifts", (string)null);
+                    b.ToTable("work_shifts");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.Contract", b =>
@@ -2074,11 +4753,41 @@ namespace HRM.backend.Migrations
                     b.Navigation("Contract");
                 });
 
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.ContractAddendumDetail", b =>
+                {
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.ContractAddendum", "ContractAddendum")
+                        .WithMany("Details")
+                        .HasForeignKey("ContractAddendumId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ContractAddendum");
+                });
+
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.Dependent", b =>
                 {
                     b.HasOne("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.Employee", "Employee")
                         .WithMany("Dependents")
-                        .HasForeignKey("EmployeeId");
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.Navigation("Employee");
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.DependentUpdateRequest", b =>
+                {
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.Dependent", "Dependent")
+                        .WithMany()
+                        .HasForeignKey("DependentId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.Employee", "Employee")
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Dependent");
 
                     b.Navigation("Employee");
                 });
@@ -2098,6 +4807,11 @@ namespace HRM.backend.Migrations
                         .HasForeignKey("DeptId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.Organization.JobLevel", "JobLevel")
+                        .WithMany("Employees")
+                        .HasForeignKey("JobLevelId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("HRM.backend.src.HRM.Core.Entities.Organization.Position", "Position")
                         .WithMany("Employees")
                         .HasForeignKey("PositionId")
@@ -2109,7 +4823,77 @@ namespace HRM.backend.Migrations
 
                     b.Navigation("Department");
 
+                    b.Navigation("JobLevel");
+
                     b.Navigation("Position");
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.EmploymentServicePeriod", b =>
+                {
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.Employee", "Employee")
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Employee");
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.FinalSettlement", b =>
+                {
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.System.Account", "ApprovedByAccount")
+                        .WithMany()
+                        .HasForeignKey("ApprovedByAccountId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.Employee", "Employee")
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.System.Account", "LockedByAccount")
+                        .WithMany()
+                        .HasForeignKey("LockedByAccountId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.TerminationRequest", "TerminationRequest")
+                        .WithOne("FinalSettlement")
+                        .HasForeignKey("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.FinalSettlement", "TerminationRequestId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("ApprovedByAccount");
+
+                    b.Navigation("Employee");
+
+                    b.Navigation("LockedByAccount");
+
+                    b.Navigation("TerminationRequest");
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.MaternityLeave", b =>
+                {
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.System.Account", "ApprovedByAccount")
+                        .WithMany()
+                        .HasForeignKey("ApprovedByAccountId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.Employee", "Employee")
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.TimeAttendance.LeaveRequest", "LeaveRequest")
+                        .WithMany()
+                        .HasForeignKey("LeaveRequestId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("ApprovedByAccount");
+
+                    b.Navigation("Employee");
+
+                    b.Navigation("LeaveRequest");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.OnboardingRequest", b =>
@@ -2134,6 +4918,24 @@ namespace HRM.backend.Migrations
                     b.Navigation("Employee");
                 });
 
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.TerminationRequest", b =>
+                {
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.System.Account", "ApprovedByAccount")
+                        .WithMany()
+                        .HasForeignKey("ApprovedByAccountId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.Employee", "Employee")
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ApprovedByAccount");
+
+                    b.Navigation("Employee");
+                });
+
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.Organization.Department", b =>
                 {
                     b.HasOne("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.Employee", "Manager")
@@ -2151,6 +4953,25 @@ namespace HRM.backend.Migrations
                     b.Navigation("ParentDepartment");
                 });
 
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.Organization.PositionJobLevelPolicy", b =>
+                {
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.Organization.JobLevel", "JobLevel")
+                        .WithMany("PositionPolicies")
+                        .HasForeignKey("JobLevelId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.Organization.Position", "Position")
+                        .WithMany("JobLevelPolicies")
+                        .HasForeignKey("PositionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("JobLevel");
+
+                    b.Navigation("Position");
+                });
+
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.EmployeeAllowance", b =>
                 {
                     b.HasOne("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.AllowanceType", "AllowanceType")
@@ -2166,13 +4987,178 @@ namespace HRM.backend.Migrations
                     b.Navigation("Employee");
                 });
 
-            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.Payroll", b =>
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.EmployeeSalaryComponent", b =>
                 {
                     b.HasOne("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.Employee", "Employee")
                         .WithMany()
-                        .HasForeignKey("EmployeeId");
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.SalaryComponentType", "SalaryComponentType")
+                        .WithMany("EmployeeSalaryComponents")
+                        .HasForeignKey("SalaryComponentTypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
                     b.Navigation("Employee");
+
+                    b.Navigation("SalaryComponentType");
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.ExternalTimesheetImport", b =>
+                {
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.System.Account", "ImportedByAccount")
+                        .WithMany()
+                        .HasForeignKey("ImportedByAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ImportedByAccount");
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.ExternalTimesheetLine", b =>
+                {
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.Employee", "CollaboratorEmployee")
+                        .WithMany()
+                        .HasForeignKey("CollaboratorEmployeeId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.ExternalTimesheetImport", "Import")
+                        .WithMany("Lines")
+                        .HasForeignKey("ImportId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.Payroll", "Payroll")
+                        .WithMany()
+                        .HasForeignKey("PayrollId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("CollaboratorEmployee");
+
+                    b.Navigation("Import");
+
+                    b.Navigation("Payroll");
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.MonthlyInsuranceStatus", b =>
+                {
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.Employee", "Employee")
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Employee");
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.Payroll", b =>
+                {
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.System.Account", "CalculatedByAccount")
+                        .WithMany()
+                        .HasForeignKey("CalculatedByAccountId");
+
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.Employee", "Employee")
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.System.Account", "LockedByAccount")
+                        .WithMany()
+                        .HasForeignKey("LockedByAccountId");
+
+                    b.Navigation("CalculatedByAccount");
+
+                    b.Navigation("Employee");
+
+                    b.Navigation("LockedByAccount");
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.PayrollAdjustment", b =>
+                {
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.Payroll", "AppliedPayroll")
+                        .WithMany()
+                        .HasForeignKey("AppliedPayrollId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.System.Account", "ApprovedByAccount")
+                        .WithMany()
+                        .HasForeignKey("ApprovedByAccountId");
+
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.Employee", "Employee")
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.Payroll", "RelatedPayroll")
+                        .WithMany()
+                        .HasForeignKey("RelatedPayrollId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("AppliedPayroll");
+
+                    b.Navigation("ApprovedByAccount");
+
+                    b.Navigation("Employee");
+
+                    b.Navigation("RelatedPayroll");
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.PayrollContractSegment", b =>
+                {
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.Contract", "Contract")
+                        .WithMany()
+                        .HasForeignKey("ContractId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.Employee", "Employee")
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.Payroll", "Payroll")
+                        .WithMany("ContractSegments")
+                        .HasForeignKey("PayrollId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.Navigation("Contract");
+
+                    b.Navigation("Employee");
+
+                    b.Navigation("Payroll");
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.PayrollDetail", b =>
+                {
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.Payroll", "Payroll")
+                        .WithMany("Details")
+                        .HasForeignKey("PayrollId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Payroll");
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.PayrollFormulaLine", b =>
+                {
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.PayrollFormula", "PayrollFormula")
+                        .WithMany("Lines")
+                        .HasForeignKey("PayrollFormulaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.SalaryComponentType", "SalaryComponentType")
+                        .WithMany()
+                        .HasForeignKey("SalaryComponentTypeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("PayrollFormula");
+
+                    b.Navigation("SalaryComponentType");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.Recruitment.Candidate", b =>
@@ -2213,44 +5199,6 @@ namespace HRM.backend.Migrations
                     b.Navigation("Approver");
 
                     b.Navigation("Employee");
-                });
-
-            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.RequestHandover.HandoverItem", b =>
-                {
-                    b.HasOne("HRM.backend.src.HRM.Core.Entities.RequestHandover.HandoverRequest", "HandoverRequest")
-                        .WithMany("HandoverItems")
-                        .HasForeignKey("HandoverRequestId");
-
-                    b.HasOne("HRM.backend.src.HRM.Core.Entities.TasksTraining.WorkTask", "Task")
-                        .WithMany()
-                        .HasForeignKey("TaskId");
-
-                    b.Navigation("HandoverRequest");
-
-                    b.Navigation("Task");
-                });
-
-            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.RequestHandover.HandoverRequest", b =>
-                {
-                    b.HasOne("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.Employee", "Receiver")
-                        .WithMany()
-                        .HasForeignKey("ReceiverId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("HRM.backend.src.HRM.Core.Entities.RequestHandover.Request", "Request")
-                        .WithMany("HandoverRequests")
-                        .HasForeignKey("RequestId");
-
-                    b.HasOne("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.Employee", "Sender")
-                        .WithMany()
-                        .HasForeignKey("SenderId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("Receiver");
-
-                    b.Navigation("Request");
-
-                    b.Navigation("Sender");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.RequestHandover.Request", b =>
@@ -2348,6 +5296,45 @@ namespace HRM.backend.Migrations
                     b.Navigation("Department");
 
                     b.Navigation("ImportedByAccount");
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TasksTraining.PenaltyRecord", b =>
+                {
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.System.Account", "ApprovedByAccount")
+                        .WithMany()
+                        .HasForeignKey("ApprovedByAccountId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.TimeAttendance.AttendanceAdjustmentLog", "AttendanceAdjustmentLog")
+                        .WithMany()
+                        .HasForeignKey("AttendanceAdjustmentLogId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.System.Account", "CreatedByAccount")
+                        .WithMany()
+                        .HasForeignKey("CreatedByAccountId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.Employee", "Employee")
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.TasksTraining.PerformanceReview", "PerformanceReview")
+                        .WithMany()
+                        .HasForeignKey("PerformanceReviewId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("ApprovedByAccount");
+
+                    b.Navigation("AttendanceAdjustmentLog");
+
+                    b.Navigation("CreatedByAccount");
+
+                    b.Navigation("Employee");
+
+                    b.Navigation("PerformanceReview");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TasksTraining.PerformanceDetail", b =>
@@ -2499,6 +5486,48 @@ namespace HRM.backend.Migrations
                     b.Navigation("Training");
                 });
 
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TimeAttendance.AttendanceAdjustmentLog", b =>
+                {
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.System.Account", "AdjustedByAccount")
+                        .WithMany()
+                        .HasForeignKey("AdjustedByAccountId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.TimeAttendance.AttendanceDailySummary", "AttendanceDailySummary")
+                        .WithMany("AdjustmentLogs")
+                        .HasForeignKey("AttendanceDailySummaryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AdjustedByAccount");
+
+                    b.Navigation("AttendanceDailySummary");
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TimeAttendance.AttendanceDailySummary", b =>
+                {
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.System.Account", "AdjustedByAccount")
+                        .WithMany()
+                        .HasForeignKey("AdjustedByAccountId");
+
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.Employee", "Employee")
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.TimeAttendance.LeaveRequest", "LeaveRequest")
+                        .WithMany()
+                        .HasForeignKey("LeaveRequestId");
+
+                    b.Navigation("AdjustedByAccount");
+
+                    b.Navigation("Employee");
+
+                    b.Navigation("LeaveRequest");
+                });
+
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TimeAttendance.AttendanceLog", b =>
                 {
                     b.HasOne("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.Employee", "Employee")
@@ -2570,6 +5599,28 @@ namespace HRM.backend.Migrations
                     b.Navigation("Employee");
                 });
 
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TimeAttendance.OvertimeSegment", b =>
+                {
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.TimeAttendance.OvertimeRequest", "OvertimeRequest")
+                        .WithMany("Segments")
+                        .HasForeignKey("OvertimeRequestId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("OvertimeRequest");
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TimeAttendance.WorkCalendarConfig", b =>
+                {
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.Organization.Department", "Department")
+                        .WithMany()
+                        .HasForeignKey("DeptId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Department");
+                });
+
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TimeAttendance.WorkShift", b =>
                 {
                     b.HasOne("HRM.backend.src.HRM.Core.Entities.Organization.Department", "Department")
@@ -2584,11 +5635,21 @@ namespace HRM.backend.Migrations
                     b.Navigation("Addendums");
                 });
 
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.ContractAddendum", b =>
+                {
+                    b.Navigation("Details");
+                });
+
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.Employee", b =>
                 {
                     b.Navigation("Contracts");
 
                     b.Navigation("Dependents");
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.TerminationRequest", b =>
+                {
+                    b.Navigation("FinalSettlement");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.Organization.Department", b =>
@@ -2598,9 +5659,18 @@ namespace HRM.backend.Migrations
                     b.Navigation("SubDepartments");
                 });
 
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.Organization.JobLevel", b =>
+                {
+                    b.Navigation("Employees");
+
+                    b.Navigation("PositionPolicies");
+                });
+
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.Organization.Position", b =>
                 {
                     b.Navigation("Employees");
+
+                    b.Navigation("JobLevelPolicies");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.AllowanceType", b =>
@@ -2608,19 +5678,31 @@ namespace HRM.backend.Migrations
                     b.Navigation("EmployeeAllowances");
                 });
 
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.ExternalTimesheetImport", b =>
+                {
+                    b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.Payroll", b =>
+                {
+                    b.Navigation("ContractSegments");
+
+                    b.Navigation("Details");
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.PayrollFormula", b =>
+                {
+                    b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.SalaryComponentType", b =>
+                {
+                    b.Navigation("EmployeeSalaryComponents");
+                });
+
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.Recruitment.RecruitmentRequest", b =>
                 {
                     b.Navigation("Candidates");
-                });
-
-            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.RequestHandover.HandoverRequest", b =>
-                {
-                    b.Navigation("HandoverItems");
-                });
-
-            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.RequestHandover.Request", b =>
-                {
-                    b.Navigation("HandoverRequests");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.System.ApprovalRequest", b =>
@@ -2667,11 +5749,21 @@ namespace HRM.backend.Migrations
                     b.Navigation("Progresses");
                 });
 
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TimeAttendance.AttendanceDailySummary", b =>
+                {
+                    b.Navigation("AdjustmentLogs");
+                });
+
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TimeAttendance.LeaveType", b =>
                 {
                     b.Navigation("LeaveBalances");
 
                     b.Navigation("LeaveRequests");
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TimeAttendance.OvertimeRequest", b =>
+                {
+                    b.Navigation("Segments");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TimeAttendance.WorkShift", b =>

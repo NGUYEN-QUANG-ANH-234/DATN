@@ -194,7 +194,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
             data["insurance_salary"] = Money(contract.InsuranceSalary);
             data["salary_percentage"] = $"{contract.SalaryPercentage:0.##}%";
             data["start_date"] = Date(contract.StartDate);
-            data["end_date"] = contract.EndDate.HasValue ? Date(contract.EndDate.Value) : "Khong xac dinh";
+            data["end_date"] = contract.EndDate.HasValue ? Date(contract.EndDate.Value) : "Không xác định";
             data["effective_date"] = Date(contract.StartDate);
             data["created_date"] = Date(DateTime.UtcNow);
             data["status"] = EnumText(contract.Status);
@@ -212,9 +212,9 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
             FillEmployee(data, employee);
             data["addendum_number"] = Safe(addendum.AddendumNumber);
             data["contract_number"] = Safe(contract?.ContractNumber);
-            data["new_basic_salary"] = addendum.NewBasicSalary.HasValue ? Money(addendum.NewBasicSalary.Value) : "Khong thay doi";
-            data["new_insurance_salary"] = addendum.NewInsuranceSalary.HasValue ? Money(addendum.NewInsuranceSalary.Value) : "Khong thay doi";
-            data["new_end_date"] = addendum.NewEndDate.HasValue ? Date(addendum.NewEndDate.Value) : "Khong thay doi";
+            data["new_basic_salary"] = addendum.NewBasicSalary.HasValue ? Money(addendum.NewBasicSalary.Value) : "Không thay đổi";
+            data["new_insurance_salary"] = addendum.NewInsuranceSalary.HasValue ? Money(addendum.NewInsuranceSalary.Value) : "Không thay đổi";
+            data["new_end_date"] = addendum.NewEndDate.HasValue ? Date(addendum.NewEndDate.Value) : "Không thay đổi";
             data["other_changes"] = JsonToFlatText(addendum.OtherChangesJson);
             data["effective_date"] = Date(addendum.EffectiveDate);
             data["created_date"] = Date(addendum.CreatedAt);
@@ -353,7 +353,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
                 ["company_address"] = "Dia chi cong ty",
                 ["company_tax_code"] = "",
                 ["company_logo_url"] = "",
-                ["director_name"] = "Giam doc",
+                ["director_name"] = "Giám đốc",
                 ["created_date"] = Date(DateTime.UtcNow)
             };
         }

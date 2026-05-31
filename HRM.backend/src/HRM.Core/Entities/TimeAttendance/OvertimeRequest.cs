@@ -18,6 +18,8 @@ namespace HRM.backend.src.HRM.Core.Entities.TimeAttendance
         public DateTime WorkDate { get; set; }
         public TimeSpan StartTime { get; set; }
         public TimeSpan EndTime { get; set; }
+        public DateTime StartAt { get; set; }
+        public DateTime EndAt { get; set; }
 
         [StringLength(500)]
         public required string Reason { get; set; }
@@ -35,6 +37,10 @@ namespace HRM.backend.src.HRM.Core.Entities.TimeAttendance
         public DateTime? HrReviewedAt { get; set; }
         [StringLength(500)] public string? HrNote { get; set; }
 
+        public int? DirectorReviewerAccountId { get; set; }
+        public DateTime? DirectorReviewedAt { get; set; }
+        [StringLength(500)] public string? DirectorNote { get; set; }
+
         public int ApprovedMinutes { get; set; }
         public int ActualOtMinutes { get; set; }
         public bool IsPayrollLocked { get; set; }
@@ -43,5 +49,7 @@ namespace HRM.backend.src.HRM.Core.Entities.TimeAttendance
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime? ReconciledAt { get; set; }
+
+        public virtual ICollection<OvertimeSegment> Segments { get; set; } = new List<OvertimeSegment>();
     }
 }

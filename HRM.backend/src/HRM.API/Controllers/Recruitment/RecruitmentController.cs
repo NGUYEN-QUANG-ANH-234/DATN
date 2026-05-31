@@ -30,7 +30,7 @@ namespace HRM.backend.src.HRM.API.Controllers.Recruitment
             try
             {
                 // Lấy ID người đang tạo đơn
-                int userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+                int userId = User.GetAccountIdOrThrow();
                 string actorRoleName = GetRole();
 
                 // Truyền thêm userId xuống UseCase
@@ -69,7 +69,7 @@ namespace HRM.backend.src.HRM.API.Controllers.Recruitment
         {
             try
             {
-                int approverId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+                int approverId = User.GetAccountIdOrThrow();
 
                 // TRỌNG TÂM: Lấy RoleName của người dùng từ Token
                 string actorRoleName = GetRole();
@@ -113,7 +113,7 @@ namespace HRM.backend.src.HRM.API.Controllers.Recruitment
         {
             try
             {
-                int actorId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+                int actorId = User.GetAccountIdOrThrow();
 
                 var requests = await _useCase.GetPendingRequestsAsync(actorId, ct);
 
@@ -140,7 +140,7 @@ namespace HRM.backend.src.HRM.API.Controllers.Recruitment
         [RequirePermission("RECRUITMENT_REQUEST_SELF_VIEW", GroupName = SystemModules.Recruitment, Description = "Xem danh sách yêu cầu tuyển dụng cá nhân đã tạo")]
         public async Task<IActionResult> GetMyRequests(CancellationToken ct)
         {
-            int userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+            int userId = User.GetAccountIdOrThrow();
 
             // Viết một hàm trong UseCase/Repo để lấy các đơn có CreatedById == userId
             var requests = await _useCase.GetMyRequestsAsync(userId, ct);

@@ -12,6 +12,7 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.EmployeePr
         public async Task<ContractAddendum?> GetByIdWithContractAsync(int id, CancellationToken ct = default)
         {
             return await _dbSet
+                .Include(a => a.Details)
                 .Include(a => a.Contract)
                     .ThenInclude(c => c!.Employee)
                 .FirstOrDefaultAsync(a => a.Id == id, ct);
@@ -20,6 +21,7 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.EmployeePr
         public async Task<List<ContractAddendum>> GetByContractIdAsync(int contractId, CancellationToken ct = default)
         {
             return await _dbSet
+                .Include(a => a.Details)
                 .Include(a => a.Contract)
                     .ThenInclude(c => c!.Employee)
                 .Where(a => a.ContractId == contractId)
@@ -31,6 +33,7 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.EmployeePr
         public async Task<List<ContractAddendum>> GetByStatusAsync(AddendumStatus status, CancellationToken ct = default)
         {
             return await _dbSet
+                .Include(a => a.Details)
                 .Include(a => a.Contract)
                     .ThenInclude(c => c!.Employee)
                 .Where(a => a.Status == status)
@@ -42,6 +45,7 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.EmployeePr
         public async Task<List<ContractAddendum>> GetAllWithContractAsync(CancellationToken ct = default)
         {
             return await _dbSet
+                .Include(a => a.Details)
                 .Include(a => a.Contract)
                     .ThenInclude(c => c!.Employee)
                 .OrderByDescending(a => a.CreatedAt)

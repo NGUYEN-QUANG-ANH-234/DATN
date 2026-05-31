@@ -33,5 +33,16 @@ namespace HRM.backend.src.HRM.Application.DTOs.EmployeeProfile
         public DateTime CreatedAt { get; set; }
         public int? EmployeeId { get; set; }
         public string? EmployeeName { get; set; }
+        public List<ContractAddendumDetailDto> Details { get; set; } = new();
+    }
+
+    public class ContractAddendumDetailDto
+    {
+        public int Id { get; set; }
+        public string FieldName { get; set; } = string.Empty;
+        public string? OldValue { get; set; }
+        public string? NewValue { get; set; }
+        public string ValueType { get; set; } = string.Empty;
+        public string? Note { get; set; }
     }
 }

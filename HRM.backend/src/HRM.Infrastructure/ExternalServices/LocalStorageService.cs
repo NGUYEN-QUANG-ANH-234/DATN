@@ -4,6 +4,12 @@ namespace HRM.backend.src.HRM.Infrastructure.ExternalServices
 {
     public class LocalStorageService : IStorageService
     {
+        private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".csv", ".jpg", ".jpeg", ".png", ".webp"
+        };
+
+        private const long MaxFileSizeBytes = 10 * 1024 * 1024;
         private readonly IWebHostEnvironment _env;
 
         // Tiêm IWebHostEnvironment để lấy đường dẫn chuẩn xác tới thư mục wwwroot
@@ -16,6 +22,13 @@ namespace HRM.backend.src.HRM.Infrastructure.ExternalServices
         {
             if (file == null || file.Length == 0)
                 return string.Empty;
+
+            if (file.Length > MaxFileSizeBytes)
+                throw new InvalidOperationException("File vượt quá dung lượng cho phép 10MB.");
+
+            var extension = Path.GetExtension(file.FileName);
+            if (string.IsNullOrWhiteSpace(extension) || !AllowedExtensions.Contains(extension))
+                throw new InvalidOperationException("Định dạng file không được hỗ trợ.");
 
             // 1. Xác định thư mục lưu trữ (VD: wwwroot/uploads/evidences)
             // Nếu WebRootPath null (khi chạy test), fallback về thư mục hiện tại
@@ -30,7 +43,6 @@ namespace HRM.backend.src.HRM.Infrastructure.ExternalServices
 
             // 2. Bảo mật: Không dùng tên file gốc để tránh lỗi ký tự đặc biệt hoặc Path Traversal
             // Chỉ lấy đuôi mở rộng (VD: .jpg, .pdf) và gắn với GUID
-            var extension = Path.GetExtension(file.FileName);
             var uniqueFileName = $"{Guid.NewGuid()}{extension}";
             var fullFilePath = Path.Combine(uploadFolderPath, uniqueFileName);
 

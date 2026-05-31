@@ -1,5 +1,6 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using HRM.backend.src.HRM.Core.Enums;
 
 namespace HRM.backend.src.HRM.Core.Entities.TimeAttendance
 {
@@ -10,8 +11,12 @@ namespace HRM.backend.src.HRM.Core.Entities.TimeAttendance
 
         [StringLength(50)] public string? TypeName { get; set; }
         public bool IsPaid { get; set; } = true;
+        public LeaveCategory Category { get; set; } = LeaveCategory.AnnualPaid;
+        public bool CountsAsUnpaidForInsurance { get; set; }
+        public bool CountsAsWorkday { get; set; } = true;
+        public bool DeductAnnualLeave { get; set; } = true;
+        public bool AffectsKpiPenalty { get; set; }
 
-        // --- Navigation Properties ---
         public virtual ICollection<LeaveBalance> LeaveBalances { get; set; } = new List<LeaveBalance>();
         public virtual ICollection<LeaveRequest> LeaveRequests { get; set; } = new List<LeaveRequest>();
     }

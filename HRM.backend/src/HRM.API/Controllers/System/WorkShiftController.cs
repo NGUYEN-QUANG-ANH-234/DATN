@@ -27,7 +27,7 @@ namespace HRM.backend.src.HRM.API.Controllers.System
             try
             {
                 // Trích xuất ID Admin thực hiện thao tác từ JWT Token
-                int actorId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+                int actorId = User.GetAccountIdOrThrow();
 
                 await _useCase.ConfigureWorkScheduleAsync(dto, actorId, ct);
 
@@ -37,6 +37,10 @@ namespace HRM.backend.src.HRM.API.Controllers.System
             {
                 // Trả về mã lỗi 400 Bad Request chuẩn xác khi sai logic thời gian đầu vào
                 return BadRequest(new { Success = false, Message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Conflict(new { Success = false, Message = ex.Message });
             }
             catch (Exception ex)
             {
@@ -57,6 +61,21 @@ namespace HRM.backend.src.HRM.API.Controllers.System
             catch (Exception ex)
             {
                 return StatusCode(500, new { Success = false, Message = "Lỗi truy xuất hệ thống: " + ex.Message });
+            }
+        }
+
+        [HttpGet("history")]
+        [RequirePermission("WORK_SHIFT_VIEW", GroupName = SystemModules.TimekeepingLeave, Description = "Xem lịch sử cấu hình ca làm việc và quỹ thời gian")]
+        public async Task<IActionResult> GetScheduleHistory(CancellationToken ct)
+        {
+            try
+            {
+                var data = await _useCase.GetScheduleChangeHistoryAsync(ct);
+                return Ok(new { Success = true, Data = data });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { Success = false, Message = "Lỗi truy xuất lịch sử: " + ex.Message });
             }
         }
     }

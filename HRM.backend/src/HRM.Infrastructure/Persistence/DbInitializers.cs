@@ -1,4 +1,4 @@
-﻿using Bogus;
+using Bogus;
 using Microsoft.EntityFrameworkCore;
 using HRM.backend.src.HRM.Infrastructure.Persistence;
 using HRM.backend.src.HRM.Core.Enums;
@@ -66,9 +66,44 @@ public static class DbInitializer
 
         var leaveTypes = new List<LeaveType>
         {
-            new LeaveType { TypeName = "Phép năm", IsPaid = true },
-            new LeaveType { TypeName = "Nghỉ ốm", IsPaid = true },
-            new LeaveType { TypeName = "Nghỉ không lương", IsPaid = false }
+            new LeaveType
+            {
+                TypeName = "Phép năm",
+                IsPaid = true,
+                Category = LeaveCategory.AnnualPaid,
+                CountsAsWorkday = true,
+                DeductAnnualLeave = true,
+                AffectsKpiPenalty = false
+            },
+            new LeaveType
+            {
+                TypeName = "Nghỉ ốm",
+                IsPaid = true,
+                Category = LeaveCategory.Sick,
+                CountsAsWorkday = false,
+                DeductAnnualLeave = false,
+                AffectsKpiPenalty = false
+            },
+            new LeaveType
+            {
+                TypeName = "Nghỉ không lương",
+                IsPaid = false,
+                Category = LeaveCategory.Unpaid,
+                CountsAsUnpaidForInsurance = true,
+                CountsAsWorkday = false,
+                DeductAnnualLeave = false,
+                AffectsKpiPenalty = false
+            },
+            new LeaveType
+            {
+                TypeName = "Nghỉ thai sản",
+                IsPaid = false,
+                Category = LeaveCategory.Maternity,
+                CountsAsUnpaidForInsurance = false,
+                CountsAsWorkday = false,
+                DeductAnnualLeave = false,
+                AffectsKpiPenalty = false
+            }
         };
         context.LeaveTypes.AddRange(leaveTypes);
 
@@ -89,57 +124,79 @@ public static class DbInitializer
                 Description = "Dung cho worker tong hop cham cong khi so lan/phut di muon vuot nguong cau hinh.",
                 ThresholdValue = 3,
                 ThresholdUnit = "times/month",
-                PenaltyPoint = 1
+                PenaltyPoint = 1,
+                AffectsPerformance = true,
+                AffectsPersonnelDecision = true,
+                Severity = PenaltySeverity.Medium,
+                RequiresEmployeeExplanation = true,
+                RequiresHRApproval = true
             },
             new PenaltyRule
             {
                 SourceType = PenaltySourceType.Leave,
                 RuleCode = "LEAVE_OVER_BALANCE",
                 RuleName = "Nghi vuot quy phep",
-                Description = "Dung cho worker nghi phep khi nhan vien nghi vuot quy phep duoc cap.",
+                Description = "Dùng cho worker nghỉ phép khi nhân viên nghỉ vượt quỹ phép được cấp.",
                 ThresholdValue = 0,
                 ThresholdUnit = "day",
-                PenaltyPoint = 1
+                PenaltyPoint = 1,
+                AffectsPerformance = true,
+                AffectsPersonnelDecision = true,
+                Severity = PenaltySeverity.Medium,
+                RequiresEmployeeExplanation = true,
+                RequiresHRApproval = true
             },
             new PenaltyRule
             {
                 SourceType = PenaltySourceType.SLA,
                 RuleCode = "SLA_APPROVAL_VIOLATION",
                 RuleName = "Cham xu ly phe duyet SLA",
-                Description = "Dung cho cac workflow co SLA khi nguoi xu ly duoi cap giam doc bi qua han.",
+                Description = "Dùng cho các workflow có SLA khi người xử lý dưới cấp Giám đốc bị quá hạn.",
                 ThresholdValue = 1,
                 ThresholdUnit = "violation",
-                PenaltyPoint = 1
+                PenaltyPoint = 1,
+                AffectsPerformance = true,
+                Severity = PenaltySeverity.Low,
+                RequiresHRApproval = false
             },
             new PenaltyRule
             {
                 SourceType = PenaltySourceType.Task,
                 RuleCode = "TASK_SUBMISSION_OVERDUE",
                 RuleName = "Tre han nop cong viec",
-                Description = "Dung cho TaskSlaWorker khi nhan vien tre han nop tien do/minh chung.",
+                Description = "Dùng cho TaskSlaWorker khi nhân viên trễ hạn nộp tiến độ/minh chứng.",
                 ThresholdValue = 1,
                 ThresholdUnit = "violation",
-                PenaltyPoint = 1
+                PenaltyPoint = 1,
+                AffectsPerformance = true,
+                Severity = PenaltySeverity.Low,
+                RequiresHRApproval = false
             },
             new PenaltyRule
             {
                 SourceType = PenaltySourceType.SLA,
                 RuleCode = "TASK_REVIEW_SLA_VIOLATION",
                 RuleName = "Cham duyet cong viec",
-                Description = "Dung cho TaskSlaWorker khi truong phong cham duyet task.",
+                Description = "Dùng cho TaskSlaWorker khi Trưởng phòng chậm duyệt task.",
                 ThresholdValue = 1,
                 ThresholdUnit = "violation",
-                PenaltyPoint = 1
+                PenaltyPoint = 1,
+                AffectsPerformance = true,
+                Severity = PenaltySeverity.Low,
+                RequiresHRApproval = false
             },
             new PenaltyRule
             {
                 SourceType = PenaltySourceType.SLA,
                 RuleCode = "TRAINING_EVAL_SLA_VIOLATION",
                 RuleName = "Cham danh gia dao tao",
-                Description = "Dung cho TrainingSlaWorker khi truong phong cham danh gia thuc tap sinh/nhan su dao tao.",
+                Description = "Dùng cho TrainingSlaWorker khi Trưởng phòng chậm đánh giá thực tập sinh/nhân sự đào tạo.",
                 ThresholdValue = 1,
                 ThresholdUnit = "violation",
-                PenaltyPoint = 1
+                PenaltyPoint = 1,
+                AffectsPerformance = true,
+                Severity = PenaltySeverity.Low,
+                RequiresHRApproval = false
             }
         };
         context.PenaltyRules.AddRange(penaltyRules);
@@ -229,6 +286,7 @@ public static class DbInitializer
                 {
                     EmployeeId = emp.Id,
                     ShiftId = workShifts[0].Id,
+                    WorkDate = DateTime.Now.Date.AddDays(-d),
                     CheckIn = DateTime.Now.Date.AddDays(-d).AddHours(8).AddMinutes(faker.Random.Int(-10, 15)),
                     CheckOut = DateTime.Now.Date.AddDays(-d).AddHours(17).AddMinutes(faker.Random.Int(30, 60)),
                     IpAddress = "192.168.1.100",
@@ -285,9 +343,34 @@ public static class DbInitializer
         // ======================================================
         context.PayrollFormulas.Add(new PayrollFormula
         {
-            FormulaName = "Lương cơ bản 2024",
-            Expression = "Gross = BasicSalary * (WorkDays/StandardDays) + TotalAllowance",
-            Status = FormulaStatus.Approved
+            FormulaCode = "DEFAULT_PAYROLL_V2",
+            FormulaName = "Công thức lương mặc định",
+            Expression = "gross_income = sum(payroll_formula_lines)",
+            Status = FormulaStatus.Approved,
+            IsActive = true,
+            Version = 1,
+            EffectiveFrom = new DateTime(2020, 7, 1),
+            ApprovedAt = DateTime.UtcNow,
+            Lines = new List<PayrollFormulaLine>
+            {
+                new PayrollFormulaLine { ComponentCode = "BASE_SALARY_ACTUAL", Expression = "contract_segment_salary_amount", CalculationOrder = 10, IsGrossComponent = true, IsTaxable = true, IsInsuranceBased = true, IsDeduction = false, IsSnapshotRequired = true },
+                new PayrollFormulaLine { ComponentCode = "POSITION_ALLOWANCE", Expression = "position_allowance / standard_workdays * actual_workdays", CalculationOrder = 20, IsGrossComponent = true, IsTaxable = true, IsInsuranceBased = true, IsDeduction = false, IsSnapshotRequired = true },
+                new PayrollFormulaLine { ComponentCode = "RESPONSIBILITY_ALLOWANCE", Expression = "responsibility_allowance / standard_workdays * actual_workdays", CalculationOrder = 30, IsGrossComponent = true, IsTaxable = true, IsInsuranceBased = true, IsDeduction = false, IsSnapshotRequired = true },
+                new PayrollFormulaLine { ComponentCode = "SENIORITY_ALLOWANCE", Expression = "seniority_allowance_prorated", CalculationOrder = 35, IsGrossComponent = true, IsTaxable = true, IsInsuranceBased = true, IsDeduction = false, IsSnapshotRequired = true },
+                new PayrollFormulaLine { ComponentCode = "MEAL_ALLOWANCE", Expression = "meal_allowance_per_day * actual_attendance_days", CalculationOrder = 40, IsGrossComponent = true, IsTaxable = false, IsInsuranceBased = false, IsDeduction = false, IsSnapshotRequired = true },
+                new PayrollFormulaLine { ComponentCode = "LEGACY_INSURANCE_ALLOWANCE", Expression = "legacy_insurance_allowance", CalculationOrder = 50, IsGrossComponent = true, IsTaxable = true, IsInsuranceBased = true, IsDeduction = false, IsSnapshotRequired = true },
+                new PayrollFormulaLine { ComponentCode = "LEGACY_TAXABLE_ALLOWANCE", Expression = "legacy_taxable_allowance", CalculationOrder = 60, IsGrossComponent = true, IsTaxable = true, IsInsuranceBased = false, IsDeduction = false, IsSnapshotRequired = true },
+                new PayrollFormulaLine { ComponentCode = "LEGACY_NONTAXABLE_ALLOWANCE", Expression = "legacy_nontaxable_allowance", CalculationOrder = 70, IsGrossComponent = true, IsTaxable = false, IsInsuranceBased = false, IsDeduction = false, IsSnapshotRequired = true },
+                new PayrollFormulaLine { ComponentCode = "KPI_BONUS", Expression = "kpi_bonus_amount", CalculationOrder = 80, IsGrossComponent = true, IsTaxable = true, IsInsuranceBased = false, IsDeduction = false, IsSnapshotRequired = true },
+                new PayrollFormulaLine { ComponentCode = "OT_BASE", Expression = "overtime_base_amount", CalculationOrder = 90, IsGrossComponent = true, IsTaxable = true, IsInsuranceBased = false, IsDeduction = false, IsSnapshotRequired = true },
+                new PayrollFormulaLine { ComponentCode = "OT_PREMIUM", Expression = "overtime_premium_amount", CalculationOrder = 100, IsGrossComponent = true, IsTaxable = false, IsInsuranceBased = false, IsDeduction = false, IsSnapshotRequired = true },
+                new PayrollFormulaLine { ComponentCode = "PAYROLL_ADJUSTMENT_TAXABLE_INSURANCE", Expression = "payroll_adjustment_taxable_insurance", CalculationOrder = 110, IsGrossComponent = true, IsTaxable = true, IsInsuranceBased = true, IsDeduction = false, IsSnapshotRequired = true },
+                new PayrollFormulaLine { ComponentCode = "PAYROLL_ADJUSTMENT_TAXABLE", Expression = "payroll_adjustment_taxable", CalculationOrder = 120, IsGrossComponent = true, IsTaxable = true, IsInsuranceBased = false, IsDeduction = false, IsSnapshotRequired = true },
+                new PayrollFormulaLine { ComponentCode = "PAYROLL_ADJUSTMENT_NONTAXABLE", Expression = "payroll_adjustment_nontaxable", CalculationOrder = 130, IsGrossComponent = true, IsTaxable = false, IsInsuranceBased = false, IsDeduction = false, IsSnapshotRequired = true },
+                new PayrollFormulaLine { ComponentCode = "EMPLOYEE_INSURANCE", Expression = "insurance_salary * employee_insurance_rate", CalculationOrder = 200, IsGrossComponent = false, IsTaxable = false, IsInsuranceBased = false, IsDeduction = true, IsSnapshotRequired = true },
+                new PayrollFormulaLine { ComponentCode = "PIT", Expression = "pit(pit_tax_base)", CalculationOrder = 210, IsGrossComponent = false, IsTaxable = false, IsInsuranceBased = false, IsDeduction = true, IsSnapshotRequired = true },
+                new PayrollFormulaLine { ComponentCode = "PAYROLL_ADJUSTMENT_DEDUCTION", Expression = "payroll_adjustment_deduction", CalculationOrder = 220, IsGrossComponent = false, IsTaxable = false, IsInsuranceBased = false, IsDeduction = true, IsSnapshotRequired = true }
+            }
         });
 
         foreach (var emp in employees.Take(5)) // Lấy 5 người tạo phiếu lương tháng trước
@@ -309,7 +392,7 @@ public static class DbInitializer
         }
 
         // ======================================================
-        // MODULE 8: REQUESTS & HANDOVER (Biến động nhân sự)
+        // MODULE 8: REQUESTS (Biến động nhân sự)
         // ======================================================
         var resignationRequest = new Request
         {
@@ -320,16 +403,6 @@ public static class DbInitializer
             DeadlineAt = DateTime.Now.AddDays(2)
         };
         context.Requests.Add(resignationRequest);
-        await context.SaveChangesAsync();
-
-        context.HandoverRequests.Add(new HandoverRequest
-        {
-            RequestId = resignationRequest.Id,
-            SenderId = employees[10].Id,
-            ReceiverId = employees[11].Id, // Bàn giao cho người khác
-            Status = HandoverStatus.Pending_Verification
-        });
-
         await context.SaveChangesAsync();
     }
 }

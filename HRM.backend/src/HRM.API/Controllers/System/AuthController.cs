@@ -83,6 +83,22 @@ namespace HRM.backend.src.HRM.API.Controllers.System
             }
         }
 
+        [Authorize]
+        [HttpPost("change-password")]
+        public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto dto, CancellationToken ct)
+        {
+            try
+            {
+                var userId = User.GetAccountIdOrThrow();
+                await _identityUseCase.ChangePasswordAsync(userId, dto, ct);
+                return Ok(new { Message = "Đổi mật khẩu thành công. Vui lòng đăng nhập lại." });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = ex.Message });
+            }
+        }
+
         [HttpPost("verify-mfa")]
         public async Task<IActionResult> VerifyMfa([FromBody] VerifyMfaDto dto, CancellationToken ct)
         {
@@ -131,7 +147,7 @@ namespace HRM.backend.src.HRM.API.Controllers.System
         {
             try
             {
-                int userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+                int userId = User.GetAccountIdOrThrow();
                 string email = User.FindFirst(ClaimTypes.Email)!.Value;
                 var result = await _identityUseCase.InitiateMfaSetupAsync(userId, email);
                 return Ok(result);
@@ -147,7 +163,7 @@ namespace HRM.backend.src.HRM.API.Controllers.System
         [HttpPost("mfa/confirm")]
         public async Task<IActionResult> ConfirmMfaSetup([FromBody] ConfirmMfaSetupDto dto, CancellationToken ct)
         {
-            int userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+            int userId = User.GetAccountIdOrThrow();
 
             try
             {

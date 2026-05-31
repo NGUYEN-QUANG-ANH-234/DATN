@@ -27,7 +27,7 @@ namespace HRM.backend.src.HRM.API.Controllers.TimeAttendance
         {
             try
             {
-                var accountId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+                var accountId = User.GetAccountIdOrThrow();
                 var result = await _useCase.GetTodayStatusAsync(accountId, ct);
 
                 return Ok(new { Success = true, Data = result });
@@ -48,7 +48,7 @@ namespace HRM.backend.src.HRM.API.Controllers.TimeAttendance
         {
             try
             {
-                var accountId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+                var accountId = User.GetAccountIdOrThrow();
                 var clientIp = ExtractClientIp();
                 var result = await _useCase.VerifyAndRecordAsync(accountId, clientIp, dto, ct);
 

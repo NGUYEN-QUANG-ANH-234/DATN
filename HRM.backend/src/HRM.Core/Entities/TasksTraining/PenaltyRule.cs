@@ -23,6 +23,21 @@ namespace HRM.backend.src.HRM.Core.Entities.TasksTraining
         [Column(TypeName = "decimal(5,2)")]
         public decimal PenaltyPoint { get; set; }
 
+        public bool AffectsAttendance { get; set; }
+        public bool AffectsPerformance { get; set; } = true;
+        public bool AffectsPersonnelDecision { get; set; }
+
+        public PenaltySeverity Severity { get; set; } = PenaltySeverity.Low;
+        public bool RequiresEmployeeExplanation { get; set; }
+        public bool RequiresHRApproval { get; set; } = true;
+        public bool RequiresDirectorApproval { get; set; }
+
+        public AttendanceAdjustmentImpactType AttendanceAdjustmentType { get; set; } = AttendanceAdjustmentImpactType.None;
+        public int? AttendanceDeductMinutes { get; set; }
+
+        [Column(TypeName = "decimal(5,2)")]
+        public decimal? AttendanceDeductWorkday { get; set; }
+
         public bool IsActive { get; set; } = true;
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }

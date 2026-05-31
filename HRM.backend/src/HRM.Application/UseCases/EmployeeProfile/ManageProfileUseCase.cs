@@ -8,8 +8,6 @@ using HRM.backend.src.HRM.Core.Enums;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.EmployeeProfile;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.System;
-using HRM.backend.src.HRM.Core.Interfaces.Repositories.System.HRM.backend.src.HRM.Infrastructure.Repositories.Interfaces.System;
-using HRM.backend.src.HRM.Infrastructure.ExternalServices;
 using System.Text.Json;
 
 namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile

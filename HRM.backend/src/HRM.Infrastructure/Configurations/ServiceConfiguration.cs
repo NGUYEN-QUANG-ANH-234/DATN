@@ -1,6 +1,8 @@
 using HRM.backend.src.HRM.Application.DTOs.System;
 using HRM.backend.src.HRM.Application.Interfaces;
 using HRM.backend.src.HRM.Application.Interfaces.EmployeeProfile.Usecases;
+using HRM.backend.src.HRM.Application.Interfaces.PayrollAllowances.Services;
+using HRM.backend.src.HRM.Application.Interfaces.PayrollAllowances.Usecases;
 using HRM.backend.src.HRM.Application.Interfaces.Recruitment.Usecases;
 using HRM.backend.src.HRM.Application.Interfaces.Services;
 using HRM.backend.src.HRM.Application.Interfaces.System;
@@ -8,10 +10,14 @@ using HRM.backend.src.HRM.Application.Interfaces.System.Services;
 using HRM.backend.src.HRM.Application.Interfaces.System.UseCases;
 using HRM.backend.src.HRM.Application.Interfaces.TasksTraining.Services;
 using HRM.backend.src.HRM.Application.Interfaces.TasksTraining.Usecases;
+using HRM.backend.src.HRM.Application.Interfaces.TimeAttendance.Services;
 using HRM.backend.src.HRM.Application.Interfaces.TimeAttendance.Usecases;
 using HRM.backend.src.HRM.Application.Services.System;
+using HRM.backend.src.HRM.Application.Services.PayrollAllowances;
 using HRM.backend.src.HRM.Application.Services.TasksTraining;
+using HRM.backend.src.HRM.Application.Services.TimeAttendance;
 using HRM.backend.src.HRM.Application.UseCases.EmployeeProfile;
+using HRM.backend.src.HRM.Application.UseCases.PayrollAllowances;
 using HRM.backend.src.HRM.Application.UseCases.Recruitment;
 using HRM.backend.src.HRM.Application.UseCases.System;
 using HRM.backend.src.HRM.Application.UseCases.TasksTraining;
@@ -39,6 +45,7 @@ namespace HRM.backend.src.HRM.Infrastructure.Configurations
             services.AddScoped<IAttendanceConfigUseCase, AttendanceConfigUseCase>();
             services.AddScoped<ILeaveTypeUseCase, LeaveTypeUseCase>();
             services.AddScoped<IDocumentExportUseCase, DocumentExportUseCase>();
+            services.AddScoped<IPayrollPolicyUseCase, PayrollPolicyUseCase>();
             services.AddScoped<ISlaTrackingService, SlaTrackingService>();
             services.AddScoped<IApprovalConflictGuard, ApprovalConflictGuard>();
             services.AddScoped<IIdempotencyService, IdempotencyService>();
@@ -52,17 +59,29 @@ namespace HRM.backend.src.HRM.Infrastructure.Configurations
             services.AddScoped<IAttendanceUseCase, AttendanceUseCase>();
             services.AddScoped<IAttendanceSummaryUseCase, AttendanceSummaryUseCase>();
             services.AddScoped<IOvertimeRequestUseCase, OvertimeRequestUseCase>();
+            services.AddScoped<IOvertimeReconciliationService, OvertimeReconciliationService>();
+            services.AddScoped<IAttendancePenaltyGeneratorService, AttendancePenaltyGeneratorService>();
             services.AddScoped<ILeaveRequestUseCase, LeaveRequestUseCase>();
 
             // Module: Performance & Training
             services.AddScoped<IKpiManagementUseCase, KpiManagementUseCase>();
             services.AddScoped<ITaskManagementUseCase, TaskManagementUseCase>();
             services.AddScoped<IPerformanceEvaluationUseCase, PerformanceEvaluationUseCase>();
+            services.AddScoped<IPenaltyManagementUseCase, PenaltyManagementUseCase>();
             services.AddScoped<ITrainingUseCase, TrainingUseCase>();
             services.AddScoped<IExcelKpiParserService, ExcelKpiParserService>();
 
+            // Module: Payroll
+            services.AddScoped<IPayrollSourceResolver, PayrollSourceResolver>();
+            services.AddScoped<IPayrollFormulaValidator, PayrollFormulaValidator>();
+            services.AddScoped<IPayrollCalculationEngine, PayrollCalculationEngine>();
+            services.AddScoped<IPayrollSnapshotWriter, PayrollSnapshotWriter>();
+            services.AddScoped<IPayrollCalculationUseCase, PayrollCalculationUseCase>();
+            services.AddScoped<IPayrollAccessUseCase, PayrollAccessUseCase>();
+
             // Module: Profile
             services.AddScoped<IManageProfileUseCase, ManageProfileUseCase>();
+            services.AddScoped<IDependentUseCase, DependentUseCase>();
             services.AddScoped<IHistoryTrackingUseCase, HistoryTrackingUseCase>();
 
             // Module: Recruitment

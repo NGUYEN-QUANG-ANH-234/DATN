@@ -41,7 +41,7 @@ namespace HRM.backend.src.HRM.API.Controllers.Organization
         {
             try
             {
-                int actorId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+                int actorId = User.GetAccountIdOrThrow();
                 await _orgTreeUseCase.UpdateDepartmentNodeAsync(id, dto, actorId, ct);
 
                 return Ok(new { Success = true, Message = "Cập nhật cấu trúc sơ đồ tổ chức thành công." });
@@ -63,7 +63,7 @@ namespace HRM.backend.src.HRM.API.Controllers.Organization
         {
             try
             {
-                int actorId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+                int actorId = User.GetAccountIdOrThrow();
                 await _orgTreeUseCase.DeactivateDepartmentAsync(id, actorId, ct);
 
                 return Ok(new { Success = true, Message = "Đã giải thể phòng ban thành công." });
@@ -89,7 +89,7 @@ namespace HRM.backend.src.HRM.API.Controllers.Organization
         {
             try
             {
-                int actorId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+                int actorId = User.GetAccountIdOrThrow();
                 await _orgTreeUseCase.CreateDepartmentAsync(dto, actorId, ct);
 
                 return Ok(new { Success = true, Message = "Tạo phòng ban thành công." });

@@ -65,6 +65,8 @@ namespace HRM.backend.src.HRM.Application.DTOs.TimeAttendance
         public string? DepartmentName { get; set; }
         public int RequestedByAccountId { get; set; }
         public DateTime WorkDate { get; set; }
+        public DateTime StartAt { get; set; }
+        public DateTime EndAt { get; set; }
         public string StartTime { get; set; } = string.Empty;
         public string EndTime { get; set; } = string.Empty;
         public string Reason { get; set; } = string.Empty;
@@ -72,11 +74,22 @@ namespace HRM.backend.src.HRM.Application.DTOs.TimeAttendance
         public string Status { get; set; } = string.Empty;
         public string? ManagerNote { get; set; }
         public string? HrNote { get; set; }
+        public string? DirectorNote { get; set; }
         public int ApprovedMinutes { get; set; }
         public int ActualOtMinutes { get; set; }
         public bool IsPayrollLocked { get; set; }
         public string? PayrollPeriod { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime? ReconciledAt { get; set; }
+        public List<OvertimeSegmentDto> Segments { get; set; } = new();
+    }
+
+    public class OvertimeSegmentDto
+    {
+        public DateTime SegmentStartAt { get; set; }
+        public DateTime SegmentEndAt { get; set; }
+        public int Minutes { get; set; }
+        public string PolicyCode { get; set; } = string.Empty;
+        public decimal RateMultiplierSnapshot { get; set; }
     }
 }

@@ -19,5 +19,6 @@ namespace HRM.backend.src.HRM.Core.Entities.Organization
         // --- Navigation Properties (Quan hệ 1-N) ---
         // Một vị trí/chức vụ có thể được nắm giữ bởi nhiều nhân viên
         public virtual ICollection<Employee> Employees { get; set; } = new List<Employee>();
+        public virtual ICollection<PositionJobLevelPolicy> JobLevelPolicies { get; set; } = new List<PositionJobLevelPolicy>();
     }
 }

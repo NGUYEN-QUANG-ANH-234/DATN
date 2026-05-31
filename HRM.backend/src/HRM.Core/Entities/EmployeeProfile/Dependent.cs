@@ -23,5 +23,9 @@ namespace HRM.backend.src.HRM.Core.Entities.EmployeeProfile
         public DateTime ValidFrom { get; set; }
         public DateTime? ValidTo { get; set; }
         public bool IsActive { get; set; } = true;
+        public string? EvidenceUrl { get; set; }
+        public string? Note { get; set; }
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime? UpdatedAt { get; set; }
     }
 }

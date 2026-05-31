@@ -16,19 +16,19 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories
 
         public async Task<int> CommitAsync(CancellationToken ct = default)
         {
-            return await _context.SaveChangesAsync();
+            return await _context.SaveChangesAsync(ct);
         }
 
         public async Task BeginTransactionAsync(CancellationToken ct = default)
         {
-            _transaction = await _context.Database.BeginTransactionAsync();
+            _transaction = await _context.Database.BeginTransactionAsync(ct);
         }
 
         public async Task CommitTransactionAsync(CancellationToken ct = default)
         {
             if (_transaction != null)
             {
-                await _transaction.CommitAsync();
+                await _transaction.CommitAsync(ct);
                 await _transaction.DisposeAsync();
                 _transaction = null;
             }
@@ -38,7 +38,7 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories
         {
             if (_transaction != null)
             {
-                await _transaction.RollbackAsync();
+                await _transaction.RollbackAsync(ct);
                 await _transaction.DisposeAsync();
                 _transaction = null;
             }

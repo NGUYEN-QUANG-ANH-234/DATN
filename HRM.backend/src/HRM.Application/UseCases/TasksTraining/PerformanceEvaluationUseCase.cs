@@ -167,8 +167,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.TasksTraining
 
         private async Task<(decimal TotalPoint, string Reason)> GetSystemPenaltyAsync(PerformanceReview review, CancellationToken ct)
         {
-            var records = await _penaltyRecordRepo.GetByEmployeePeriodAsync(review.EmployeeId, review.Period, ct);
-            var systemRecords = records.Where(r => r.CreatedBySystem).ToList();
+            var systemRecords = await _penaltyRecordRepo.GetApprovedPerformanceByEmployeePeriodAsync(review.EmployeeId, review.Period, ct);
             return (
                 systemRecords.Sum(r => r.PenaltyPoint),
                 string.Join("; ", systemRecords.Select(r => $"{r.RuleCode}: {r.Reason}").Where(x => !string.IsNullOrWhiteSpace(x))));

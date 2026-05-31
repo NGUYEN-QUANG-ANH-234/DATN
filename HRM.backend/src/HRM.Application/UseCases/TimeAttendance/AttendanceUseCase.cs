@@ -3,6 +3,7 @@ using System.Text.Json;
 using HRM.backend.src.HRM.Application.DTOs.System;
 using HRM.backend.src.HRM.Application.DTOs.TimeAttendance;
 using HRM.backend.src.HRM.Application.Interfaces;
+using HRM.backend.src.HRM.Application.Interfaces.TimeAttendance.Services;
 using HRM.backend.src.HRM.Application.Interfaces.TimeAttendance.Usecases;
 using HRM.backend.src.HRM.Core.Entities.EmployeeProfile;
 using HRM.backend.src.HRM.Core.Entities.TimeAttendance;
@@ -17,11 +18,14 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
     public class AttendanceUseCase : IAttendanceUseCase
     {
         private const string CacheKey = "Attendance_Config_Cache";
+        private const int MaxOpenSessionHours = 36;
 
         private readonly IEmployeeRepository _employeeRepo;
         private readonly IAttendanceRepository _attendanceRepo;
         private readonly IWorkShiftRepository _workShiftRepo;
         private readonly IConfigurationRepository _configRepo;
+        private readonly IOvertimeRequestRepository _overtimeRepo;
+        private readonly IOvertimeReconciliationService _overtimeReconciliationService;
         private readonly IAppCache _cache;
         private readonly IUnitOfWork _unitOfWork;
         private readonly ILockService _lockService;
@@ -31,6 +35,8 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
             IAttendanceRepository attendanceRepo,
             IWorkShiftRepository workShiftRepo,
             IConfigurationRepository configRepo,
+            IOvertimeRequestRepository overtimeRepo,
+            IOvertimeReconciliationService overtimeReconciliationService,
             IAppCache cache,
             IUnitOfWork unitOfWork,
             ILockService lockService)
@@ -39,6 +45,8 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
             _attendanceRepo = attendanceRepo;
             _workShiftRepo = workShiftRepo;
             _configRepo = configRepo;
+            _overtimeRepo = overtimeRepo;
+            _overtimeReconciliationService = overtimeReconciliationService;
             _cache = cache;
             _unitOfWork = unitOfWork;
             _lockService = lockService;
@@ -50,7 +58,8 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
         {
             var employee = await GetEmployeeByAccountAsync(accountId, ct);
             var now = DateTime.Now;
-            var todayLog = await _attendanceRepo.GetTodayLogAsync(employee.Id, now, ct);
+            var todayLog = await _attendanceRepo.GetOpenLogAsync(employee.Id, now, MaxOpenSessionHours, ct)
+                ?? await _attendanceRepo.GetTodayLogAsync(employee.Id, now, ct);
             var shift = await GetEmployeeShiftAsync(employee, ct);
 
             var nextAction = todayLog == null
@@ -89,7 +98,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
             ValidateSecurity(clientIp, dto, config);
 
             return await _lockService.GetWithLockAsync(
-                $"attendance_{employee.Id}_{DateTime.Now:yyyyMMdd}",
+                $"attendance_{employee.Id}",
                 async (innerCt) =>
                     await VerifyAndRecordCoreAsync(employee, clientIp, dto, innerCt),
                 cancellationToken: ct);
@@ -102,7 +111,8 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
             CancellationToken ct)
         {
             var now = DateTime.Now;
-            var todayLog = await _attendanceRepo.GetTodayLogAsync(employee.Id, now, ct);
+            var todayLog = await _attendanceRepo.GetOpenLogAsync(employee.Id, now, MaxOpenSessionHours, ct)
+                ?? await _attendanceRepo.GetTodayLogAsync(employee.Id, now, ct);
             var shift = await GetEmployeeShiftAsync(employee, ct);
 
             if (todayLog == null)
@@ -111,6 +121,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
                 {
                     EmployeeId = employee.Id,
                     ShiftId = shift?.Id,
+                    WorkDate = ResolveBusinessDate(now, shift),
                     CheckIn = now,
                     IpAddress = clientIp,
                     GpsLat = dto.Latitude,
@@ -143,6 +154,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
             todayLog.GpsLong = dto.Longitude;
             todayLog.Status = ResolveCheckOutStatus(now, shift, todayLog.Status);
             await _attendanceRepo.UpdateAsync(todayLog, ct);
+            await ReconcileOvertimeForLogAsync(todayLog, ct);
             await _unitOfWork.CommitAsync(ct);
 
             return new AttendanceLogResponseDto
@@ -193,11 +205,11 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
                     var configs = await _configRepo.FetchLatestConfigAsync(innerCt);
                     var rawConfig = configs.FirstOrDefault(c => c.ConfigGroup == "ATTENDANCE_PARAM")?.ParamValue;
                     if (string.IsNullOrWhiteSpace(rawConfig))
-                        throw new InvalidOperationException("Chua cau hinh tham so bao mat cham cong.");
+                        throw new InvalidOperationException("Chưa cấu hình tham số bảo mật chấm công.");
 
                     var config = JsonSerializer.Deserialize<AttendanceConfigDto>(rawConfig);
                     if (config == null)
-                        throw new InvalidOperationException("Cau hinh cham cong khong hop le.");
+                        throw new InvalidOperationException("Cấu hình chấm công không hợp lệ.");
 
                     return config;
                 },
@@ -336,6 +348,35 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
 
             var latestValidCheckIn = shift.StartTime.Value.Add(TimeSpan.FromMinutes(shift.LateThresholdMins));
             return now.TimeOfDay > latestValidCheckIn ? AttendanceStatus.Late : AttendanceStatus.Valid;
+        }
+
+        private static DateTime ResolveBusinessDate(DateTime now, WorkShift? shift)
+        {
+            if (shift?.StartTime == null)
+                return now.Date;
+
+            var shiftStartToday = now.Date.Add(shift.StartTime.Value);
+            return now < shiftStartToday.AddHours(-6)
+                ? now.Date.AddDays(-1)
+                : now.Date;
+        }
+
+        private async Task ReconcileOvertimeForLogAsync(AttendanceLog log, CancellationToken ct)
+        {
+            if (!log.EmployeeId.HasValue || !log.CheckIn.HasValue || !log.CheckOut.HasValue)
+                return;
+
+            var requests = await _overtimeRepo.GetReconcileCandidatesAsync(
+                log.EmployeeId.Value,
+                log.CheckIn.Value,
+                log.CheckOut.Value,
+                ct);
+
+            foreach (var request in requests)
+            {
+                await _overtimeReconciliationService.ReconcileAsync(request, log, ct);
+                await _overtimeRepo.UpdateAsync(request, ct);
+            }
         }
 
         private static AttendanceStatus ResolveCheckOutStatus(DateTime now, WorkShift? shift, AttendanceStatus currentStatus)

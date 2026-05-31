@@ -16,6 +16,7 @@ namespace HRM.backend.src.HRM.Core.Entities.TimeAttendance
         public int? ShiftId { get; set; }
         [ForeignKey("ShiftId")] public virtual WorkShift? WorkShift { get; set; }
 
+        public DateTime WorkDate { get; set; }
         public DateTime? CheckIn { get; set; }
         public DateTime? CheckOut { get; set; }
 

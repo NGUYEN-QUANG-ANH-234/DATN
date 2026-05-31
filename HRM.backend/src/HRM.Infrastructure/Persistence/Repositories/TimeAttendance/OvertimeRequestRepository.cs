@@ -39,11 +39,13 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.TimeAttend
 
         public async Task<List<OvertimeRequest>> GetApprovedAsync(DateTime? fromDate = null, DateTime? toDate = null, CancellationToken ct = default)
         {
-            var query = BaseQuery().Where(x => x.Status == OvertimeRequestStatus.Approved);
+            var query = BaseQuery().Where(x =>
+                x.Status == OvertimeRequestStatus.Approved ||
+                x.Status == OvertimeRequestStatus.Reconciled);
             if (fromDate.HasValue)
-                query = query.Where(x => x.WorkDate >= fromDate.Value.Date);
+                query = query.Where(x => x.StartAt >= fromDate.Value.Date);
             if (toDate.HasValue)
-                query = query.Where(x => x.WorkDate < toDate.Value.Date.AddDays(1));
+                query = query.Where(x => x.StartAt < toDate.Value.Date.AddDays(1));
 
             return await query
                 .OrderByDescending(x => x.WorkDate)
@@ -54,22 +56,34 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.TimeAttend
         public async Task<List<OvertimeRequest>> GetApprovedByPeriodAsync(DateTime fromDate, DateTime toDate, CancellationToken ct = default)
         {
             return await BaseQuery()
-                .Where(x => x.Status == OvertimeRequestStatus.Approved &&
-                            x.WorkDate >= fromDate.Date &&
-                            x.WorkDate < toDate.Date)
+                .Where(x => (x.Status == OvertimeRequestStatus.Approved ||
+                             x.Status == OvertimeRequestStatus.Reconciled) &&
+                            x.StartAt < toDate.Date &&
+                            x.EndAt > fromDate.Date)
                 .ToListAsync(ct);
         }
 
-        public async Task<bool> HasOverlappingRequestAsync(int employeeId, DateTime workDate, TimeSpan startTime, TimeSpan endTime, int? excludeId = null, CancellationToken ct = default)
+        public async Task<List<OvertimeRequest>> GetReconcileCandidatesAsync(int employeeId, DateTime checkIn, DateTime checkOut, CancellationToken ct = default)
+        {
+            return await BaseQuery()
+                .Where(x => x.EmployeeId == employeeId &&
+                            !x.IsPayrollLocked &&
+                            (x.Status == OvertimeRequestStatus.Approved ||
+                             x.Status == OvertimeRequestStatus.Reconciled) &&
+                            x.StartAt < checkOut &&
+                            x.EndAt > checkIn)
+                .ToListAsync(ct);
+        }
+
+        public async Task<bool> HasOverlappingRequestAsync(int employeeId, DateTime startAt, DateTime endAt, int? excludeId = null, CancellationToken ct = default)
         {
             return await _dbSet.AnyAsync(x =>
                 x.EmployeeId == employeeId &&
-                x.WorkDate == workDate.Date &&
                 x.Status != OvertimeRequestStatus.Rejected &&
                 x.Status != OvertimeRequestStatus.Cancelled &&
                 (!excludeId.HasValue || x.Id != excludeId.Value) &&
-                startTime < x.EndTime &&
-                endTime > x.StartTime,
+                startAt < x.EndAt &&
+                endAt > x.StartAt,
                 ct);
         }
 
@@ -82,7 +96,8 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.TimeAttend
         {
             return _dbSet
                 .Include(x => x.Employee)
-                .ThenInclude(e => e.Department);
+                .ThenInclude(e => e.Department)
+                .Include(x => x.Segments);
         }
     }
 }

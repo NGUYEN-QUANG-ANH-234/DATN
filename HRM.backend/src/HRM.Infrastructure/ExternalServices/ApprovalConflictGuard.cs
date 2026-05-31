@@ -27,7 +27,7 @@ namespace HRM.backend.src.HRM.Infrastructure.ExternalServices
         public async Task<string?> GetEmployeeRoleNameAsync(int employeeId, CancellationToken ct = default)
         {
             var employee = await _employeeRepo.GetProfileByIdAsync(employeeId, ct)
-                ?? throw new InvalidOperationException("Khong tim thay ho so nhan su.");
+                ?? throw new InvalidOperationException("Không tìm thấy hồ sơ nhân sự.");
 
             if (!employee.AccountId.HasValue)
                 return null;
@@ -45,7 +45,7 @@ namespace HRM.backend.src.HRM.Infrastructure.ExternalServices
         public async Task<bool> HasAlternativeHrApproverAsync(int employeeId, CancellationToken ct = default)
         {
             var employee = await _employeeRepo.GetProfileByIdAsync(employeeId, ct)
-                ?? throw new InvalidOperationException("Khong tim thay ho so nhan su.");
+                ?? throw new InvalidOperationException("Không tìm thấy hồ sơ nhân sự.");
 
             var hrAccountIds = await _accountRepo.GetAccountIdsByRoleAsync("HR", ct);
             return hrAccountIds.Any(id => !employee.AccountId.HasValue || id != employee.AccountId.Value);
@@ -57,7 +57,7 @@ namespace HRM.backend.src.HRM.Infrastructure.ExternalServices
             var directorId = directorIds.FirstOrDefault();
 
             if (directorId == 0)
-                throw new InvalidOperationException("He thong chua co tai khoan Giam doc de xu ly phe duyet dac biet.");
+                throw new InvalidOperationException("Hệ thống chưa có tài khoản Giám đốc để xử lý phê duyệt đặc biệt.");
 
             return directorId;
         }
@@ -65,7 +65,7 @@ namespace HRM.backend.src.HRM.Infrastructure.ExternalServices
         public async Task EnsureNotSelfApprovalForEmployeeAsync(int employeeId, int approverAccountId, CancellationToken ct = default)
         {
             var employee = await _employeeRepo.GetProfileByIdAsync(employeeId, ct)
-                ?? throw new InvalidOperationException("Khong tim thay ho so nhan su.");
+                ?? throw new InvalidOperationException("Không tìm thấy hồ sơ nhân sự.");
 
             EnsureNotSelfApproval(employee.AccountId, approverAccountId);
         }
@@ -73,7 +73,7 @@ namespace HRM.backend.src.HRM.Infrastructure.ExternalServices
         public void EnsureNotSelfApproval(int? targetAccountId, int approverAccountId)
         {
             if (targetAccountId.HasValue && targetAccountId.Value == approverAccountId)
-                throw new UnauthorizedAccessException("Khong duoc tu phe duyet yeu cau lien quan den chinh minh.");
+                throw new UnauthorizedAccessException("Không được tự phê duyệt yêu cầu liên quan đến chính mình.");
         }
 
         private static bool IsSpecialApprovalRole(string? roleName)

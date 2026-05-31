@@ -16,6 +16,8 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
         private readonly ILeaveRequestRepository _leaveReqRepo;
         private readonly ILeaveBalanceRepository _leaveBalRepo;
         private readonly ILeaveTypeRepository _leaveTypeRepo;
+        private readonly IBaseRepository<MaternityLeave> _maternityLeaveRepo;
+        private readonly IBaseRepository<EmploymentServicePeriod> _servicePeriodRepo;
         private readonly IAttendanceRepository _attendanceRepo;
         private readonly IEmployeeRepository _employeeRepo;
         private readonly IApprovalConflictGuard _approvalConflictGuard;
@@ -29,6 +31,8 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
             ILeaveRequestRepository leaveReqRepo,
             ILeaveBalanceRepository leaveBalRepo,
             ILeaveTypeRepository leaveTypeRepo,
+            IBaseRepository<MaternityLeave> maternityLeaveRepo,
+            IBaseRepository<EmploymentServicePeriod> servicePeriodRepo,
             IAttendanceRepository attendanceRepo,
             IEmployeeRepository employeeRepo,
             IApprovalConflictGuard approvalConflictGuard,
@@ -41,6 +45,8 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
             _leaveReqRepo = leaveReqRepo;
             _leaveBalRepo = leaveBalRepo;
             _leaveTypeRepo = leaveTypeRepo;
+            _maternityLeaveRepo = maternityLeaveRepo;
+            _servicePeriodRepo = servicePeriodRepo;
             _attendanceRepo = attendanceRepo;
             _employeeRepo = employeeRepo;
             _approvalConflictGuard = approvalConflictGuard;
@@ -67,19 +73,19 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
                 async (innerCt) =>
                 {
                     var leaveType = await _leaveTypeRepo.GetByIdAsync(dto.LeaveTypeId, innerCt)
-                        ?? throw new InvalidOperationException("Loai phep khong ton tai.");
+                        ?? throw new InvalidOperationException("Loại phép không tồn tại.");
 
                     var requestedDays = CountBusinessDays(dto.StartDate, dto.EndDate);
                     var finalLeaveType = leaveType;
 
-                    if (leaveType.IsPaid)
+                    if (ShouldDeductLeaveBalance(leaveType))
                     {
                         var balance = await _leaveBalRepo.GetBalanceAsync(employee.Id, leaveType.Id, (short)dto.StartDate.Year, innerCt);
                         var availableDays = (balance?.TotalDays ?? 0) - (balance?.UsedDays ?? 0);
                         if (availableDays < requestedDays)
                         {
                             finalLeaveType = (await _leaveTypeRepo.FindAsync(t => !t.IsPaid, innerCt)).FirstOrDefault()
-                                ?? throw new InvalidOperationException("Quy phep khong du va chua cau hinh loai nghi khong luong.");
+                                ?? throw new InvalidOperationException("Quỹ phép không đủ và chưa cấu hình loại nghỉ không lương.");
                         }
                     }
 
@@ -118,11 +124,11 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
                 return (await _leaveReqRepo.GetPendingDeptAsync(null, ct)).Select(MapToResponse);
 
             if (!IsManager(actorRoleName))
-                throw new UnauthorizedAccessException("Chi Truong phong hoac Admin duoc xem don nghi cho tham dinh.");
+                throw new UnauthorizedAccessException("Chỉ Trưởng phòng hoặc Admin được xem đơn nghỉ chờ thẩm định.");
 
             var manager = await GetEmployeeByAccountAsync(actorAccountId, ct);
             if (!manager.DeptId.HasValue)
-                throw new UnauthorizedAccessException("Tai khoan Truong phong chua duoc gan phong ban.");
+                throw new UnauthorizedAccessException("Tài khoản Trưởng phòng chưa được gắn phòng ban.");
 
             return (await _leaveReqRepo.GetPendingDeptAsync(manager.DeptId.Value, ct)).Select(MapToResponse);
         }
@@ -139,7 +145,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
             {
                 var request = await GetRequestOrThrowAsync(id, innerCt);
                 if (request.Status != LeaveRequestStatus.PendingDept)
-                    throw new InvalidOperationException("Don nghi khong o trang thai cho Truong phong tham dinh.");
+                    throw new InvalidOperationException("Đơn nghỉ không ở trạng thái chờ Trưởng phòng thẩm định.");
 
                 await EnsureManagerCanAccessAsync(request.Employee, actorAccountId, actorRoleName, innerCt);
                 await _approvalConflictGuard.EnsureNotSelfApprovalForEmployeeAsync(request.EmployeeId!.Value, actorAccountId, innerCt);
@@ -161,7 +167,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
             {
                 var request = await GetRequestOrThrowAsync(id, innerCt);
                 if (request.Status != LeaveRequestStatus.PendingDirector)
-                    throw new InvalidOperationException("Don nghi khong o trang thai cho Giam doc phe duyet.");
+                    throw new InvalidOperationException("Đơn nghỉ không ở trạng thái chờ Giám đốc phê duyệt.");
 
                 await _approvalConflictGuard.EnsureNotSelfApprovalForEmployeeAsync(request.EmployeeId!.Value, actorAccountId, innerCt);
 
@@ -179,7 +185,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
                     $"leave_balance_{request.EmployeeId!.Value}_{request.StartDate!.Value.Year}",
                     async (balanceCt) =>
                     {
-                        await ApproveAndSyncAsync(request, LeaveRequestStatus.Approved, balanceCt);
+                        await ApproveAndSyncAsync(request, LeaveRequestStatus.Approved, actorAccountId, balanceCt);
                         return true;
                     },
                     cancellationToken: innerCt);
@@ -189,19 +195,19 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
             }, cancellationToken: ct);
         }
 
-        private async Task ApproveAndSyncAsync(LeaveRequest request, LeaveRequestStatus finalStatus, CancellationToken ct)
+        private async Task ApproveAndSyncAsync(LeaveRequest request, LeaveRequestStatus finalStatus, int approvedByAccountId, CancellationToken ct)
         {
             if (request.EmployeeId == null || request.LeaveTypeId == null || request.StartDate == null || request.EndDate == null)
                 throw new InvalidOperationException("Don nghi phep thieu du lieu bat buoc.");
 
             var days = CountBusinessDays(request.StartDate.Value, request.EndDate.Value);
             var leaveType = request.LeaveType ?? await _leaveTypeRepo.GetByIdAsync(request.LeaveTypeId.Value, ct)
-                ?? throw new InvalidOperationException("Loai phep khong ton tai.");
+                ?? throw new InvalidOperationException("Loại phép không tồn tại.");
 
             request.Status = finalStatus;
             request.DeadlineAt = null;
 
-            if (leaveType.IsPaid)
+            if (ShouldDeductLeaveBalance(leaveType))
                 await _leaveBalRepo.DeductAsync(request.EmployeeId.Value, request.LeaveTypeId.Value, (short)request.StartDate.Value.Year, days, ct);
 
             await _attendanceRepo.SyncLeaveToAttendanceAsync(
@@ -209,20 +215,97 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
                 EnumerateBusinessDates(request.StartDate.Value, request.EndDate.Value).ToList(),
                 AttendanceStatus.OnLeave);
 
+            await SyncMaternityLeaveAsync(request, leaveType, approvedByAccountId, ct);
+
             await _leaveReqRepo.UpdateAsync(request, ct);
             await _unitOfWork.CommitAsync(ct);
+        }
+
+        private async Task SyncMaternityLeaveAsync(LeaveRequest request, LeaveType leaveType, int approvedByAccountId, CancellationToken ct)
+        {
+            if (leaveType.Category != LeaveCategory.Maternity)
+                return;
+
+            var employeeId = request.EmployeeId!.Value;
+            var startDate = request.StartDate!.Value.Date;
+            var endDate = request.EndDate!.Value.Date;
+
+            var existing = (await _maternityLeaveRepo.FindAsync(m => m.LeaveRequestId == request.Id, ct)).FirstOrDefault();
+            if (existing == null)
+            {
+                await _maternityLeaveRepo.AddAsync(new MaternityLeave
+                {
+                    EmployeeId = employeeId,
+                    LeaveRequestId = request.Id,
+                    StartDate = startDate,
+                    EndDate = endDate,
+                    ExpectedReturnDate = endDate.AddDays(1),
+                    Status = MaternityLeaveStatus.Active,
+                    ApprovedByAccountId = approvedByAccountId,
+                    ApprovedAt = DateTime.UtcNow,
+                    Note = request.Reason
+                }, ct);
+            }
+            else
+            {
+                existing.StartDate = startDate;
+                existing.EndDate = endDate;
+                existing.ExpectedReturnDate = endDate.AddDays(1);
+                existing.Status = MaternityLeaveStatus.Active;
+                existing.ApprovedByAccountId = approvedByAccountId;
+                existing.ApprovedAt = DateTime.UtcNow;
+                existing.Note = request.Reason;
+                _maternityLeaveRepo.Update(existing);
+            }
+
+            var employee = request.Employee ?? await _employeeRepo.GetByIdAsync(employeeId, ct);
+            if (employee != null)
+            {
+                employee.Status = EmployeeStatus.OnMaternityLeave;
+                _employeeRepo.Update(employee);
+            }
+
+            var existingPeriod = (await _servicePeriodRepo.FindAsync(
+                p => p.SourceType == "MaternityLeave" && p.SourceId == request.Id,
+                ct)).FirstOrDefault();
+
+            if (existingPeriod == null)
+            {
+                await _servicePeriodRepo.AddAsync(new EmploymentServicePeriod
+                {
+                    EmployeeId = employeeId,
+                    PeriodStart = startDate,
+                    PeriodEnd = endDate,
+                    PeriodType = EmploymentServicePeriodType.MaternityLeave,
+                    IsActualWorkingTime = false,
+                    IsSocialInsuranceContributed = false,
+                    IsUnemploymentInsuranceContributed = false,
+                    IsExcludedFromSeverance = false,
+                    SourceType = "MaternityLeave",
+                    SourceId = request.Id,
+                    Note = "Ghi nhận tự động từ đơn nghỉ thai sản đã duyệt."
+                }, ct);
+            }
+            else
+            {
+                existingPeriod.PeriodStart = startDate;
+                existingPeriod.PeriodEnd = endDate;
+                existingPeriod.PeriodType = EmploymentServicePeriodType.MaternityLeave;
+                existingPeriod.Note = "Cập nhật tự động từ đơn nghỉ thai sản đã duyệt.";
+                _servicePeriodRepo.Update(existingPeriod);
+            }
         }
 
         private async Task<LeaveRequest> GetRequestOrThrowAsync(int id, CancellationToken ct)
         {
             return await _leaveReqRepo.GetDetailAsync(id, ct)
-                ?? throw new InvalidOperationException("Don nghi phep khong ton tai.");
+                ?? throw new InvalidOperationException("Đơn nghỉ phép không tồn tại.");
         }
 
         private async Task<Employee> GetEmployeeByAccountAsync(int accountId, CancellationToken ct)
         {
             return await _employeeRepo.GetByAccountIdAsync(accountId, ct)
-                ?? throw new UnauthorizedAccessException("Tai khoan chua lien ket ho so nhan su.");
+                ?? throw new UnauthorizedAccessException("Tài khoản chưa liên kết hồ sơ nhân sự.");
         }
 
         private async Task SendLeaveNotificationAsync(
@@ -262,20 +345,20 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
                 return;
 
             if (!IsManager(actorRoleName))
-                throw new UnauthorizedAccessException("Chi Truong phong duoc tham dinh don nghi phep.");
+                throw new UnauthorizedAccessException("Chỉ Trưởng phòng được thẩm định đơn nghỉ phép.");
 
             if (targetEmployee == null)
-                throw new InvalidOperationException("Don nghi phep chua lien ket nhan vien.");
+                throw new InvalidOperationException("Đơn nghỉ phép chưa liên kết nhân viên.");
 
             var manager = await GetEmployeeByAccountAsync(actorAccountId, ct);
             if (!manager.DeptId.HasValue || targetEmployee.DeptId != manager.DeptId)
-                throw new UnauthorizedAccessException("Truong phong chi duoc tham dinh don nghi cua nhan vien trong phong ban minh.");
+                throw new UnauthorizedAccessException("Trưởng phòng chỉ được thẩm định đơn nghỉ của nhân viên trong phòng ban mình.");
         }
 
         private static void ValidateDateRange(DateTime startDate, DateTime endDate)
         {
             if (startDate.Date < DateTime.UtcNow.Date.AddDays(-7))
-                throw new InvalidOperationException("Khong the tao don nghi cho ngay qua xa trong qua khu.");
+                throw new InvalidOperationException("Không thể tạo đơn nghỉ cho ngày quá xa trong quá khứ.");
 
             if (endDate.Date < startDate.Date)
                 throw new InvalidOperationException("Ngay ket thuc phai lon hon hoac bang ngay bat dau.");
@@ -301,7 +384,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
         private static void EnsureDirectorOrAdmin(string actorRoleName)
         {
             if (!IsDirector(actorRoleName) && !IsAdmin(actorRoleName))
-                throw new UnauthorizedAccessException("Chi Giam doc hoac Admin duoc phe duyet cuoi cung don nghi phep.");
+                throw new UnauthorizedAccessException("Chỉ Giám đốc hoặc Admin được phê duyệt cuối cùng đơn nghỉ phép.");
         }
 
         private static LeaveRequestResponseDto MapToResponse(LeaveRequest request)
@@ -311,11 +394,12 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
                 Id = request.Id,
                 EmployeeId = request.EmployeeId ?? 0,
                 EmployeeCode = request.Employee?.EmployeeCode ?? string.Empty,
-                EmployeeName = request.Employee?.FullName ?? "Khong xac dinh",
+                EmployeeName = request.Employee?.FullName ?? "Không xác định",
                 DepartmentName = request.Employee?.Department?.DeptName,
                 LeaveTypeId = request.LeaveTypeId ?? 0,
-                LeaveTypeName = request.LeaveType?.TypeName ?? "Khong xac dinh",
+                LeaveTypeName = request.LeaveType?.TypeName ?? "Không xác định",
                 IsPaidLeave = request.LeaveType?.IsPaid ?? false,
+                LeaveCategory = request.LeaveType?.Category.ToString() ?? string.Empty,
                 StartDate = request.StartDate ?? DateTime.MinValue,
                 EndDate = request.EndDate ?? DateTime.MinValue,
                 RequestedDays = request.StartDate.HasValue && request.EndDate.HasValue
@@ -330,5 +414,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
         private static bool IsAdmin(string role) => string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase);
         private static bool IsManager(string role) => string.Equals(role, "Manager", StringComparison.OrdinalIgnoreCase);
         private static bool IsDirector(string role) => string.Equals(role, "Director", StringComparison.OrdinalIgnoreCase);
+        private static bool ShouldDeductLeaveBalance(LeaveType leaveType) =>
+            leaveType.IsPaid && leaveType.DeductAnnualLeave;
     }
 }

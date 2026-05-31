@@ -22,7 +22,7 @@ namespace HRM.backend.src.HRM.API.Controllers.System
         {
             try
             {
-                int approverId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+                int approverId = User.GetAccountIdOrThrow();
                 string actorRoleName = GetRole();
 
                 var result = await _approvalService.GetPendingApprovalsAsync(approverId, actorRoleName, ct);
@@ -41,7 +41,7 @@ namespace HRM.backend.src.HRM.API.Controllers.System
         {
             try
             {
-                int approverId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+                int approverId = User.GetAccountIdOrThrow();
                 string actorRoleName = GetRole();
 
                 var status = await _approvalService.ProcessStepAsync(dto.ModuleCode, dto.ReferenceId, approverId, actorRoleName, dto.IsApproved, dto.Note, ct);

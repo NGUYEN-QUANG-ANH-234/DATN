@@ -91,7 +91,7 @@ namespace HRM.backend.src.HRM.API.Controllers.Recruitment
         {
             try
             {
-                int userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+                int userId = User.GetAccountIdOrThrow();
                 string actorRoleName = GetRole();
 
                 var result = await _useCase.GetAllCandidatesAsync(userId, actorRoleName, ct);
@@ -113,7 +113,7 @@ namespace HRM.backend.src.HRM.API.Controllers.Recruitment
         {
             try
             {
-                int userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+                int userId = User.GetAccountIdOrThrow();
                 string actorRoleName = GetRole();
 
                 await _useCase.HrApproveAsync(id, userId, actorRoleName, ct);
@@ -139,7 +139,7 @@ namespace HRM.backend.src.HRM.API.Controllers.Recruitment
         {
             try
             {
-                int userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+                int userId = User.GetAccountIdOrThrow();
                 string actorRoleName = GetRole();
 
                 await _useCase.ConfirmByDepartmentAsync(id, userId, actorRoleName, ct);
@@ -165,8 +165,8 @@ namespace HRM.backend.src.HRM.API.Controllers.Recruitment
         {
             try
             {
-                // THÊM 2 DÒNG NÀY
-                int userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+                // THÃŠM 2 DÃ’NG NÃ€Y
+                int userId = User.GetAccountIdOrThrow();
                 string actorRoleName = GetRole();
 
                 await _useCase.FinalApproveAsync(id, userId, actorRoleName, ct); // TRUYỀN THÊM THAM SỐ
@@ -192,7 +192,7 @@ namespace HRM.backend.src.HRM.API.Controllers.Recruitment
         {
             try
             {
-                int userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+                int userId = User.GetAccountIdOrThrow();
                 string actorRoleName = GetRole();
 
                 await _useCase.RejectAsync(id, userId, actorRoleName, ct);

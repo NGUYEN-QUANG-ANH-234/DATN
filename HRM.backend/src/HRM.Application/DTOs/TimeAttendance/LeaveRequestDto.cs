@@ -33,6 +33,7 @@ namespace HRM.backend.src.HRM.Application.DTOs.TimeAttendance
         public int LeaveTypeId { get; set; }
         public string LeaveTypeName { get; set; } = string.Empty;
         public bool IsPaidLeave { get; set; }
+        public string LeaveCategory { get; set; } = string.Empty;
         public DateTime StartDate { get; set; }
         public DateTime EndDate { get; set; }
         public decimal RequestedDays { get; set; }

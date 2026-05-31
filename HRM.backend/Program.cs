@@ -23,6 +23,7 @@ public class Program
             builder.Configuration.AddEnvironmentVariables();
 
             // 2. Cấu hình Logging (Infrastructure)
+            builder.Logging.AddFilter("LuckyPennySoftware.MediatR.License", LogLevel.None);
             builder.Host.UseSerilog();
 
             // 3. Đăng ký các dịch vụ (Dependency Injection)

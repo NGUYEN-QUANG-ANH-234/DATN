@@ -58,9 +58,66 @@ namespace HRM.backend.src.HRM.API.Controllers.TimeAttendance
             }
         }
 
+        [HttpGet("daily")]
+        [RequirePermission("ATTENDANCE_SUMMARY_VIEW", GroupName = SystemModules.TimekeepingLeave, Description = "Xem bảng công theo ngày")]
+        public async Task<IActionResult> GetDaily([FromQuery] byte month, [FromQuery] short year, CancellationToken ct)
+        {
+            try
+            {
+                var data = await _useCase.GetDailyAsync(month, year, GetRole(), ct);
+                return Ok(new { Success = true, Data = data });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, new { Success = false, Message = ex.Message });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { Success = false, Message = ex.Message });
+            }
+        }
+
+        [HttpPatch("daily/{id:int}/adjust")]
+        [RequirePermission("ATTENDANCE_SUMMARY_GENERATE", GroupName = SystemModules.TimekeepingLeave, Description = "Điều chỉnh bảng công theo ngày")]
+        public async Task<IActionResult> AdjustDaily(int id, [FromBody] AdjustAttendanceDailySummaryDto dto, CancellationToken ct)
+        {
+            try
+            {
+                var data = await _useCase.AdjustDailyAsync(id, dto, GetAccountId(), GetRole(), ct);
+                return Ok(new { Success = true, Data = data, Message = "Đã điều chỉnh bảng công ngày." });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, new { Success = false, Message = ex.Message });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { Success = false, Message = ex.Message });
+            }
+        }
+
+        [HttpPatch("daily/{id:int}/approve")]
+        [RequirePermission("ATTENDANCE_SUMMARY_GENERATE", GroupName = SystemModules.TimekeepingLeave, Description = "Phê duyệt bảng công theo ngày")]
+        public async Task<IActionResult> ApproveDaily(int id, CancellationToken ct)
+        {
+            try
+            {
+                var data = await _useCase.ApproveDailyAsync(id, GetAccountId(), GetRole(), ct);
+                return Ok(new { Success = true, Data = data, Message = "Đã phê duyệt bảng công ngày." });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, new { Success = false, Message = ex.Message });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { Success = false, Message = ex.Message });
+            }
+        }
+
         private int GetAccountId()
         {
-            return int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+            return User.GetAccountIdOrThrow();
         }
 
         private string GetRole()

@@ -61,7 +61,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.Recruitment
             {
                 var managerDeptId = await GetManagerDeptIdAsync(creatorId, ct);
                 if (dto.DeptId.HasValue && dto.DeptId.Value != managerDeptId)
-                    throw new UnauthorizedAccessException("Manager chi duoc tao yeu cau tuyen dung cho phong ban cua minh.");
+                    throw new UnauthorizedAccessException("Manager chỉ được tạo yêu cầu tuyển dụng cho phòng ban của mình.");
 
                 dto.DeptId = managerDeptId;
             }
@@ -70,14 +70,14 @@ namespace HRM.backend.src.HRM.Application.UseCases.Recruitment
             {
                 var dept = await _deptRepo.GetByIdAsync(dto.DeptId.Value, ct);
                 if (dept == null || dept.Status != DeptStatus.Active)
-                    throw new InvalidOperationException("Phong ban khong ton tai hoac da bi giai the.");
+                    throw new InvalidOperationException("Phòng ban không tồn tại hoặc đã bị giải thể.");
             }
 
             if (dto.PositionId.HasValue)
             {
                 var position = await _positionRepo.GetByIdAsync(dto.PositionId.Value, ct);
                 if (position == null || !position.IsActive)
-                    throw new InvalidOperationException("Vi tri chuc danh khong ton tai hoac da ngung su dung.");
+                    throw new InvalidOperationException("Vị trí chức danh không tồn tại hoặc đã ngừng sử dụng.");
             }
 
             var lockDeptId = dto.DeptId?.ToString() ?? "none";
@@ -102,7 +102,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.Recruitment
                 var directorAccountIds = await _accountRepo.GetAccountIdsByRoleAsync("Director", innerCt);
 
                 if (!hrAccountIds.Any() || !directorAccountIds.Any())
-                    throw new InvalidOperationException("He thong chua thiet lap tai khoan HR hoac Director de duyet yeu cau nay.");
+                    throw new InvalidOperationException("Hệ thống chưa thiết lập tài khoản HR hoặc Director để duyệt yêu cầu này.");
 
                 var approvers = new List<int> { hrAccountIds.First(), directorAccountIds.First() };
                 await _approvalService.CreateWorkflowAsync("RECRUITMENT", request.Id, approvers, innerCt);
@@ -125,7 +125,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.Recruitment
             {
                 var request = await _reqRepo.GetByIdAsync(requestId, innerCt);
                 if (request == null)
-                    throw new InvalidOperationException("Yeu cau khong ton tai.");
+                    throw new InvalidOperationException("Yêu cầu không tồn tại.");
 
                 var workflowStatus = await _approvalService.ProcessStepAsync(
                     "RECRUITMENT",
@@ -192,7 +192,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.Recruitment
         {
             var employee = await _employeeRepo.GetByAccountIdAsync(accountId, ct);
             if (employee == null || !employee.DeptId.HasValue)
-                throw new UnauthorizedAccessException("Tai khoan Manager chua duoc gan voi phong ban.");
+                throw new UnauthorizedAccessException("Tài khoản Manager chưa được gắn với phòng ban.");
 
             return employee.DeptId.Value;
         }

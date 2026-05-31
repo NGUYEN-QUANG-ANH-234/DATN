@@ -28,7 +28,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
             _lockService = lockService;
         }
 
-        public async Task<int> CreateAccountAsync(CreateAccountDto dto, CancellationToken ct = default)
+        public async Task<CreateAccountResultDto> CreateAccountAsync(CreateAccountDto dto, CancellationToken ct = default)
         {
             var email = dto.Email.Trim();
             return await _lockService.GetWithLockAsync($"account_create_{email.ToLowerInvariant()}", async (innerCt) =>
@@ -37,9 +37,10 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
                 if (existingUser != null)
                     throw new Exception("Email nay da duoc su dung trong he thong.");
 
-                string rawPassword = string.IsNullOrWhiteSpace(dto.Password)
+                var isGeneratedPassword = string.IsNullOrWhiteSpace(dto.Password);
+                string rawPassword = isGeneratedPassword
                     ? GenerateSecurePassword()
-                    : dto.Password.Trim();
+                    : dto.Password!.Trim();
                 string hashedPassword = BCrypt.Net.BCrypt.HashPassword(rawPassword);
                 var roleId = dto.RoleId > 0 ? dto.RoleId : 8;
 
@@ -56,11 +57,16 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
                 await _accountRepo.AddAsync(newAccount, innerCt);
                 await _unitOfWork.CommitAsync(innerCt);
 
-                await _emailService.SendEmailAsync(email, "Tai khoan HICAS cua ban",
-                    $"Tai khoan: {email}\nMat khau tam thoi: {rawPassword}\nVui long doi mat khau sau khi dang nhap.");
+                await _emailService.SendEmailAsync(email, "Tài khoản HICAS của bạn",
+                    $"Tài khoản: {email}\nMật khẩu tạm thời: {rawPassword}\nVui lòng đổi mật khẩu sau khi đăng nhập.");
                 await _unitOfWork.CommitAsync(innerCt);
 
-                return newAccount.Id;
+                return new CreateAccountResultDto
+                {
+                    AccountId = newAccount.Id,
+                    TemporaryPassword = isGeneratedPassword ? rawPassword : null,
+                    IsGeneratedPassword = isGeneratedPassword
+                };
             }, cancellationToken: ct);
         }
 
@@ -69,7 +75,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
             await _lockService.GetWithLockAsync($"account_{accountId}", async (innerCt) =>
             {
                 var account = await _accountRepo.GetByIdAsync(accountId, innerCt);
-                if (account == null) throw new Exception("Tai khoan khong ton tai.");
+                if (account == null) throw new Exception("Tài khoản không tồn tại.");
 
                 account.Status = newStatus;
 
@@ -83,12 +89,12 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
             }, cancellationToken: ct);
         }
 
-        public async Task ResetPasswordManuallyAsync(int accountId, CancellationToken ct = default)
+        public async Task<ResetPasswordResultDto> ResetPasswordManuallyAsync(int accountId, CancellationToken ct = default)
         {
-            await _lockService.GetWithLockAsync($"account_{accountId}", async (innerCt) =>
+            return await _lockService.GetWithLockAsync($"account_{accountId}", async (innerCt) =>
             {
                 var account = await _accountRepo.GetByIdAsync(accountId, innerCt);
-                if (account == null) throw new Exception("Tai khoan khong ton tai.");
+                if (account == null) throw new Exception("Tài khoản không tồn tại.");
 
                 string newRawPassword = GenerateSecurePassword();
                 account.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newRawPassword);
@@ -96,10 +102,14 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
 
                 await _unitOfWork.CommitAsync(innerCt);
 
-                await _emailService.SendEmailAsync(account.Email, "Mat khau HICAS da duoc cap lai",
-                    $"Mat khau moi cua ban la: {newRawPassword}");
+                await _emailService.SendEmailAsync(account.Email, "Mật khẩu HICAS đã được cấp lại",
+                    $"Mật khẩu mới của bạn là: {newRawPassword}");
                 await _unitOfWork.CommitAsync(innerCt);
-                return true;
+
+                return new ResetPasswordResultDto
+                {
+                    TemporaryPassword = newRawPassword
+                };
             }, cancellationToken: ct);
         }
 
@@ -113,16 +123,16 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
             await _lockService.GetWithLockAsync($"account_{targetAccountId}", async (innerCt) =>
             {
                 var targetAccount = await _accountRepo.GetByIdAsync(targetAccountId, innerCt);
-                if (targetAccount == null) throw new Exception("Tai khoan khong ton tai.");
+                if (targetAccount == null) throw new Exception("Tài khoản không tồn tại.");
 
                 if (actorId > 0 && targetAccountId == actorId && targetAccount.RoleId == 1 && newRoleId != 1)
-                    throw new Exception("Ban khong the tu ha cap quyen Admin cua chinh minh.");
+                    throw new Exception("Bạn không thể tự hạ cấp quyền Admin của chính mình.");
 
                 if (targetAccount.RoleId == 1 && newRoleId != 1)
                 {
                     var adminCount = (await _accountRepo.GetAllAsync(innerCt)).Count(a => a.RoleId == 1 && a.Status == AccountStatus.Active);
                     if (adminCount <= 1)
-                        throw new Exception("He thong phai co it nhat mot tai khoan Admin dang hoat dong.");
+                        throw new Exception("Hệ thống phải có ít nhất một tài khoản Admin đang hoạt động.");
                 }
 
                 targetAccount.RoleId = newRoleId;

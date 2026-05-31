@@ -7,5 +7,6 @@ namespace HRM.backend.src.HRM.Application.Interfaces.TimeAttendance.Usecases
     {
         Task<bool> ConfigureWorkScheduleAsync(ConfigureWorkScheduleDto dto, int actorId, CancellationToken ct = default);
         Task<List<ConfiguredScheduleDto>> GetConfiguredSchedulesAsync(CancellationToken ct = default);
+        Task<List<ScheduleChangeHistoryDto>> GetScheduleChangeHistoryAsync(CancellationToken ct = default);
     }
 }

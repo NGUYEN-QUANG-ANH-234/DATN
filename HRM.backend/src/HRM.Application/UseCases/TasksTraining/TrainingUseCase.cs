@@ -97,7 +97,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.TasksTraining
                     _employeeRepo.Update(employee);
                 }
 
-                if (dto.CreatePromotionRequest)
+                if (dto.CreatePromotionRequest && !training.PromotionRequestId.HasValue)
                 {
                     var request = new Request
                     {
@@ -108,6 +108,8 @@ namespace HRM.backend.src.HRM.Application.UseCases.TasksTraining
                         DeadlineAt = DateTime.UtcNow.AddDays(3)
                     };
                     await _requestRepo.AddAsync(request, innerCt);
+                    await _unitOfWork.CommitAsync(innerCt);
+                    training.PromotionRequestId = request.Id;
                 }
 
                 _trainingRepo.Update(training);

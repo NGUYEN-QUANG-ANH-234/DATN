@@ -21,13 +21,13 @@ namespace HRM.backend.src.HRM.Application.Handlers
             var subject = "Chao mung gia nhap HICAS!";
             var body = $@"
                 <h3>Xin chao {notification.FullName},</h3>
-                <p>Ho so Onboarding cua ban da duoc nhan su xac minh thanh cong.</p>
+                <p>Hồ sơ Onboarding của bạn đã được nhân sự xác minh thành công.</p>
                 <p>Duoi day la thong tin dang nhap he thong noi bo cua ban:</p>
                 <ul>
-                    <li><b>Ma nhan vien:</b> {notification.EmpCode}</li>
-                    <li><b>Tai khoan:</b> {notification.Email}</li>
+                    <li><b>Mã nhân viên:</b> {notification.EmpCode}</li>
+                    <li><b>Tài khoản:</b> {notification.Email}</li>
                 </ul>
-                <p>Vui long dang nhap va doi mat khau trong lan dau truy cap.</p>";
+                <p>Vui lòng đăng nhập và đổi mật khẩu trong lần đầu truy cập.</p>";
 
             await _emailService.SendEmailAsync(notification.Email, subject, body);
             await _unitOfWork.CommitAsync(ct);

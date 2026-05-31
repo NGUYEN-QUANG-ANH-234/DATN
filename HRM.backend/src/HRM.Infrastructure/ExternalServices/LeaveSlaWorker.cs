@@ -7,68 +7,81 @@ namespace HRM.backend.src.HRM.Infrastructure.ExternalServices
     public class LeaveSlaWorker : BackgroundService
     {
         private readonly IServiceProvider _serviceProvider;
+        private readonly ILogger<LeaveSlaWorker> _logger;
 
-        public LeaveSlaWorker(IServiceProvider serviceProvider)
+        public LeaveSlaWorker(IServiceProvider serviceProvider, ILogger<LeaveSlaWorker> logger)
         {
             _serviceProvider = serviceProvider;
+            _logger = logger;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             while (!stoppingToken.IsCancellationRequested)
             {
-                using var scope = _serviceProvider.CreateScope();
-                var leaveReqRepo = scope.ServiceProvider.GetRequiredService<ILeaveRequestRepository>();
-                var leaveBalRepo = scope.ServiceProvider.GetRequiredService<ILeaveBalanceRepository>();
-                var attendanceRepo = scope.ServiceProvider.GetRequiredService<IAttendanceRepository>();
-                var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
-
-                var expiredRequests = (await leaveReqRepo.FetchExpiredRequestsAsync()).ToList();
-                foreach (var request in expiredRequests)
+                try
                 {
-                    if (request.Status == LeaveRequestStatus.PendingDept)
-                    {
-                        request.Status = LeaveRequestStatus.PendingDirector;
-                        request.DeadlineAt = DateTime.UtcNow.AddHours(24);
-                        await leaveReqRepo.UpdateAsync(request, stoppingToken);
-                        continue;
-                    }
+                    using var scope = _serviceProvider.CreateScope();
+                    var leaveReqRepo = scope.ServiceProvider.GetRequiredService<ILeaveRequestRepository>();
+                    var leaveBalRepo = scope.ServiceProvider.GetRequiredService<ILeaveBalanceRepository>();
+                    var attendanceRepo = scope.ServiceProvider.GetRequiredService<IAttendanceRepository>();
+                    var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
 
-                    if (request.Status != LeaveRequestStatus.PendingDirector ||
-                        request.EmployeeId == null ||
-                        request.LeaveTypeId == null ||
-                        request.StartDate == null ||
-                        request.EndDate == null)
+                    var expiredRequests = (await leaveReqRepo.FetchExpiredRequestsAsync()).ToList();
+                    foreach (var request in expiredRequests)
                     {
-                        continue;
-                    }
+                        if (request.Status == LeaveRequestStatus.PendingDept)
+                        {
+                            request.Status = LeaveRequestStatus.PendingDirector;
+                            request.DeadlineAt = DateTime.UtcNow.AddHours(24);
+                            await leaveReqRepo.UpdateAsync(request, stoppingToken);
+                            continue;
+                        }
 
-                    request.Status = LeaveRequestStatus.AutoFinalApproved;
-                    request.DeadlineAt = null;
+                        if (request.Status != LeaveRequestStatus.PendingDirector ||
+                            request.EmployeeId == null ||
+                            request.LeaveTypeId == null ||
+                            request.StartDate == null ||
+                            request.EndDate == null)
+                        {
+                            continue;
+                        }
 
-                    var days = CountBusinessDays(request.StartDate.Value, request.EndDate.Value);
-                    if (request.LeaveType?.IsPaid == true)
-                    {
-                        var balance = await leaveBalRepo.GetBalanceAsync(
+                        request.Status = LeaveRequestStatus.AutoFinalApproved;
+                        request.DeadlineAt = null;
+
+                        var days = CountBusinessDays(request.StartDate.Value, request.EndDate.Value);
+                        if (request.LeaveType?.IsPaid == true)
+                        {
+                            var balance = await leaveBalRepo.GetBalanceAsync(
+                                request.EmployeeId.Value,
+                                request.LeaveTypeId.Value,
+                                (short)request.StartDate.Value.Year,
+                                stoppingToken);
+
+                            if (balance != null)
+                                balance.UsedDays = (balance.UsedDays ?? 0) + days;
+                        }
+
+                        await attendanceRepo.SyncLeaveToAttendanceAsync(
                             request.EmployeeId.Value,
-                            request.LeaveTypeId.Value,
-                            (short)request.StartDate.Value.Year,
-                            stoppingToken);
+                            EnumerateBusinessDates(request.StartDate.Value, request.EndDate.Value).ToList(),
+                            AttendanceStatus.OnLeave);
 
-                        if (balance != null)
-                            balance.UsedDays = (balance.UsedDays ?? 0) + days;
+                        await leaveReqRepo.UpdateAsync(request, stoppingToken);
                     }
 
-                    await attendanceRepo.SyncLeaveToAttendanceAsync(
-                        request.EmployeeId.Value,
-                        EnumerateBusinessDates(request.StartDate.Value, request.EndDate.Value).ToList(),
-                        AttendanceStatus.OnLeave);
-
-                    await leaveReqRepo.UpdateAsync(request, stoppingToken);
+                    if (expiredRequests.Count > 0)
+                        await unitOfWork.CommitAsync(stoppingToken);
                 }
-
-                if (expiredRequests.Count > 0)
-                    await unitOfWork.CommitAsync(stoppingToken);
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Leave SLA worker cycle failed.");
+                }
 
                 await Task.Delay(TimeSpan.FromHours(1), stoppingToken);
             }

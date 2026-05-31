@@ -45,7 +45,7 @@ namespace HRM.backend.src.HRM.API.Controllers.EmployeeProfile
 
             try
             {
-                int employeeId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+                int employeeId = User.GetAccountIdOrThrow();
                 await _useCase.RequestProfileUpdateAsync(employeeId, dto, ct);
                 return Ok(new { Success = true, Message = "Cập nhật hồ sơ thành công. Vui lòng chờ HR phê duyệt." });
             }
@@ -71,7 +71,7 @@ namespace HRM.backend.src.HRM.API.Controllers.EmployeeProfile
         [RequirePermission("PROFILE_SELF_VIEW", GroupName = SystemModules.ProfileContract, Description = "Xem thông tin hồ sơ cá nhân")]
         public async Task<IActionResult> GetMyProfile(CancellationToken ct)
         {
-            int employeeId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+            int employeeId = User.GetAccountIdOrThrow();
             var profile = await _useCase.GetMyProfileAsync(employeeId, ct);
 
             if (profile == null)
@@ -84,7 +84,7 @@ namespace HRM.backend.src.HRM.API.Controllers.EmployeeProfile
         [RequirePermission("CONTRACT_SELF_VIEW", GroupName = SystemModules.ProfileContract, Description = "Xem danh sách hợp đồng cá nhân")]
         public async Task<IActionResult> GetMyContracts(CancellationToken ct)
         {
-            int employeeId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+            int employeeId = User.GetAccountIdOrThrow();
             var contracts = await _useCase.GetMyContractsAsync(employeeId, ct);
             return Ok(new { Success = true, Data = contracts });
         }
@@ -95,7 +95,7 @@ namespace HRM.backend.src.HRM.API.Controllers.EmployeeProfile
         {
             try
             {
-                int accountId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+                int accountId = User.GetAccountIdOrThrow();
                 var history = await _historyUseCase.GetConsolidatedHistoryAsync(accountId, filter, ct);
                 return Ok(new { Success = true, Data = history });
             }
@@ -115,7 +115,7 @@ namespace HRM.backend.src.HRM.API.Controllers.EmployeeProfile
         {
             try
             {
-                int hrAccountId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+                int hrAccountId = User.GetAccountIdOrThrow();
 
                 // TRỌNG TÂM: Lấy RoleName từ Token người dùng (ví dụ: "HR")
                 string actorRoleName = GetRole();
@@ -161,7 +161,7 @@ namespace HRM.backend.src.HRM.API.Controllers.EmployeeProfile
 
         private int GetAccountId()
         {
-            return int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+            return User.GetAccountIdOrThrow();
         }
     }
 }

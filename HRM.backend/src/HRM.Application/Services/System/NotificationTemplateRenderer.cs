@@ -57,7 +57,7 @@ namespace HRM.backend.src.HRM.Application.Services.System
                     }
 
                     var template = JsonSerializer.Deserialize<TemplateDto>(config.ParamValue) ??
-                        throw new InvalidOperationException($"Mau thong bao {templateKey} khong hop le.");
+                        throw new InvalidOperationException($"Mẫu thông báo {templateKey} không hợp lệ.");
                     template.TemplateKey = templateKey;
                     return template;
                 },

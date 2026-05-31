@@ -18,10 +18,17 @@ namespace HRM.backend.src.HRM.Core.Entities.EmployeeProfile
         [StringLength(50)] public required string ContractNumber { get; set; }
 
         public ContractType ContractType { get; set; } = ContractType.Probation;
+        public PayBasis PayBasis { get; set; } = PayBasis.Monthly;
+        public TaxMethod? TaxMethodOverride { get; set; }
+        public bool IsInsuranceEligible { get; set; } = true;
 
         [Column(TypeName = "decimal(15,2)")] public decimal BasicSalary { get; set; }
 
         [Column(TypeName = "decimal(5,2)")] public decimal SalaryPercentage { get; set; } = 100.0m;
+        [Column(TypeName = "decimal(15,2)")] public decimal? HourlyRate { get; set; }
+        [Column(TypeName = "decimal(15,2)")] public decimal? DailyRate { get; set; }
+        [Column(TypeName = "decimal(5,2)")] public decimal StandardHoursPerDaySnapshot { get; set; } = 8m;
+        [Column(TypeName = "decimal(5,2)")] public decimal StandardWorkdaysSnapshot { get; set; } = 22m;
         public int? PayrollFormulaId { get; set; }
 
         [ForeignKey("PayrollFormulaId")] public virtual PayrollFormula? PayrollFormula { get; set; }

@@ -30,7 +30,13 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
                     return list.Select(x => new LeaveTypeSelectDto
                     {
                         Id = x.Id,
-                        TypeName = x.TypeName ?? string.Empty
+                        TypeName = x.TypeName ?? string.Empty,
+                        Category = x.Category.ToString(),
+                        IsPaid = x.IsPaid,
+                        CountsAsUnpaidForInsurance = x.CountsAsUnpaidForInsurance,
+                        CountsAsWorkday = x.CountsAsWorkday,
+                        DeductAnnualLeave = x.DeductAnnualLeave,
+                        AffectsKpiPenalty = x.AffectsKpiPenalty
                     }).ToList();
                 },
                 TimeSpan.FromHours(24),

@@ -27,6 +27,18 @@ namespace HRM.backend.src.HRM.Application.DTOs
         public AccountStatus Status { get; set; } // Ví dụ: 0 = Active, 1 = Locked
     }
 
+    public class CreateAccountResultDto
+    {
+        public int AccountId { get; set; }
+        public string? TemporaryPassword { get; set; }
+        public bool IsGeneratedPassword { get; set; }
+    }
+
+    public class ResetPasswordResultDto
+    {
+        public string TemporaryPassword { get; set; } = string.Empty;
+    }
+
     public class AccountListItemDto
     {
         public int Id { get; set; }

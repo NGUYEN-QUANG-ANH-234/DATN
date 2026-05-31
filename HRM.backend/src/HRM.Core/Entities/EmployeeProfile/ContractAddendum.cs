@@ -40,5 +40,7 @@ namespace HRM.backend.src.HRM.Core.Entities.EmployeeProfile
         public string? RejectReason { get; set; }
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+        public virtual ICollection<ContractAddendumDetail> Details { get; set; } = new List<ContractAddendumDetail>();
     }
 }

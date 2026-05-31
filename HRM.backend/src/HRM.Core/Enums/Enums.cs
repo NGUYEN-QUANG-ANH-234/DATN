@@ -16,7 +16,7 @@ namespace HRM.backend.src.HRM.Core.Enums
     // MODULE 4: Employee & Contract
     // ==========================================
     public enum Gender { Male, Female, Other }
-    public enum EmployeeStatus { Probation, Official, Resigned, Terminated }
+    public enum EmployeeStatus { Probation, Official, OnMaternityLeave, Resigned, Terminated }
     public enum ContractType { Probation, Definite, Indefinite, PartTime }
     public enum ContractStatus { Draft, PendingDept, PendingHR, Negotiating, PendingDirector, Rejected, Active, Liquidating, Expired, Draft_Cancelled }
 
@@ -38,10 +38,79 @@ namespace HRM.backend.src.HRM.Core.Enums
         Task,
         Manual
     }
+
+    public enum PenaltyRecordStatus
+    {
+        Draft,
+        PendingEmployeeExplanation,
+        PendingHRReview,
+        PendingDirectorApproval,
+        Approved,
+        Rejected,
+        Applied,
+        Cancelled
+    }
+
+    public enum ViolationType
+    {
+        AttendanceLate,
+        EarlyLeave,
+        UnauthorizedAbsence,
+        LeftWorkplace,
+        NotAtWorkLocation,
+        SlaMissed,
+        TaskMissed,
+        ProcessViolation,
+        KpiManualAdjustment,
+        TrainingEvaluationSla,
+        Manual
+    }
+
+    public enum PenaltySeverity
+    {
+        Low,
+        Medium,
+        High,
+        Critical
+    }
+
+    public enum AttendanceAdjustmentImpactType
+    {
+        None,
+        DeductWorkedMinutes,
+        DeductPayableHours,
+        DeductWorkday,
+        MarkAbsence,
+        MarkUnpaidLeave,
+        ManualAdjusted
+    }
+
     // ==========================================
     // MODULE 5: Time & Attendance
     // ==========================================
     public enum AttendanceStatus { Valid, Invalid, Late, Early, OnLeave }
+    public enum AttendanceDailyStatus
+    {
+        Present,
+        HalfDay,
+        PaidLeave,
+        UnpaidLeave,
+        Absence,
+        Holiday,
+        Weekend,
+        MaternityLeave,
+        SickLeave,
+        ManualAdjusted
+    }
+    public enum AttendancePayrollApprovalStatus { Draft, PendingHRReview, Approved, Rejected, Locked }
+    public enum LeaveCategory
+    {
+        AnnualPaid,
+        Unpaid,
+        Sick,
+        Maternity,
+        SpecialPaid
+    }
     public enum LeaveRequestStatus
     {
         Pending,
@@ -62,7 +131,9 @@ namespace HRM.backend.src.HRM.Core.Enums
         Approved = 2,
         Rejected = 3,
         Cancelled = 4,
-        PendingDirector = 5
+        PendingDirector = 5,
+        Reconciled = 6,
+        PayrollLocked = 7
     }
 
     // ==========================================
@@ -129,10 +200,33 @@ namespace HRM.backend.src.HRM.Core.Enums
     // ==========================================
     // MODULE 7: Payroll
     // ==========================================
-    public enum FormulaStatus { Pending, Approved, Rejected }
-    public enum PayrollStatus { Draft, Finalized, Paid }
+    public enum FormulaStatus { Pending, Approved, Rejected, Expired }
+    public enum PayrollStatus { Draft, Calculated, HRReviewed, PendingApproval, Approved, Locked, Finalized, Paid, Cancelled }
     public enum SalaryVariableDataType { Number, Money, Hours, Days, Percent }
     public enum SalaryAggregationType { Latest, Sum, Count, MonthlyTotal, Manual }
+    public enum PayrollPolicyType { Overtime, PitTax, Insurance, Allowance, Deduction, Seniority }
+    public enum PayrollPolicyValueType { RatePercent, Amount, Bracket, Formula }
+    public enum PayrollAccessScope { All, Department, Individual }
+    public enum PayBasis { Monthly, Daily, Hourly, FixedPackage }
+    public enum TaxMethod { Progressive, Flat10Percent, NonResident20Percent, None }
+    public enum ResidenceStatus { Resident, NonResident }
+    public enum TaxCodeStatus { Unknown, NotRegistered, Registered, Invalid }
+    public enum ProrationType { None, ByWorkingDays, ByAttendanceDays, ByCalendarDays, ByHours, FixedPerDay }
+    public enum CalculationMethod { FixedAmount, FixedPerDay, FixedPerHour, PercentOfBaseSalary, Formula }
+    public enum SalaryComponentGroup { BaseSalary, Allowance, Bonus, Overtime, Insurance, Tax, Deduction, Adjustment }
+    public enum PayrollAdjustmentType { RetroactiveSalaryIncrease, RetroactiveAllowance, InsuranceArrears, TaxAdjustment, ManualCorrection, Other }
+    public enum PayrollAdjustmentStatus { Draft, Approved, Rejected, Applied, Cancelled }
+    public enum InsuranceContributionStatus { Pending, Contributed, NotContributed }
+    public enum PayrollContractSegmentType { Contract, Addendum, ManualAdjustment }
+    public enum OvertimeType { Weekday, Weekend, Holiday, Night, WeekdayNight, WeekendNight, HolidayNight }
+    public enum MaternityLeaveStatus { Draft, PendingApproval, Approved, Active, Completed, Cancelled }
+    public enum TerminationType { Resignation, ContractExpired, MutualAgreement, TerminationByCompany, Dismissal, RedundancyOrRestructure, Retirement }
+    public enum TerminationLegalStatus { PendingHrReview, Lawful, LawfulNoNotice, UnlawfulNoNotice, UnlawfulInsufficientNotice }
+    public enum TerminationRequestStatus { Draft, PendingHR, PendingDirector, Approved, Rejected, Cancelled, Settled }
+    public enum FinalSettlementStatus { Draft, Calculated, PendingApproval, Approved, Locked, Paid, Cancelled }
+    public enum EmploymentServicePeriodType { Probation, OfficialWork, UnpaidLeave, MaternityLeave, SickLeave, Suspension, UnemploymentInsurance, PriorSeverancePaid }
+    public enum ExternalTimesheetImportStatus { Draft, Imported, Validated, Approved, Rejected, PayrollImported, Cancelled }
+    public enum ContractAddendumDetailValueType { Text, Money, Date, Number, Json, Boolean }
 
     // ==========================================
     // MODULE 8: Requests & Handover

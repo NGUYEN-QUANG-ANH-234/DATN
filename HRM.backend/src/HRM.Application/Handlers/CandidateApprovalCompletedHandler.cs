@@ -5,7 +5,6 @@ using HRM.backend.src.HRM.Core.Enums;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.Recruitment;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.System;
-using HRM.backend.src.HRM.Core.Interfaces.Repositories.System.HRM.backend.src.HRM.Infrastructure.Repositories.Interfaces.System;
 using MediatR;
 
 namespace HRM.backend.src.HRM.Application.Handlers

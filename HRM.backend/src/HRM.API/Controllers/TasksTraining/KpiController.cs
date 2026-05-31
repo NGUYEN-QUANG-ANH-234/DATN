@@ -57,7 +57,7 @@ namespace HRM.backend.src.HRM.API.Controllers.TasksTraining
 
         private int GetAccountId()
         {
-            return int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+            return User.GetAccountIdOrThrow();
         }
 
         private string GetRole()

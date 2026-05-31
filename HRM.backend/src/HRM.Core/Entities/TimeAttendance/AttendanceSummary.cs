@@ -18,6 +18,11 @@ namespace HRM.backend.src.HRM.Core.Entities.TimeAttendance
         [Column(TypeName = "decimal(5,2)")]
         public decimal WorkDays { get; set; }
 
+        public int WorkedMinutes { get; set; }
+
+        [Column(TypeName = "decimal(7,2)")]
+        public decimal PayableWorkHours { get; set; }
+
         public int LateMinutes { get; set; }
         public int EarlyLeaveMinutes { get; set; }
         public int ActualOtMinutes { get; set; }

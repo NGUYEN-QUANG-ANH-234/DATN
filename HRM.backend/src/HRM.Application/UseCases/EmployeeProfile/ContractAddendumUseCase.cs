@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Globalization;
 using HRM.backend.src.HRM.Application.DTOs.EmployeeProfile;
 using HRM.backend.src.HRM.Application.Interfaces;
 using HRM.backend.src.HRM.Application.Interfaces.EmployeeProfile.Usecases;
@@ -73,7 +74,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                     AddendumNumber = GenerateAddendumNumber(contractId),
                     Status = AddendumStatus.Draft
                 };
-                ApplyDraftFields(addendum, dto);
+                ApplyDraftFields(addendum, dto, contract);
 
                 await _addendumRepo.AddAsync(addendum, innerCt);
                 await _unitOfWork.CommitAsync(innerCt);
@@ -103,7 +104,8 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                 if (addendum.Contract == null || addendum.Contract.Status != ContractStatus.Active)
                     throw new InvalidOperationException("Hợp đồng gốc không còn ở trạng thái có hiệu lực.");
 
-                ApplyDraftFields(addendum, dto);
+                addendum.Details.Clear();
+                ApplyDraftFields(addendum, dto, addendum.Contract);
                 await _addendumRepo.UpdateAsync(addendum, innerCt);
                 await _unitOfWork.CommitAsync(innerCt);
                 }, innerCt);
@@ -127,7 +129,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                     throw new InvalidOperationException("Chỉ bản nháp phụ lục mới có thể gửi duyệt.");
 
                 if (addendum.Contract?.EmployeeId.HasValue != true)
-                    throw new InvalidOperationException("Phu luc chua lien ket nhan vien.");
+                    throw new InvalidOperationException("Phụ lục chưa liên kết nhân viên.");
 
                 var targetEmployeeId = addendum.Contract.EmployeeId.GetValueOrDefault();
                 var targetRoleName = await _approvalConflictGuard.GetEmployeeRoleNameAsync(targetEmployeeId, innerCt);
@@ -149,9 +151,9 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
             {
                 var addendum = await _addendumRepo.GetByIdWithContractAsync(addendumId, innerCt);
                 if (addendum == null)
-                    throw new InvalidOperationException("KhÃ´ng tÃ¬m tháº¥y phá»¥ lá»¥c há»£p Ä‘á»“ng.");
+                    throw new InvalidOperationException("Không tìm thấy phụ lục hợp đồng.");
                 if (addendum.Status != AddendumStatus.PendingDept)
-                    throw new InvalidOperationException("Phá»¥ lá»¥c khÃ´ng á»Ÿ tráº¡ng thÃ¡i chá» TrÆ°á»Ÿng phÃ²ng xÃ¡c nháº­n.");
+                    throw new InvalidOperationException("Phụ lục không ở trạng thái chờ Trưởng phòng xác nhận.");
 
                 await EnsureManagerCanAccessAsync(addendum, actorAccountId, actorRoleName, innerCt);
                 await _approvalConflictGuard.EnsureNotSelfApprovalForEmployeeAsync(GetTargetEmployeeId(addendum), actorAccountId, innerCt);
@@ -160,7 +162,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                 addendum.RejectReason = dto.IsApproved
                     ? null
                     : string.IsNullOrWhiteSpace(dto.RejectReason)
-                        ? "TrÆ°á»Ÿng phÃ²ng tá»« chá»‘i phá»¥ lá»¥c há»£p Ä‘á»“ng."
+                        ? "Trưởng phòng từ chối phụ lục hợp đồng."
                         : dto.RejectReason.Trim();
 
                 await _addendumRepo.UpdateAsync(addendum, innerCt);
@@ -178,9 +180,9 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
             {
                 var addendum = await _addendumRepo.GetByIdWithContractAsync(addendumId, innerCt);
                 if (addendum == null)
-                    throw new InvalidOperationException("KhÃ´ng tÃ¬m tháº¥y phá»¥ lá»¥c há»£p Ä‘á»“ng.");
+                    throw new InvalidOperationException("Không tìm thấy phụ lục hợp đồng.");
                 if (addendum.Status != AddendumStatus.PendingHR)
-                    throw new InvalidOperationException("Phá»¥ lá»¥c khÃ´ng á»Ÿ tráº¡ng thÃ¡i chá» HR xÃ¡c nháº­n chÃ­nh sÃ¡ch.");
+                    throw new InvalidOperationException("Phụ lục không ở trạng thái chờ HR xác nhận chính sách.");
 
                 EnsureHrDirectorOrAdmin(actorRoleName);
                 if (!IsDirector(actorRoleName) && !IsAdmin(actorRoleName))
@@ -190,7 +192,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                 addendum.RejectReason = dto.IsApproved
                     ? null
                     : string.IsNullOrWhiteSpace(dto.RejectReason)
-                        ? "HR tá»« chá»‘i phá»¥ lá»¥c do khÃ´ng Ä‘Ã¡p á»©ng chÃ­nh sÃ¡ch."
+                        ? "HR từ chối phụ lục do không đáp ứng chính sách."
                         : dto.RejectReason.Trim();
 
                 await _addendumRepo.UpdateAsync(addendum, innerCt);
@@ -208,9 +210,9 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
             {
                 var addendum = await _addendumRepo.GetByIdWithContractAsync(addendumId, innerCt);
                 if (addendum == null)
-                    throw new InvalidOperationException("Khong tim thay phu luc hop dong.");
+                    throw new InvalidOperationException("Không tìm thấy phụ lục hợp đồng.");
                 if (addendum.Status != AddendumStatus.PendingEmployee)
-                    throw new InvalidOperationException("Phu luc khong o trang thai cho nguoi lao dong xac nhan.");
+                    throw new InvalidOperationException("Phụ lục không ở trạng thái chờ người lao động xác nhận.");
 
                 await EnsureEmployeeOwnsAddendumAsync(addendum, actorAccountId, innerCt);
 
@@ -218,7 +220,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                 addendum.RejectReason = dto.IsApproved
                     ? null
                     : string.IsNullOrWhiteSpace(dto.RejectReason)
-                        ? "Nguoi lao dong tu choi dieu khoan phu luc hop dong."
+                        ? "Người lao động từ chối điều khoản phụ lục hợp đồng."
                         : dto.RejectReason.Trim();
 
                 await _addendumRepo.UpdateAsync(addendum, innerCt);
@@ -317,10 +319,10 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                 return addendums.Select(Map);
 
             if (!IsManager(actorRoleName))
-                throw new UnauthorizedAccessException("Chá»‰ TrÆ°á»Ÿng phÃ²ng hoáº·c Admin Ä‘Æ°á»£c xem phá»¥ lá»¥c chá» xÃ¡c nháº­n nghiá»‡p vá»¥.");
+                throw new UnauthorizedAccessException("Chỉ Trưởng phòng hoặc Admin được xem phụ lục chờ xác nhận nghiệp vụ.");
 
             var manager = await _employeeRepo.GetByAccountIdAsync(actorAccountId, ct)
-                ?? throw new UnauthorizedAccessException("TÃ i khoáº£n TrÆ°á»Ÿng phÃ²ng chÆ°a liÃªn káº¿t há»“ sÆ¡ nhÃ¢n sá»±.");
+                ?? throw new UnauthorizedAccessException("Tài khoản Trưởng phòng chưa liên kết hồ sơ nhân sự.");
 
             return addendums
                 .Where(a => a.Contract?.Employee?.DeptId.HasValue == true &&
@@ -370,7 +372,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
             return JsonSerializer.Serialize(doc.RootElement);
         }
 
-        private static void ApplyDraftFields(ContractAddendum addendum, CreateContractAddendumDto dto)
+        private static void ApplyDraftFields(ContractAddendum addendum, CreateContractAddendumDto dto, Contract? contract)
         {
             addendum.NewBasicSalary = dto.NewBasicSalary;
             addendum.NewInsuranceSalary = dto.NewInsuranceSalary;
@@ -378,6 +380,86 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
             addendum.OtherChangesJson = NormalizeJson(dto.OtherChangesJson);
             addendum.Content = string.IsNullOrWhiteSpace(dto.Content) ? null : dto.Content.Trim();
             addendum.EffectiveDate = dto.EffectiveDate;
+
+            if (dto.NewBasicSalary.HasValue)
+            {
+                AddDetail(
+                    addendum,
+                    "BasicSalary",
+                    contract?.BasicSalary.ToString(CultureInfo.InvariantCulture),
+                    dto.NewBasicSalary.Value.ToString(CultureInfo.InvariantCulture),
+                    ContractAddendumDetailValueType.Money);
+            }
+
+            if (dto.NewInsuranceSalary.HasValue)
+            {
+                AddDetail(
+                    addendum,
+                    "InsuranceSalary",
+                    contract?.InsuranceSalary.ToString(CultureInfo.InvariantCulture),
+                    dto.NewInsuranceSalary.Value.ToString(CultureInfo.InvariantCulture),
+                    ContractAddendumDetailValueType.Money);
+            }
+
+            if (dto.NewEndDate.HasValue)
+            {
+                AddDetail(
+                    addendum,
+                    "EndDate",
+                    FormatDate(contract?.EndDate),
+                    dto.NewEndDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                    ContractAddendumDetailValueType.Date);
+            }
+
+            AppendOtherChangeDetails(addendum, addendum.OtherChangesJson);
+        }
+
+        private static void AddDetail(
+            ContractAddendum addendum,
+            string fieldName,
+            string? oldValue,
+            string? newValue,
+            ContractAddendumDetailValueType valueType,
+            string? note = null)
+        {
+            addendum.Details.Add(new ContractAddendumDetail
+            {
+                FieldName = fieldName,
+                OldValue = oldValue,
+                NewValue = newValue,
+                ValueType = valueType,
+                Note = note
+            });
+        }
+
+        private static void AppendOtherChangeDetails(ContractAddendum addendum, string? normalizedJson)
+        {
+            if (string.IsNullOrWhiteSpace(normalizedJson)) return;
+
+            using var doc = JsonDocument.Parse(normalizedJson);
+            if (doc.RootElement.ValueKind != JsonValueKind.Object) return;
+
+            foreach (var property in doc.RootElement.EnumerateObject())
+            {
+                AddDetail(
+                    addendum,
+                    property.Name,
+                    null,
+                    property.Value.ToString(),
+                    ResolveJsonValueType(property.Value),
+                    "OtherChangesJson");
+            }
+        }
+
+        private static ContractAddendumDetailValueType ResolveJsonValueType(JsonElement value)
+        {
+            return value.ValueKind switch
+            {
+                JsonValueKind.Number => ContractAddendumDetailValueType.Number,
+                JsonValueKind.True or JsonValueKind.False => ContractAddendumDetailValueType.Boolean,
+                JsonValueKind.Object or JsonValueKind.Array => ContractAddendumDetailValueType.Json,
+                _ => ContractAddendumDetailValueType.Text
+            };
         }
 
         private static string GenerateAddendumNumber(int contractId)
@@ -456,6 +538,18 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                     ct);
                 employee.PositionId = newPositionId;
             }
+
+            if (TryGetInt(root, "jobLevelId", out var newJobLevelId) && newJobLevelId != employee.JobLevelId)
+            {
+                await AddHistoryAsync(
+                    employee.Id,
+                    HistoryType.Appointment,
+                    $"JobLevelId: {employee.JobLevelId?.ToString() ?? "null"}",
+                    $"JobLevelId: {newJobLevelId} (Addendum {addendum.AddendumNumber})",
+                    addendum.EffectiveDate,
+                    ct);
+                employee.JobLevelId = newJobLevelId;
+            }
         }
 
         private async Task AddHistoryAsync(
@@ -494,42 +588,42 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                 return;
 
             if (!IsManager(actorRoleName))
-                throw new UnauthorizedAccessException("Chá»‰ TrÆ°á»Ÿng phÃ²ng Ä‘Æ°á»£c xÃ¡c nháº­n nghiá»‡p vá»¥ phá»¥ lá»¥c.");
+                throw new UnauthorizedAccessException("Chỉ Trưởng phòng được xác nhận nghiệp vụ phụ lục.");
 
             var manager = await _employeeRepo.GetByAccountIdAsync(actorAccountId, ct)
-                ?? throw new UnauthorizedAccessException("TÃ i khoáº£n TrÆ°á»Ÿng phÃ²ng chÆ°a liÃªn káº¿t há»“ sÆ¡ nhÃ¢n sá»±.");
+                ?? throw new UnauthorizedAccessException("Tài khoản Trưởng phòng chưa liên kết hồ sơ nhân sự.");
 
             var employeeDeptId = addendum.Contract?.Employee?.DeptId;
             if (!manager.DeptId.HasValue || !employeeDeptId.HasValue || manager.DeptId.Value != employeeDeptId.Value)
-                throw new UnauthorizedAccessException("TrÆ°á»Ÿng phÃ²ng chá»‰ Ä‘Æ°á»£c xÃ¡c nháº­n phá»¥ lá»¥c cá»§a nhÃ¢n viÃªn trong phÃ²ng ban mÃ¬nh.");
+                throw new UnauthorizedAccessException("Trưởng phòng chỉ được xác nhận phụ lục của nhân viên trong phòng ban mình.");
         }
 
         private static int GetTargetEmployeeId(ContractAddendum addendum)
         {
             return addendum.Contract?.EmployeeId
-                ?? throw new InvalidOperationException("Phu luc chua gan voi nhan vien.");
+                ?? throw new InvalidOperationException("Phụ lục chưa gắn với nhân viên.");
         }
 
         private async Task EnsureEmployeeOwnsAddendumAsync(ContractAddendum addendum, int actorAccountId, CancellationToken ct)
         {
             var employeeId = GetTargetEmployeeId(addendum);
             var employee = await _employeeRepo.GetProfileByIdAsync(employeeId, ct)
-                ?? throw new InvalidOperationException("Khong tim thay nhan vien cua phu luc.");
+                ?? throw new InvalidOperationException("Không tìm thấy nhân viên của phụ lục.");
 
             if (!employee.AccountId.HasValue || employee.AccountId.Value != actorAccountId)
-                throw new UnauthorizedAccessException("Chi nguoi lao dong cua phu luc moi duoc xac nhan dieu khoan.");
+                throw new UnauthorizedAccessException("Chỉ người lao động của phụ lục mới được xác nhận điều khoản.");
         }
 
         private static void EnsureHrDirectorOrAdmin(string actorRoleName)
         {
             if (!IsHr(actorRoleName) && !IsDirector(actorRoleName) && !IsAdmin(actorRoleName))
-                throw new UnauthorizedAccessException("Chi HR, Giam doc hoac Admin duoc xac nhan chinh sach phu luc.");
+                throw new UnauthorizedAccessException("Chỉ HR, Giám đốc hoặc Admin được xác nhận chính sách phụ lục.");
         }
 
         private static void EnsureDirectorOrAdmin(string actorRoleName)
         {
             if (!IsDirector(actorRoleName) && !IsAdmin(actorRoleName))
-                throw new UnauthorizedAccessException("Chi Giam doc hoac Admin duoc phe duyet cuoi phu luc.");
+                throw new UnauthorizedAccessException("Chỉ Giám đốc hoặc Admin được phê duyệt cuối phụ lục.");
         }
 
         private static bool IsAdmin(string role) => string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase);
@@ -553,7 +647,19 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
             RejectReason = addendum.RejectReason,
             CreatedAt = addendum.CreatedAt,
             EmployeeId = addendum.Contract?.EmployeeId,
-            EmployeeName = addendum.Contract?.Employee?.FullName
+            EmployeeName = addendum.Contract?.Employee?.FullName,
+            Details = addendum.Details
+                .OrderBy(d => d.Id)
+                .Select(d => new ContractAddendumDetailDto
+                {
+                    Id = d.Id,
+                    FieldName = d.FieldName,
+                    OldValue = d.OldValue,
+                    NewValue = d.NewValue,
+                    ValueType = d.ValueType.ToString(),
+                    Note = d.Note
+                })
+                .ToList()
         };
     }
 }

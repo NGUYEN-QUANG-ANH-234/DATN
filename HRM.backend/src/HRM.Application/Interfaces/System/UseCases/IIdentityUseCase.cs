@@ -2,7 +2,6 @@
 using HRM.backend.src.HRM.Application.Interfaces.Services;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.System;
-using HRM.backend.src.HRM.Core.Interfaces.Repositories.System.HRM.backend.src.HRM.Infrastructure.Repositories.Interfaces.System;
 
 namespace HRM.backend.src.HRM.Application.Interfaces.System.UseCases
 {
@@ -16,5 +15,6 @@ namespace HRM.backend.src.HRM.Application.Interfaces.System.UseCases
         Task<MfaSetupResponseDto> InitiateMfaSetupAsync(int userId, string email);
         Task<List<string>> ConfirmMfaSetupAsync(int userId, string otpCode, CancellationToken ct);
         Task<AuthResponseDto> RefreshTokenAsync(string expiredToken, string refreshToken, CancellationToken ct);
+        Task ChangePasswordAsync(int accountId, ChangePasswordDto dto, CancellationToken ct);
     }
 }

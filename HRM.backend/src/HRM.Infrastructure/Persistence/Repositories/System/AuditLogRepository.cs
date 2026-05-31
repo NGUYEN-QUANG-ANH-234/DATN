@@ -1,6 +1,6 @@
 ﻿using HRM.backend.src.HRM.Application.DTOs.System;
 using HRM.backend.src.HRM.Core.Entities.System;
-using HRM.backend.src.HRM.Core.Interfaces.Repositories.System.HRM.backend.src.HRM.Infrastructure.Repositories.Interfaces.System;
+using HRM.backend.src.HRM.Core.Interfaces.Repositories.System;
 using Microsoft.EntityFrameworkCore;
 
 namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.System
@@ -8,7 +8,7 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.System
     public class AuditLogRepository : BaseRepository<AuditLog>, IAuditLogRepository
     {
         // BẢO MẬT: Whitelist - Chỉ cho phép truy vấn các module này, chặn đứng nguy cơ lộ CSDL
-        private readonly string[] ALLOWED_MODULES = { "accounts", "role_permissions", "configurations", "employees", "payrolls" };
+        private readonly string[] ALLOWED_MODULES = { "accounts", "role_permissions", "configurations", "employees", "payrolls", "time_attendance" };
 
         public AuditLogRepository(MyDbContext context) : base(context) { }
 

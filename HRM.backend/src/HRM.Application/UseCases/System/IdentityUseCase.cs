@@ -5,7 +5,6 @@ using HRM.backend.src.HRM.Core.Entities.System;
 using HRM.backend.src.HRM.Core.Enums;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.System;
-using HRM.backend.src.HRM.Core.Interfaces.Repositories.System.HRM.backend.src.HRM.Infrastructure.Repositories.Interfaces.System;
 using static Google.Apis.Requests.BatchRequest;
 
 namespace HRM.backend.src.HRM.Application.Interfaces.System.UseCases
@@ -324,6 +323,46 @@ namespace HRM.backend.src.HRM.Application.Interfaces.System.UseCases
             }, TimeSpan.FromSeconds(10), ct);            
         }
 
+        public async Task ChangePasswordAsync(int accountId, ChangePasswordDto dto, CancellationToken ct)
+        {
+            await _lockService.GetWithLockAsync($"change_password_{accountId}", async (innerCt) =>
+            {
+                var user = await _accountRepo.GetByIdAsync(accountId, innerCt);
+                if (user == null)
+                    throw new UnauthorizedAccessException("Không thể xác định tài khoản người dùng.");
+
+                if (user.Status != AccountStatus.Active)
+                    throw new UnauthorizedAccessException("Tài khoản không ở trạng thái hoạt động.");
+
+                if (string.IsNullOrWhiteSpace(user.PasswordHash))
+                    throw new InvalidOperationException("Tài khoản này chưa có mật khẩu nội bộ. Vui lòng liên hệ Admin để khởi tạo mật khẩu.");
+
+                var currentPassword = dto.CurrentPassword?.Trim() ?? string.Empty;
+                var newPassword = dto.NewPassword?.Trim() ?? string.Empty;
+                var confirmPassword = dto.ConfirmPassword?.Trim() ?? string.Empty;
+
+                if (string.IsNullOrWhiteSpace(currentPassword))
+                    throw new ArgumentException("Vui lòng nhập mật khẩu hiện tại.");
+
+                if (!BCrypt.Net.BCrypt.Verify(currentPassword, user.PasswordHash))
+                    throw new UnauthorizedAccessException("Mật khẩu hiện tại không chính xác.");
+
+                ValidateNewPassword(newPassword, confirmPassword);
+
+                if (BCrypt.Net.BCrypt.Verify(newPassword, user.PasswordHash))
+                    throw new ArgumentException("Mật khẩu mới không được trùng với mật khẩu hiện tại.");
+
+                user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
+                user.RefreshToken = null;
+                user.RefreshTokenExpiryTime = DateTime.MinValue;
+
+                await _auditLogRepo.LogSystemEventAsync("CHANGE_PASSWORD_SELF", user.Id, "accounts", "Người dùng tự đổi mật khẩu tài khoản.");
+                await _unitOfWork.CommitAsync(innerCt);
+
+                return true;
+            }, TimeSpan.FromSeconds(10), ct);
+        }
+
         public async Task<AuthResponseDto> RefreshTokenAsync(string expiredToken, string refreshToken, CancellationToken ct)
         {
             var userId = _jwtService.ExtractUserIdFromToken(expiredToken);
@@ -354,6 +393,26 @@ namespace HRM.backend.src.HRM.Application.Interfaces.System.UseCases
                     IsMfaEnabled = user.IsMfaEnabled
                 };
             });
+        }
+
+        private static void ValidateNewPassword(string newPassword, string confirmPassword)
+        {
+            if (string.IsNullOrWhiteSpace(newPassword))
+                throw new ArgumentException("Vui lòng nhập mật khẩu mới.");
+
+            if (newPassword.Length < 8)
+                throw new ArgumentException("Mật khẩu mới phải có ít nhất 8 ký tự.");
+
+            if (newPassword != confirmPassword)
+                throw new ArgumentException("Xác nhận mật khẩu mới không khớp.");
+
+            var hasUpper = newPassword.Any(char.IsUpper);
+            var hasLower = newPassword.Any(char.IsLower);
+            var hasDigit = newPassword.Any(char.IsDigit);
+            var hasSpecial = newPassword.Any(ch => !char.IsLetterOrDigit(ch));
+
+            if (!hasUpper || !hasLower || !hasDigit || !hasSpecial)
+                throw new ArgumentException("Mật khẩu mới phải có chữ hoa, chữ thường, số và ký tự đặc biệt.");
         }
 
     }

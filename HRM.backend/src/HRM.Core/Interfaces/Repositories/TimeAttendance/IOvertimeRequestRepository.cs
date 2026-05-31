@@ -10,7 +10,8 @@ namespace HRM.backend.src.HRM.Core.Interfaces.Repositories.TimeAttendance
         Task<List<OvertimeRequest>> GetPendingManagerByDeptAsync(int deptId, CancellationToken ct = default);
         Task<List<OvertimeRequest>> GetApprovedAsync(DateTime? fromDate = null, DateTime? toDate = null, CancellationToken ct = default);
         Task<List<OvertimeRequest>> GetApprovedByPeriodAsync(DateTime fromDate, DateTime toDate, CancellationToken ct = default);
-        Task<bool> HasOverlappingRequestAsync(int employeeId, DateTime workDate, TimeSpan startTime, TimeSpan endTime, int? excludeId = null, CancellationToken ct = default);
+        Task<List<OvertimeRequest>> GetReconcileCandidatesAsync(int employeeId, DateTime checkIn, DateTime checkOut, CancellationToken ct = default);
+        Task<bool> HasOverlappingRequestAsync(int employeeId, DateTime startAt, DateTime endAt, int? excludeId = null, CancellationToken ct = default);
         Task<OvertimeRequest?> GetDetailAsync(int id, CancellationToken ct = default);
     }
 }

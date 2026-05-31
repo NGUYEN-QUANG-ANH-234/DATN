@@ -41,27 +41,45 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.System
                 },
                 new()
                 {
-                    DisplayName = "Số phút OT hợp lệ trong kỳ",
+                    DisplayName = "So phut OT hop le trong ky",
                     SourcePath = "Overtime.ActualOtMinutes",
-                    Module = "Chấm công",
+                    Module = "Cham cong",
                     DataType = SalaryVariableDataType.Hours,
                     AggregationType = SalaryAggregationType.MonthlyTotal,
                     IsPeriodBased = true
                 },
                 new()
                 {
-                    DisplayName = "Số phút đi muộn trong kỳ",
+                    DisplayName = "So phut OT ngay thuong trong ky",
+                    SourcePath = "Overtime.WeekdayMinutes",
+                    Module = "Cham cong",
+                    DataType = SalaryVariableDataType.Hours,
+                    AggregationType = SalaryAggregationType.MonthlyTotal,
+                    IsPeriodBased = true
+                },
+                new()
+                {
+                    DisplayName = "So phut OT cuoi tuan trong ky",
+                    SourcePath = "Overtime.WeekendMinutes",
+                    Module = "Cham cong",
+                    DataType = SalaryVariableDataType.Hours,
+                    AggregationType = SalaryAggregationType.MonthlyTotal,
+                    IsPeriodBased = true
+                },
+                new()
+                {
+                    DisplayName = "So phut di muon trong ky",
                     SourcePath = "Attendance.LateMinutes",
-                    Module = "Chấm công",
+                    Module = "Cham cong",
                     DataType = SalaryVariableDataType.Number,
                     AggregationType = SalaryAggregationType.MonthlyTotal,
                     IsPeriodBased = true
                 },
                 new()
                 {
-                    DisplayName = "Số ngày công thực tế trong kỳ",
+                    DisplayName = "So ngay cong thuc te trong ky",
                     SourcePath = "Attendance.WorkDays",
-                    Module = "Chấm công",
+                    Module = "Cham cong",
                     DataType = SalaryVariableDataType.Days,
                     AggregationType = SalaryAggregationType.MonthlyTotal,
                     IsPeriodBased = true

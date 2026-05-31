@@ -6,6 +6,7 @@ using HRM.backend.src.HRM.Core.Entities.RequestHandover;
 using HRM.backend.src.HRM.Core.Entities.System;
 using HRM.backend.src.HRM.Core.Entities.TasksTraining;
 using HRM.backend.src.HRM.Core.Entities.TimeAttendance;
+using HRM.backend.src.HRM.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Microsoft.Extensions.Logging;
@@ -20,7 +21,9 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
         private readonly IHttpContextAccessor? _httpContextAccessor;
         private readonly string[] SENSITIVE_FIELDS = {
             "PasswordHash", "RefreshToken", "MfaSecretKey", "MfaRecoveryCodes",
-            "BaseSalary", "BonusAmount", "NetPay" // Thêm các cột tài chính nếu cần giấu IT
+            "BaseSalary", "BaseSalaryActual", "BasicSalary", "BonusAmount", "GrossIncome",
+            "InsuranceSalary", "EmployeeInsuranceAmount", "TaxableIncome", "PitAmount",
+            "NetPay", "NetSalary", "TotalCompanyCost"
         };
 
         // Cập nhật constructor (Cho phép Nullable IHttpContextAccessor để tránh lỗi lúc chạy Migration)
@@ -32,19 +35,6 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
             base.OnConfiguring(optionsBuilder);
-            //optionsBuilder.UseLoggerFactory(MyLoggerFactory);
-
-            // 1. Ghi log thẳng ra Console cực nhanh, an toàn, không lo xung đột Serilog
-            optionsBuilder.LogTo(
-                Console.WriteLine,
-                new[] { DbLoggerCategory.Database.Command.Name },
-                LogLevel.Information);
-
-            // 2. VŨ KHÍ TỐI THƯỢNG: Hiển thị giá trị thật của tham số
-            optionsBuilder.EnableSensitiveDataLogging();
-
-            // 3. Hiển thị thông tin lỗi chi tiết đến từng cột/bảng
-            optionsBuilder.EnableDetailedErrors();
         }
 
         // ==========================================
@@ -60,6 +50,7 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
         public DbSet<AuditLog> AuditLogs { get; set; }
         public DbSet<MfaRecoveryCode> MfaRecoveryCodes { get; set; }
         public DbSet<SourceCatalog> SourceCatalogs { get; set; }
+        public DbSet<PayrollPolicy> PayrollPolicies { get; set; }
         public DbSet<SlaTrackingTask> SlaTrackingTasks { get; set; }
         public DbSet<ApprovalRequest> ApprovalRequests { get; set; }
         public DbSet<ApprovalStep> ApprovalSteps { get; set; }
@@ -69,6 +60,8 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
         // 2. Organization
         public DbSet<Department> Departments { get; set; }
         public DbSet<Position> Positions { get; set; }
+        public DbSet<JobLevel> JobLevels { get; set; }
+        public DbSet<PositionJobLevelPolicy> PositionJobLevelPolicies { get; set; }
 
         // 3. Recruitment
         public DbSet<RecruitmentRequest> RecruitmentRequests { get; set; }
@@ -77,8 +70,14 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
         // 4. Employee Profile
         public DbSet<Employee> Employees { get; set; }
         public DbSet<Dependent> Dependents { get; set; }
+        public DbSet<DependentUpdateRequest> DependentUpdateRequests { get; set; }
         public DbSet<Contract> Contracts { get; set; }
         public DbSet<ContractAddendum> ContractAddendums { get; set; }
+        public DbSet<ContractAddendumDetail> ContractAddendumDetails { get; set; }
+        public DbSet<MaternityLeave> MaternityLeaves { get; set; }
+        public DbSet<TerminationRequest> TerminationRequests { get; set; }
+        public DbSet<FinalSettlement> FinalSettlements { get; set; }
+        public DbSet<EmploymentServicePeriod> EmploymentServicePeriods { get; set; }
         public DbSet<OnboardingRequest> OnboardingRequests { get; set; }
         public DbSet<ProfileUpdateRequest> ProfileUpdateRequests { get; set; }
 
@@ -86,10 +85,14 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
         public DbSet<WorkShift> WorkShifts { get; set; }
         public DbSet<AttendanceLog> AttendanceLogs { get; set; }
         public DbSet<AttendanceSummary> AttendanceSummaries { get; set; }
+        public DbSet<AttendanceDailySummary> AttendanceDailySummaries { get; set; }
+        public DbSet<AttendanceAdjustmentLog> AttendanceAdjustmentLogs { get; set; }
+        public DbSet<WorkCalendarConfig> WorkCalendarConfigs { get; set; }
         public DbSet<LeaveType> LeaveTypes { get; set; }
         public DbSet<LeaveBalance> LeaveBalances { get; set; }
         public DbSet<LeaveRequest> LeaveRequests { get; set; }
         public DbSet<OvertimeRequest> OvertimeRequests { get; set; }
+        public DbSet<OvertimeSegment> OvertimeSegments { get; set; }
 
         // 6. Tasks & Training
         public DbSet<KpiImportBatch> KpiImportBatches { get; set; }
@@ -106,12 +109,23 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
         public DbSet<AllowanceType> AllowanceTypes { get; set; }
         public DbSet<EmployeeAllowance> EmployeeAllowances { get; set; }
         public DbSet<PayrollFormula> PayrollFormulas { get; set; }
+        public DbSet<PayrollFormulaLine> PayrollFormulaLines { get; set; }
         public DbSet<Payroll> Payrolls { get; set; }
+        public DbSet<PayrollDetail> PayrollDetails { get; set; }
+        public DbSet<SalaryComponentType> SalaryComponentTypes { get; set; }
+        public DbSet<EmployeeSalaryComponent> EmployeeSalaryComponents { get; set; }
+        public DbSet<TaxConfig> TaxConfigs { get; set; }
+        public DbSet<PITTaxBracket> PITTaxBrackets { get; set; }
+        public DbSet<InsuranceConfig> InsuranceConfigs { get; set; }
+        public DbSet<MonthlyInsuranceStatus> MonthlyInsuranceStatuses { get; set; }
+        public DbSet<PayrollContractSegment> PayrollContractSegments { get; set; }
+        public DbSet<PayrollAdjustment> PayrollAdjustments { get; set; }
+        public DbSet<OvertimeRateConfig> OvertimeRateConfigs { get; set; }
+        public DbSet<ExternalTimesheetImport> ExternalTimesheetImports { get; set; }
+        public DbSet<ExternalTimesheetLine> ExternalTimesheetLines { get; set; }
 
         // 8. Requests & Handover
         public DbSet<Request> Requests { get; set; }
-        public DbSet<HandoverRequest> HandoverRequests { get; set; }
-        public DbSet<HandoverItem> HandoverItems { get; set; }
         public DbSet<EmploymentHistory> EmploymentHistories { get; set; }
 
 
@@ -136,16 +150,35 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
             modelBuilder.Entity<Permission>().HasIndex(p => p.PermissionCode).IsUnique();
             modelBuilder.Entity<Configuration>().HasIndex(c => new { c.ConfigGroup, c.ParamKey }).IsUnique();
             modelBuilder.Entity<SourceCatalog>().HasIndex(s => s.SourcePath).IsUnique();
+            modelBuilder.Entity<PayrollPolicy>().HasIndex(p => new { p.PolicyType, p.Code, p.EffectiveFrom }).IsUnique().HasDatabaseName("UX_payroll_policies_Type_Code_EffectiveFrom");
+            modelBuilder.Entity<PayrollPolicy>().HasIndex(p => new { p.PolicyType, p.IsActive, p.EffectiveFrom }).HasDatabaseName("IX_payroll_policies_Type_Active_EffectiveFrom");
             modelBuilder.Entity<IdempotencyRecord>().HasIndex(i => new { i.Scope, i.IdempotencyKey }).IsUnique();
             modelBuilder.Entity<OutboxMessage>().HasIndex(o => new { o.Status, o.CreatedAt });
             modelBuilder.Entity<Department>().HasIndex(d => d.DeptCode).IsUnique();
             modelBuilder.Entity<Position>().HasIndex(p => p.Title).IsUnique();
+            modelBuilder.Entity<JobLevel>().HasIndex(j => j.Code).IsUnique().HasDatabaseName("UX_job_levels_Code");
+            modelBuilder.Entity<JobLevel>().HasIndex(j => new { j.IsActive, j.RankOrder }).HasDatabaseName("IX_job_levels_Active_Rank");
+            modelBuilder.Entity<PositionJobLevelPolicy>().HasIndex(p => new { p.PositionId, p.JobLevelId, p.EffectiveFrom }).IsUnique().HasDatabaseName("UX_position_job_level_policies_Position_Level_EffectiveFrom");
+            modelBuilder.Entity<PositionJobLevelPolicy>().HasIndex(p => new { p.PositionId, p.JobLevelId, p.IsActive, p.EffectiveFrom }).HasDatabaseName("IX_position_job_level_policies_Lookup");
             modelBuilder.Entity<Contract>().HasIndex(c => c.ContractNumber).IsUnique();
+            modelBuilder.Entity<Contract>().HasIndex(c => new { c.EmployeeId, c.Status, c.StartDate }).HasDatabaseName("IX_contracts_Employee_Status_StartDate");
             modelBuilder.Entity<ContractAddendum>().HasIndex(ca => ca.AddendumNumber).IsUnique();
             modelBuilder.Entity<ContractAddendum>().HasIndex(ca => new { ca.ContractId, ca.Status });
+            modelBuilder.Entity<ContractAddendumDetail>().HasIndex(d => new { d.ContractAddendumId, d.FieldName }).HasDatabaseName("IX_contract_addendum_details_Addendum_Field");
+            modelBuilder.Entity<MaternityLeave>().HasIndex(m => new { m.EmployeeId, m.Status, m.StartDate }).HasDatabaseName("IX_maternity_leaves_Employee_Status_Start");
+            modelBuilder.Entity<TerminationRequest>().HasIndex(t => new { t.EmployeeId, t.Status, t.ExpectedLastWorkingDate }).HasDatabaseName("IX_termination_requests_Employee_Status_LastDate");
+            modelBuilder.Entity<FinalSettlement>().HasIndex(f => new { f.EmployeeId, f.Status }).HasDatabaseName("IX_final_settlements_Employee_Status");
+            modelBuilder.Entity<FinalSettlement>().HasIndex(f => f.TerminationRequestId).IsUnique().HasDatabaseName("UX_final_settlements_TerminationRequest");
+            modelBuilder.Entity<EmploymentServicePeriod>().HasIndex(p => new { p.EmployeeId, p.PeriodStart, p.PeriodEnd }).HasDatabaseName("IX_employment_service_periods_Employee_Range");
             modelBuilder.Entity<WorkShift>().HasIndex(s => s.DeptId).IsUnique().HasDatabaseName("UX_work_shifts_DeptId");
+            modelBuilder.Entity<WorkCalendarConfig>().HasIndex(w => new { w.DeptId, w.Month, w.Year }).IsUnique().HasDatabaseName("UX_work_calendar_configs_DeptId_Month_Year");
             modelBuilder.Entity<LeaveRequest>().HasIndex(l => new { l.EmployeeId, l.LeaveTypeId, l.StartDate, l.EndDate }).IsUnique().HasDatabaseName("UX_leave_requests_EmployeeId_LeaveTypeId_StartDate_EndDate");
             modelBuilder.Entity<OvertimeRequest>().HasIndex(o => new { o.EmployeeId, o.WorkDate, o.StartTime, o.EndTime }).IsUnique().HasDatabaseName("UX_overtime_requests_EmployeeId_WorkDate_StartTime_EndTime");
+            modelBuilder.Entity<OvertimeRequest>().HasIndex(o => new { o.EmployeeId, o.StartAt, o.EndAt }).HasDatabaseName("IX_overtime_requests_EmployeeId_StartAt_EndAt");
+            modelBuilder.Entity<OvertimeSegment>().HasIndex(o => new { o.OvertimeRequestId, o.SegmentStartAt }).HasDatabaseName("IX_overtime_segments_Request_Start");
+            modelBuilder.Entity<AttendanceDailySummary>().HasIndex(a => new { a.EmployeeId, a.WorkDate }).IsUnique().HasDatabaseName("UX_attendance_daily_summaries_Employee_WorkDate");
+            modelBuilder.Entity<AttendanceDailySummary>().HasIndex(a => new { a.ApprovalStatus, a.WorkDate }).HasDatabaseName("IX_attendance_daily_summaries_Status_WorkDate");
+            modelBuilder.Entity<AttendanceAdjustmentLog>().HasIndex(a => new { a.AttendanceDailySummaryId, a.AdjustedAt }).HasDatabaseName("IX_attendance_adjustment_logs_Summary_AdjustedAt");
             modelBuilder.Entity<Candidate>().HasIndex(c => new { c.RecruitmentRequestId, c.Email }).IsUnique().HasDatabaseName("UX_candidates_RecruitmentRequestId_Email");
             modelBuilder.Entity<Candidate>().HasIndex(c => c.TrackingCode).IsUnique();
             modelBuilder.Entity<Employee>().HasIndex(e => e.EmployeeCode).IsUnique();
@@ -154,16 +187,44 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
             modelBuilder.Entity<Employee>().HasIndex(e => e.IdentityNumber).IsUnique();
             modelBuilder.Entity<Employee>().HasIndex(e => e.TaxCode).IsUnique();
             modelBuilder.Entity<Employee>().HasIndex(e => e.SocialInsCode).IsUnique();
+            modelBuilder.Entity<Dependent>().HasIndex(d => new { d.EmployeeId, d.TaxDependentCode });
+            modelBuilder.Entity<DependentUpdateRequest>().HasIndex(d => new { d.EmployeeId, d.Status });
             modelBuilder.Entity<PerformanceReview>().HasIndex(p => new { p.EmployeeId, p.Period }).IsUnique().HasDatabaseName("UX_performance_reviews_EmployeeId_Period");
             modelBuilder.Entity<PerformanceReview>().HasIndex(p => new { p.DeptId, p.Period, p.Status });
             modelBuilder.Entity<PerformanceDetail>().HasIndex(p => new { p.ReviewId, p.KpiCode }).IsUnique().HasDatabaseName("UX_performance_details_ReviewId_KpiCode");
             modelBuilder.Entity<PenaltyRule>().HasIndex(p => new { p.SourceType, p.RuleCode }).IsUnique().HasDatabaseName("UX_penalty_rules_SourceType_RuleCode");
             modelBuilder.Entity<PenaltyRecord>().HasIndex(p => new { p.EmployeeId, p.Period, p.SourceType });
             modelBuilder.Entity<PenaltyRecord>().HasIndex(p => new { p.SourceType, p.ReferenceId, p.RuleCode }).HasDatabaseName("IX_penalty_records_Source_Reference_Rule");
+            modelBuilder.Entity<PenaltyRecord>().HasIndex(p => new { p.Status, p.AffectsAttendance, p.AffectsPerformance }).HasDatabaseName("IX_penalty_records_Status_Impact");
+            modelBuilder.Entity<PenaltyRecord>().HasIndex(p => new { p.EmployeeId, p.Period, p.AffectsPerformance, p.Status }).HasDatabaseName("IX_penalty_records_Employee_Performance_Status");
+            modelBuilder.Entity<PenaltyRecord>().HasIndex(p => new { p.EmployeeId, p.AffectsPersonnelDecision, p.Severity, p.OccurredAt }).HasDatabaseName("IX_penalty_records_Employee_Personnel_History");
             modelBuilder.Entity<WorkTask>().HasIndex(t => new { t.AssignedTo, t.Status, t.Deadline });
             modelBuilder.Entity<TaskProgress>().HasIndex(t => new { t.TaskId, t.SubmittedAt });
             modelBuilder.Entity<Training>().HasIndex(t => new { t.EmployeeId, t.Status });
             modelBuilder.Entity<Training>().HasIndex(t => new { t.ManagerId, t.EvaluationDeadline, t.Status });
+            modelBuilder.Entity<Payroll>().HasIndex(p => new { p.EmployeeId, p.Month, p.Year }).HasDatabaseName("IX_payrolls_Employee_Period");
+            modelBuilder.Entity<Payroll>().HasIndex(p => new { p.Month, p.Year, p.Status }).HasDatabaseName("IX_payrolls_Period_Status");
+            modelBuilder.Entity<PayrollFormula>().HasIndex(f => new { f.FormulaCode, f.Version }).HasDatabaseName("IX_payroll_formulas_Code_Version");
+            modelBuilder.Entity<PayrollFormula>().HasIndex(f => new { f.Status, f.ContractType, f.PayBasis, f.EmployeeType, f.DeptId, f.PositionId, f.JobLevelId, f.EffectiveFrom }).HasDatabaseName("IX_payroll_formulas_Scope_Lookup");
+            modelBuilder.Entity<PayrollFormulaLine>().HasIndex(l => new { l.PayrollFormulaId, l.ComponentCode }).IsUnique().HasDatabaseName("UX_payroll_formula_lines_Formula_Component");
+            modelBuilder.Entity<PayrollFormulaLine>().HasIndex(l => new { l.PayrollFormulaId, l.CalculationOrder }).HasDatabaseName("IX_payroll_formula_lines_Formula_Order");
+            modelBuilder.Entity<PayrollDetail>().HasIndex(p => new { p.PayrollId, p.ComponentCode }).HasDatabaseName("IX_payroll_details_Payroll_Component");
+            modelBuilder.Entity<SalaryComponentType>().HasIndex(s => new { s.Code, s.EffectiveFrom }).IsUnique().HasDatabaseName("UX_salary_component_types_Code_EffectiveFrom");
+            modelBuilder.Entity<SalaryComponentType>().HasIndex(s => new { s.ComponentGroup, s.IsActive, s.EffectiveFrom }).HasDatabaseName("IX_salary_component_types_Group_Active_EffectiveFrom");
+            modelBuilder.Entity<EmployeeSalaryComponent>().HasIndex(s => new { s.EmployeeId, s.SalaryComponentTypeId, s.EffectiveFrom }).HasDatabaseName("IX_employee_salary_components_Employee_Type_EffectiveFrom");
+            modelBuilder.Entity<TaxConfig>().HasIndex(t => new { t.Code, t.EffectiveFrom }).IsUnique().HasDatabaseName("UX_tax_configs_Code_EffectiveFrom");
+            modelBuilder.Entity<PITTaxBracket>().HasIndex(t => new { t.Code, t.Level, t.EffectiveFrom }).IsUnique().HasDatabaseName("UX_pit_tax_brackets_Code_Level_EffectiveFrom");
+            modelBuilder.Entity<InsuranceConfig>().HasIndex(i => new { i.Code, i.EffectiveFrom }).IsUnique().HasDatabaseName("UX_insurance_configs_Code_EffectiveFrom");
+            modelBuilder.Entity<MonthlyInsuranceStatus>().HasIndex(i => new { i.EmployeeId, i.Month, i.Year }).IsUnique().HasDatabaseName("UX_monthly_insurance_statuses_Employee_Period");
+            modelBuilder.Entity<PayrollContractSegment>().HasIndex(s => s.PayrollId).HasDatabaseName("IX_payroll_contract_segments_Payroll");
+            modelBuilder.Entity<PayrollContractSegment>().HasIndex(s => new { s.EmployeeId, s.StartDate, s.EndDate }).HasDatabaseName("IX_payroll_contract_segments_Employee_Range");
+            modelBuilder.Entity<PayrollAdjustment>().HasIndex(a => new { a.EmployeeId, a.RecognizedMonth, a.RecognizedYear, a.Status }).HasDatabaseName("IX_payroll_adjustments_Employee_Recognized_Status");
+            modelBuilder.Entity<PayrollAdjustment>().HasIndex(a => a.AppliedPayrollId).HasDatabaseName("IX_payroll_adjustments_AppliedPayroll");
+            modelBuilder.Entity<OvertimeRateConfig>().HasIndex(o => new { o.Code, o.EffectiveFrom }).IsUnique().HasDatabaseName("UX_overtime_rate_configs_Code_EffectiveFrom");
+            modelBuilder.Entity<OvertimeRateConfig>().HasIndex(o => new { o.OvertimeType, o.IsActive, o.EffectiveFrom }).HasDatabaseName("IX_overtime_rate_configs_Type_Active_EffectiveFrom");
+            modelBuilder.Entity<ExternalTimesheetImport>().HasIndex(e => new { e.SourceSystem, e.ImportMonth, e.ImportYear, e.Status }).HasDatabaseName("IX_external_timesheet_imports_Source_Period_Status");
+            modelBuilder.Entity<ExternalTimesheetLine>().HasIndex(e => new { e.ImportId, e.CollaboratorEmployeeId, e.WorkDate }).HasDatabaseName("IX_external_timesheet_lines_Import_Employee_WorkDate");
+            modelBuilder.Entity<ExternalTimesheetLine>().HasIndex(e => new { e.CollaboratorEmployeeId, e.WorkDate, e.IsPayrollImported }).HasDatabaseName("IX_external_timesheet_lines_Employee_WorkDate_Payroll");
 
             // ==========================================
             // 3. QUAN HỆ (RELATIONSHIPS) & CHỐNG LỖI CASCADE
@@ -201,10 +262,112 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
                 .HasForeignKey(e => e.PositionId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            modelBuilder.Entity<Employee>()
+                .HasOne(e => e.JobLevel)
+                .WithMany(j => j.Employees)
+                .HasForeignKey(e => e.JobLevelId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<PositionJobLevelPolicy>()
+                .HasOne(p => p.Position)
+                .WithMany(p => p.JobLevelPolicies)
+                .HasForeignKey(p => p.PositionId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<PositionJobLevelPolicy>()
+                .HasOne(p => p.JobLevel)
+                .WithMany(j => j.PositionPolicies)
+                .HasForeignKey(p => p.JobLevelId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Dependent>()
+                .HasOne(d => d.Employee)
+                .WithMany(e => e.Dependents)
+                .HasForeignKey(d => d.EmployeeId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<DependentUpdateRequest>()
+                .HasOne(d => d.Employee)
+                .WithMany()
+                .HasForeignKey(d => d.EmployeeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<DependentUpdateRequest>()
+                .HasOne(d => d.Dependent)
+                .WithMany()
+                .HasForeignKey(d => d.DependentId)
+                .OnDelete(DeleteBehavior.SetNull);
+
             modelBuilder.Entity<ContractAddendum>()
                 .HasOne(ca => ca.Contract)
                 .WithMany(c => c.Addendums)
                 .HasForeignKey(ca => ca.ContractId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<ContractAddendum>()
+                .HasMany(ca => ca.Details)
+                .WithOne(d => d.ContractAddendum)
+                .HasForeignKey(d => d.ContractAddendumId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<MaternityLeave>()
+                .HasOne(m => m.Employee)
+                .WithMany()
+                .HasForeignKey(m => m.EmployeeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<MaternityLeave>()
+                .HasOne(m => m.LeaveRequest)
+                .WithMany()
+                .HasForeignKey(m => m.LeaveRequestId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<MaternityLeave>()
+                .HasOne(m => m.ApprovedByAccount)
+                .WithMany()
+                .HasForeignKey(m => m.ApprovedByAccountId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<TerminationRequest>()
+                .HasOne(t => t.Employee)
+                .WithMany()
+                .HasForeignKey(t => t.EmployeeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<TerminationRequest>()
+                .HasOne(t => t.ApprovedByAccount)
+                .WithMany()
+                .HasForeignKey(t => t.ApprovedByAccountId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<FinalSettlement>()
+                .HasOne(f => f.Employee)
+                .WithMany()
+                .HasForeignKey(f => f.EmployeeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<FinalSettlement>()
+                .HasOne(f => f.TerminationRequest)
+                .WithOne(t => t.FinalSettlement)
+                .HasForeignKey<FinalSettlement>(f => f.TerminationRequestId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<FinalSettlement>()
+                .HasOne(f => f.ApprovedByAccount)
+                .WithMany()
+                .HasForeignKey(f => f.ApprovedByAccountId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<FinalSettlement>()
+                .HasOne(f => f.LockedByAccount)
+                .WithMany()
+                .HasForeignKey(f => f.LockedByAccountId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<EmploymentServicePeriod>()
+                .HasOne(p => p.Employee)
+                .WithMany()
+                .HasForeignKey(p => p.EmployeeId)
                 .OnDelete(DeleteBehavior.Restrict);
 
             // --- TASKS & TRAINING ---
@@ -266,6 +429,18 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
                 .HasOne(pr => pr.CreatedByAccount)
                 .WithMany()
                 .HasForeignKey(pr => pr.CreatedByAccountId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<PenaltyRecord>()
+                .HasOne(pr => pr.ApprovedByAccount)
+                .WithMany()
+                .HasForeignKey(pr => pr.ApprovedByAccountId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<PenaltyRecord>()
+                .HasOne(pr => pr.AttendanceAdjustmentLog)
+                .WithMany()
+                .HasForeignKey(pr => pr.AttendanceAdjustmentLogId)
                 .OnDelete(DeleteBehavior.SetNull);
 
             modelBuilder.Entity<PenaltyRecord>()
@@ -346,15 +521,7 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
                 .HasForeignKey(t => t.ManagerId)
                 .OnDelete(DeleteBehavior.SetNull);
 
-            // --- REQUESTS & HANDOVER ---
-            modelBuilder.Entity<HandoverRequest>()
-                .HasOne(hr => hr.Sender).WithMany()
-                .HasForeignKey(hr => hr.SenderId).OnDelete(DeleteBehavior.Restrict);
-
-            modelBuilder.Entity<HandoverRequest>()
-                .HasOne(hr => hr.Receiver).WithMany()
-                .HasForeignKey(hr => hr.ReceiverId).OnDelete(DeleteBehavior.Restrict);
-
+            // --- REQUESTS & HISTORY ---
             modelBuilder.Entity<EmploymentHistory>()
                 .HasOne(eh => eh.Approver).WithMany()
                 .HasForeignKey(eh => eh.ApprovedBy).OnDelete(DeleteBehavior.SetNull);
@@ -375,6 +542,16 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
                 .HasForeignKey(o => o.EmployeeId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            modelBuilder.Entity<OvertimeRequest>()
+                .HasMany(o => o.Segments)
+                .WithOne(s => s.OvertimeRequest)
+                .HasForeignKey(s => s.OvertimeRequestId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<OvertimeSegment>()
+                .Property(s => s.OvertimeType)
+                .HasDefaultValue(OvertimeType.Weekday);
+
             modelBuilder.Entity<AttendanceSummary>()
                 .HasIndex(s => new { s.EmployeeId, s.Month, s.Year })
                 .IsUnique();
@@ -384,6 +561,172 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
                 .WithMany()
                 .HasForeignKey(s => s.EmployeeId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<AttendanceDailySummary>()
+                .HasOne(s => s.Employee)
+                .WithMany()
+                .HasForeignKey(s => s.EmployeeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<AttendanceDailySummary>()
+                .HasMany(s => s.AdjustmentLogs)
+                .WithOne(l => l.AttendanceDailySummary)
+                .HasForeignKey(l => l.AttendanceDailySummaryId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<Payroll>()
+                .HasOne(p => p.Employee)
+                .WithMany()
+                .HasForeignKey(p => p.EmployeeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Payroll>()
+                .HasMany(p => p.Details)
+                .WithOne(d => d.Payroll)
+                .HasForeignKey(d => d.PayrollId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<Payroll>()
+                .HasMany(p => p.ContractSegments)
+                .WithOne(s => s.Payroll)
+                .HasForeignKey(s => s.PayrollId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<PayrollContractSegment>()
+                .HasOne(s => s.Employee)
+                .WithMany()
+                .HasForeignKey(s => s.EmployeeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<PayrollContractSegment>()
+                .HasOne(s => s.Contract)
+                .WithMany()
+                .HasForeignKey(s => s.ContractId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<PayrollAdjustment>()
+                .HasOne(a => a.Employee)
+                .WithMany()
+                .HasForeignKey(a => a.EmployeeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<PayrollAdjustment>()
+                .HasOne(a => a.RelatedPayroll)
+                .WithMany()
+                .HasForeignKey(a => a.RelatedPayrollId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<PayrollAdjustment>()
+                .HasOne(a => a.AppliedPayroll)
+                .WithMany()
+                .HasForeignKey(a => a.AppliedPayrollId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<MonthlyInsuranceStatus>()
+                .HasOne(s => s.Employee)
+                .WithMany()
+                .HasForeignKey(s => s.EmployeeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<MonthlyInsuranceStatus>()
+                .Property(s => s.IsUnemploymentInsuranceContributed)
+                .HasDefaultValue(true);
+
+            modelBuilder.Entity<ExternalTimesheetImport>()
+                .HasOne(i => i.ImportedByAccount)
+                .WithMany()
+                .HasForeignKey(i => i.ImportedByAccountId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<ExternalTimesheetImport>()
+                .HasMany(i => i.Lines)
+                .WithOne(l => l.Import)
+                .HasForeignKey(l => l.ImportId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<ExternalTimesheetLine>()
+                .HasOne(l => l.CollaboratorEmployee)
+                .WithMany()
+                .HasForeignKey(l => l.CollaboratorEmployeeId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<ExternalTimesheetLine>()
+                .HasOne(l => l.Payroll)
+                .WithMany()
+                .HasForeignKey(l => l.PayrollId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<PayrollFormula>()
+                .HasMany(f => f.Lines)
+                .WithOne(l => l.PayrollFormula)
+                .HasForeignKey(l => l.PayrollFormulaId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<PayrollFormulaLine>()
+                .HasOne(l => l.SalaryComponentType)
+                .WithMany()
+                .HasForeignKey(l => l.SalaryComponentTypeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<EmployeeSalaryComponent>()
+                .HasOne(s => s.Employee)
+                .WithMany()
+                .HasForeignKey(s => s.EmployeeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<EmployeeSalaryComponent>()
+                .HasOne(s => s.SalaryComponentType)
+                .WithMany(t => t.EmployeeSalaryComponents)
+                .HasForeignKey(s => s.SalaryComponentTypeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Employee>()
+                .Property(e => e.ResidenceStatus)
+                .HasDefaultValue(ResidenceStatus.Resident);
+
+            modelBuilder.Entity<Employee>()
+                .Property(e => e.TaxCodeStatus)
+                .HasDefaultValue(TaxCodeStatus.Unknown);
+
+            modelBuilder.Entity<Contract>()
+                .Property(c => c.PayBasis)
+                .HasDefaultValue(PayBasis.Monthly);
+
+            modelBuilder.Entity<Contract>()
+                .Property(c => c.IsInsuranceEligible)
+                .HasDefaultValue(true);
+
+            modelBuilder.Entity<Contract>()
+                .Property(c => c.StandardHoursPerDaySnapshot)
+                .HasDefaultValue(8m);
+
+            modelBuilder.Entity<Contract>()
+                .Property(c => c.StandardWorkdaysSnapshot)
+                .HasDefaultValue(22m);
+
+            modelBuilder.Entity<PayrollFormula>()
+                .Property(f => f.FormulaCode)
+                .HasDefaultValue("DEFAULT_PAYROLL");
+
+            modelBuilder.Entity<PayrollFormula>()
+                .Property(f => f.Version)
+                .HasDefaultValue(1);
+
+            modelBuilder.Entity<PayrollFormula>()
+                .Property(f => f.EffectiveFrom)
+                .HasDefaultValue(new DateTime(2020, 7, 1));
+
+            modelBuilder.Entity<PayrollFormula>()
+                .Property(f => f.CreatedAt)
+                .HasDefaultValue(new DateTime(2020, 7, 1));
+
+            modelBuilder.Entity<WorkCalendarConfig>()
+                .HasOne(w => w.Department)
+                .WithMany()
+                .HasForeignKey(w => w.DeptId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            SeedPayrollPhaseOneReferenceData(modelBuilder);
 
             // Tự động chuyển đổi Enum thành String khi lưu vào DB
             foreach (var entityType in modelBuilder.Model.GetEntityTypes())
@@ -412,6 +755,360 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
 
                 property.SetColumnType("DECIMAL(15,2)");
             }
+
+            // Payroll policy rates must keep four decimal places, e.g. 10.5% = 0.1050.
+            modelBuilder.Entity<TaxConfig>().Property(t => t.FlatTaxRate).HasColumnType("DECIMAL(7,4)");
+            modelBuilder.Entity<TaxConfig>().Property(t => t.NonResidentTaxRate).HasColumnType("DECIMAL(7,4)");
+            modelBuilder.Entity<PITTaxBracket>().Property(t => t.TaxRate).HasColumnType("DECIMAL(7,4)");
+            modelBuilder.Entity<InsuranceConfig>().Property(i => i.SocialInsuranceEmployeeRate).HasColumnType("DECIMAL(7,4)");
+            modelBuilder.Entity<InsuranceConfig>().Property(i => i.HealthInsuranceEmployeeRate).HasColumnType("DECIMAL(7,4)");
+            modelBuilder.Entity<InsuranceConfig>().Property(i => i.UnemploymentInsuranceEmployeeRate).HasColumnType("DECIMAL(7,4)");
+            modelBuilder.Entity<InsuranceConfig>().Property(i => i.SocialInsuranceEmployerRate).HasColumnType("DECIMAL(7,4)");
+            modelBuilder.Entity<InsuranceConfig>().Property(i => i.HealthInsuranceEmployerRate).HasColumnType("DECIMAL(7,4)");
+            modelBuilder.Entity<InsuranceConfig>().Property(i => i.UnemploymentInsuranceEmployerRate).HasColumnType("DECIMAL(7,4)");
+            modelBuilder.Entity<InsuranceConfig>().Property(i => i.UnionFeeEmployerRate).HasColumnType("DECIMAL(7,4)");
+            modelBuilder.Entity<OvertimeSegment>().Property(o => o.RateMultiplierSnapshot).HasColumnType("DECIMAL(7,4)");
+            modelBuilder.Entity<OvertimeRateConfig>().Property(o => o.BaseMultiplier).HasColumnType("DECIMAL(7,4)");
+            modelBuilder.Entity<OvertimeRateConfig>().Property(o => o.NightAllowanceRate).HasColumnType("DECIMAL(7,4)");
+            modelBuilder.Entity<OvertimeRateConfig>().Property(o => o.NightOvertimeExtraRate).HasColumnType("DECIMAL(7,4)");
+            modelBuilder.Entity<AttendanceDailySummary>().Property(a => a.WorkdayValue).HasColumnType("DECIMAL(5,2)");
+            modelBuilder.Entity<MonthlyInsuranceStatus>().Property(i => i.UnpaidLeaveWorkingDays).HasColumnType("DECIMAL(5,2)");
+            modelBuilder.Entity<MonthlyInsuranceStatus>().Property(i => i.MaternityLeaveDays).HasColumnType("DECIMAL(5,2)");
+            modelBuilder.Entity<MonthlyInsuranceStatus>().Property(i => i.SickLeaveDays).HasColumnType("DECIMAL(5,2)");
+            modelBuilder.Entity<MonthlyInsuranceStatus>().Property(i => i.OfficialContractWorkingDays).HasColumnType("DECIMAL(5,2)");
+            modelBuilder.Entity<PayrollContractSegment>().Property(s => s.SalaryPercentage).HasColumnType("DECIMAL(5,2)");
+            modelBuilder.Entity<PayrollContractSegment>().Property(s => s.StandardWorkdays).HasColumnType("DECIMAL(5,2)");
+            modelBuilder.Entity<PayrollContractSegment>().Property(s => s.ActualWorkdays).HasColumnType("DECIMAL(5,2)");
+            modelBuilder.Entity<FinalSettlement>().Property(f => f.UnusedAnnualLeaveDays).HasColumnType("DECIMAL(5,2)");
+            modelBuilder.Entity<ExternalTimesheetLine>().Property(l => l.ApprovedHours).HasColumnType("DECIMAL(7,2)");
+        }
+
+        private static void SeedPayrollPhaseOneReferenceData(ModelBuilder modelBuilder)
+        {
+            var pitEffectiveFrom = new DateTime(2020, 7, 1);
+            var insuranceEffectiveFrom = new DateTime(2025, 7, 1);
+
+            modelBuilder.Entity<JobLevel>().HasData(
+                new JobLevel { Id = 1, Code = "INTERN", Name = "Thực tập sinh", RankOrder = 1, IsManagementLevel = false, IsActive = true, CreatedAt = pitEffectiveFrom },
+                new JobLevel { Id = 2, Code = "JUNIOR", Name = "Junior", RankOrder = 2, IsManagementLevel = false, IsActive = true, CreatedAt = pitEffectiveFrom },
+                new JobLevel { Id = 3, Code = "MIDDLE", Name = "Middle", RankOrder = 3, IsManagementLevel = false, IsActive = true, CreatedAt = pitEffectiveFrom },
+                new JobLevel { Id = 4, Code = "SENIOR", Name = "Senior", RankOrder = 4, IsManagementLevel = false, IsActive = true, CreatedAt = pitEffectiveFrom },
+                new JobLevel { Id = 5, Code = "LEAD", Name = "Lead", RankOrder = 5, IsManagementLevel = true, IsActive = true, CreatedAt = pitEffectiveFrom },
+                new JobLevel { Id = 6, Code = "MANAGER", Name = "Manager", RankOrder = 6, IsManagementLevel = true, IsActive = true, CreatedAt = pitEffectiveFrom },
+                new JobLevel { Id = 7, Code = "DIRECTOR", Name = "Director", RankOrder = 7, IsManagementLevel = true, IsActive = true, CreatedAt = pitEffectiveFrom }
+            );
+
+            modelBuilder.Entity<SalaryComponentType>().HasData(
+                new SalaryComponentType
+                {
+                    Id = 1,
+                    Code = "BASE_SALARY_ACTUAL",
+                    Name = "Lương cơ bản theo công",
+                    ComponentGroup = SalaryComponentGroup.BaseSalary,
+                    IsIncome = true,
+                    IsDeduction = false,
+                    IsTaxable = true,
+                    IsInsuranceBased = true,
+                    IsFixed = true,
+                    IsAllowance = false,
+                    IsBonus = false,
+                    IsOvertime = false,
+                    ProrationType = ProrationType.ByWorkingDays,
+                    CalculationMethod = CalculationMethod.Formula,
+                    EffectiveFrom = pitEffectiveFrom,
+                    Version = 1,
+                    IsActive = true,
+                    CreatedAt = pitEffectiveFrom,
+                    Note = "Base salary prorated by approved workdays."
+                },
+                new SalaryComponentType
+                {
+                    Id = 2,
+                    Code = "POSITION_ALLOWANCE",
+                    Name = "Phụ cấp chức vụ",
+                    ComponentGroup = SalaryComponentGroup.Allowance,
+                    IsIncome = true,
+                    IsTaxable = true,
+                    IsInsuranceBased = true,
+                    IsFixed = true,
+                    IsAllowance = true,
+                    ProrationType = ProrationType.ByWorkingDays,
+                    CalculationMethod = CalculationMethod.FixedAmount,
+                    EffectiveFrom = pitEffectiveFrom,
+                    Version = 1,
+                    IsActive = true,
+                    CreatedAt = pitEffectiveFrom,
+                    Note = "Configured by PositionJobLevelPolicy when fixed and recurring."
+                },
+                new SalaryComponentType
+                {
+                    Id = 3,
+                    Code = "RESPONSIBILITY_ALLOWANCE",
+                    Name = "Phụ cấp trách nhiệm",
+                    ComponentGroup = SalaryComponentGroup.Allowance,
+                    IsIncome = true,
+                    IsTaxable = true,
+                    IsInsuranceBased = true,
+                    IsFixed = true,
+                    IsAllowance = true,
+                    ProrationType = ProrationType.ByWorkingDays,
+                    CalculationMethod = CalculationMethod.FixedAmount,
+                    EffectiveFrom = pitEffectiveFrom,
+                    Version = 1,
+                    IsActive = true,
+                    CreatedAt = pitEffectiveFrom
+                },
+                new SalaryComponentType
+                {
+                    Id = 4,
+                    Code = "MEAL_ALLOWANCE",
+                    Name = "Phụ cấp ăn ca",
+                    ComponentGroup = SalaryComponentGroup.Allowance,
+                    IsIncome = true,
+                    IsTaxable = false,
+                    IsInsuranceBased = false,
+                    IsFixed = false,
+                    IsAllowance = true,
+                    ProrationType = ProrationType.FixedPerDay,
+                    CalculationMethod = CalculationMethod.FixedPerDay,
+                    TaxExemptCap = 730000m,
+                    EffectiveFrom = pitEffectiveFrom,
+                    Version = 1,
+                    IsActive = true,
+                    CreatedAt = pitEffectiveFrom,
+                    Note = "Tax-exempt cap is stored as policy data and should be versioned when changed."
+                },
+                new SalaryComponentType
+                {
+                    Id = 5,
+                    Code = "KPI_BONUS",
+                    Name = "Thưởng KPI",
+                    ComponentGroup = SalaryComponentGroup.Bonus,
+                    IsIncome = true,
+                    IsTaxable = true,
+                    IsInsuranceBased = false,
+                    IsBonus = true,
+                    ProrationType = ProrationType.None,
+                    CalculationMethod = CalculationMethod.Formula,
+                    EffectiveFrom = pitEffectiveFrom,
+                    Version = 1,
+                    IsActive = true,
+                    CreatedAt = pitEffectiveFrom
+                },
+                new SalaryComponentType
+                {
+                    Id = 6,
+                    Code = "OT_BASE",
+                    Name = "OT phần 100% chịu thuế",
+                    ComponentGroup = SalaryComponentGroup.Overtime,
+                    IsIncome = true,
+                    IsTaxable = true,
+                    IsInsuranceBased = false,
+                    IsOvertime = true,
+                    ProrationType = ProrationType.ByHours,
+                    CalculationMethod = CalculationMethod.Formula,
+                    EffectiveFrom = pitEffectiveFrom,
+                    Version = 1,
+                    IsActive = true,
+                    CreatedAt = pitEffectiveFrom
+                },
+                new SalaryComponentType
+                {
+                    Id = 7,
+                    Code = "OT_PREMIUM",
+                    Name = "OT phần hệ số tăng thêm",
+                    ComponentGroup = SalaryComponentGroup.Overtime,
+                    IsIncome = true,
+                    IsTaxable = false,
+                    IsInsuranceBased = false,
+                    IsOvertime = true,
+                    ProrationType = ProrationType.ByHours,
+                    CalculationMethod = CalculationMethod.Formula,
+                    EffectiveFrom = pitEffectiveFrom,
+                    Version = 1,
+                    IsActive = true,
+                    CreatedAt = pitEffectiveFrom
+                },
+                new SalaryComponentType
+                {
+                    Id = 8,
+                    Code = "EMPLOYEE_INSURANCE",
+                    Name = "Bảo hiểm người lao động đóng",
+                    ComponentGroup = SalaryComponentGroup.Insurance,
+                    IsIncome = false,
+                    IsDeduction = true,
+                    IsTaxable = false,
+                    IsInsuranceBased = false,
+                    ProrationType = ProrationType.None,
+                    CalculationMethod = CalculationMethod.Formula,
+                    EffectiveFrom = pitEffectiveFrom,
+                    Version = 1,
+                    IsActive = true,
+                    CreatedAt = pitEffectiveFrom
+                },
+                new SalaryComponentType
+                {
+                    Id = 9,
+                    Code = "PIT",
+                    Name = "Thuế thu nhập cá nhân",
+                    ComponentGroup = SalaryComponentGroup.Tax,
+                    IsIncome = false,
+                    IsDeduction = true,
+                    IsTaxable = false,
+                    IsInsuranceBased = false,
+                    ProrationType = ProrationType.None,
+                    CalculationMethod = CalculationMethod.Formula,
+                    EffectiveFrom = pitEffectiveFrom,
+                    Version = 1,
+                    IsActive = true,
+                    CreatedAt = pitEffectiveFrom
+                },
+                new SalaryComponentType
+                {
+                    Id = 10,
+                    Code = "PAYROLL_ADJUSTMENT_TAXABLE_INSURANCE",
+                    Name = "Truy lĩnh chịu thuế và tính bảo hiểm",
+                    ComponentGroup = SalaryComponentGroup.Adjustment,
+                    IsIncome = true,
+                    IsTaxable = true,
+                    IsInsuranceBased = true,
+                    ProrationType = ProrationType.None,
+                    CalculationMethod = CalculationMethod.Formula,
+                    EffectiveFrom = pitEffectiveFrom,
+                    Version = 1,
+                    IsActive = true,
+                    CreatedAt = pitEffectiveFrom
+                },
+                new SalaryComponentType
+                {
+                    Id = 11,
+                    Code = "PAYROLL_ADJUSTMENT_TAXABLE",
+                    Name = "Truy lĩnh/truy thu chịu thuế",
+                    ComponentGroup = SalaryComponentGroup.Adjustment,
+                    IsIncome = true,
+                    IsTaxable = true,
+                    IsInsuranceBased = false,
+                    ProrationType = ProrationType.None,
+                    CalculationMethod = CalculationMethod.Formula,
+                    EffectiveFrom = pitEffectiveFrom,
+                    Version = 1,
+                    IsActive = true,
+                    CreatedAt = pitEffectiveFrom
+                },
+                new SalaryComponentType
+                {
+                    Id = 12,
+                    Code = "PAYROLL_ADJUSTMENT_NONTAXABLE",
+                    Name = "Truy lĩnh/truy thu không chịu thuế",
+                    ComponentGroup = SalaryComponentGroup.Adjustment,
+                    IsIncome = true,
+                    IsTaxable = false,
+                    IsInsuranceBased = false,
+                    ProrationType = ProrationType.None,
+                    CalculationMethod = CalculationMethod.Formula,
+                    EffectiveFrom = pitEffectiveFrom,
+                    Version = 1,
+                    IsActive = true,
+                    CreatedAt = pitEffectiveFrom
+                },
+                new SalaryComponentType
+                {
+                    Id = 13,
+                    Code = "PAYROLL_ADJUSTMENT_DEDUCTION",
+                    Name = "Khoản truy thu/điều chỉnh khấu trừ",
+                    ComponentGroup = SalaryComponentGroup.Adjustment,
+                    IsIncome = false,
+                    IsDeduction = true,
+                    IsTaxable = false,
+                    IsInsuranceBased = false,
+                    ProrationType = ProrationType.None,
+                    CalculationMethod = CalculationMethod.Formula,
+                    EffectiveFrom = pitEffectiveFrom,
+                    Version = 1,
+                    IsActive = true,
+                    CreatedAt = pitEffectiveFrom
+                },
+                new SalaryComponentType
+                {
+                    Id = 14,
+                    Code = "EXTERNAL_TIMESHEET_PAY",
+                    Name = "Thu nhập từ timesheet ngoài",
+                    ComponentGroup = SalaryComponentGroup.BaseSalary,
+                    IsIncome = true,
+                    IsTaxable = true,
+                    IsInsuranceBased = false,
+                    IsFixed = false,
+                    IsAllowance = false,
+                    IsBonus = false,
+                    IsOvertime = false,
+                    ProrationType = ProrationType.ByHours,
+                    CalculationMethod = CalculationMethod.Formula,
+                    EffectiveFrom = pitEffectiveFrom,
+                    Version = 1,
+                    IsActive = true,
+                    CreatedAt = pitEffectiveFrom,
+                    Note = "Used for collaborators/freelancers imported from approved external timesheets."
+                }
+            );
+
+            modelBuilder.Entity<TaxConfig>().HasData(new TaxConfig
+            {
+                Id = 1,
+                Code = "VN_PERSONAL_INCOME_TAX_2020",
+                Name = "Cấu hình thuế TNCN Việt Nam",
+                PersonalDeduction = 11000000m,
+                DependentDeduction = 4400000m,
+                FlatTaxThreshold = 2000000m,
+                FlatTaxRate = 0.10m,
+                NonResidentTaxRate = 0.20m,
+                EffectiveFrom = pitEffectiveFrom,
+                Version = 1,
+                IsActive = true,
+                CreatedAt = pitEffectiveFrom,
+                Note = "Baseline PIT config. Update by creating a newer effective version."
+            });
+
+            modelBuilder.Entity<PITTaxBracket>().HasData(
+                new PITTaxBracket { Id = 1, Code = "VN_PROGRESSIVE_PIT_2020", Level = 1, MinIncome = 0m, MaxIncome = 5000000m, TaxRate = 0.05m, QuickDeduction = 0m, EffectiveFrom = pitEffectiveFrom, Version = 1, IsActive = true, CreatedAt = pitEffectiveFrom },
+                new PITTaxBracket { Id = 2, Code = "VN_PROGRESSIVE_PIT_2020", Level = 2, MinIncome = 5000000m, MaxIncome = 10000000m, TaxRate = 0.10m, QuickDeduction = 250000m, EffectiveFrom = pitEffectiveFrom, Version = 1, IsActive = true, CreatedAt = pitEffectiveFrom },
+                new PITTaxBracket { Id = 3, Code = "VN_PROGRESSIVE_PIT_2020", Level = 3, MinIncome = 10000000m, MaxIncome = 18000000m, TaxRate = 0.15m, QuickDeduction = 750000m, EffectiveFrom = pitEffectiveFrom, Version = 1, IsActive = true, CreatedAt = pitEffectiveFrom },
+                new PITTaxBracket { Id = 4, Code = "VN_PROGRESSIVE_PIT_2020", Level = 4, MinIncome = 18000000m, MaxIncome = 32000000m, TaxRate = 0.20m, QuickDeduction = 1650000m, EffectiveFrom = pitEffectiveFrom, Version = 1, IsActive = true, CreatedAt = pitEffectiveFrom },
+                new PITTaxBracket { Id = 5, Code = "VN_PROGRESSIVE_PIT_2020", Level = 5, MinIncome = 32000000m, MaxIncome = 52000000m, TaxRate = 0.25m, QuickDeduction = 3250000m, EffectiveFrom = pitEffectiveFrom, Version = 1, IsActive = true, CreatedAt = pitEffectiveFrom },
+                new PITTaxBracket { Id = 6, Code = "VN_PROGRESSIVE_PIT_2020", Level = 6, MinIncome = 52000000m, MaxIncome = 80000000m, TaxRate = 0.30m, QuickDeduction = 5850000m, EffectiveFrom = pitEffectiveFrom, Version = 1, IsActive = true, CreatedAt = pitEffectiveFrom },
+                new PITTaxBracket { Id = 7, Code = "VN_PROGRESSIVE_PIT_2020", Level = 7, MinIncome = 80000000m, MaxIncome = null, TaxRate = 0.35m, QuickDeduction = 9850000m, EffectiveFrom = pitEffectiveFrom, Version = 1, IsActive = true, CreatedAt = pitEffectiveFrom }
+            );
+
+            modelBuilder.Entity<InsuranceConfig>().HasData(new InsuranceConfig
+            {
+                Id = 1,
+                Code = "VN_STANDARD_INSURANCE_2025",
+                Name = "Cấu hình bảo hiểm Việt Nam",
+                SocialInsuranceEmployeeRate = 0.08m,
+                HealthInsuranceEmployeeRate = 0.015m,
+                UnemploymentInsuranceEmployeeRate = 0.01m,
+                SocialInsuranceEmployerRate = 0.175m,
+                HealthInsuranceEmployerRate = 0.03m,
+                UnemploymentInsuranceEmployerRate = 0.01m,
+                UnionFeeEmployerRate = 0.02m,
+                MinInsuranceSalary = null,
+                MaxInsuranceSalary = null,
+                UnpaidLeaveNoContributionThresholdDays = 14,
+                MinContractMonthsForContribution = 1,
+                EffectiveFrom = insuranceEffectiveFrom,
+                Version = 1,
+                IsActive = true,
+                CreatedAt = insuranceEffectiveFrom,
+                Note = "Baseline insurance config for payroll engine. Salary caps should be updated by policy version when needed."
+            });
+
+            modelBuilder.Entity<OvertimeRateConfig>().HasData(
+                new OvertimeRateConfig { Id = 1, Code = "VN_OT_WEEKDAY_2020", OvertimeType = OvertimeType.Weekday, BaseMultiplier = 1.5m, NightAllowanceRate = 0m, NightOvertimeExtraRate = 0m, EffectiveFrom = pitEffectiveFrom, Version = 1, IsActive = true, CreatedAt = pitEffectiveFrom, Note = "Baseline weekday OT multiplier." },
+                new OvertimeRateConfig { Id = 2, Code = "VN_OT_WEEKEND_2020", OvertimeType = OvertimeType.Weekend, BaseMultiplier = 2.0m, NightAllowanceRate = 0m, NightOvertimeExtraRate = 0m, EffectiveFrom = pitEffectiveFrom, Version = 1, IsActive = true, CreatedAt = pitEffectiveFrom, Note = "Baseline weekly rest day OT multiplier." },
+                new OvertimeRateConfig { Id = 3, Code = "VN_OT_HOLIDAY_2020", OvertimeType = OvertimeType.Holiday, BaseMultiplier = 3.0m, NightAllowanceRate = 0m, NightOvertimeExtraRate = 0m, EffectiveFrom = pitEffectiveFrom, Version = 1, IsActive = true, CreatedAt = pitEffectiveFrom, Note = "Baseline public holiday OT multiplier." },
+                new OvertimeRateConfig { Id = 4, Code = "VN_OT_WEEKDAY_NIGHT_2020", OvertimeType = OvertimeType.WeekdayNight, BaseMultiplier = 1.5m, NightAllowanceRate = 0.3m, NightOvertimeExtraRate = 0.2m, EffectiveFrom = pitEffectiveFrom, Version = 1, IsActive = true, CreatedAt = pitEffectiveFrom, Note = "Baseline weekday night OT config." },
+                new OvertimeRateConfig { Id = 5, Code = "VN_OT_WEEKEND_NIGHT_2020", OvertimeType = OvertimeType.WeekendNight, BaseMultiplier = 2.0m, NightAllowanceRate = 0.3m, NightOvertimeExtraRate = 0.2m, EffectiveFrom = pitEffectiveFrom, Version = 1, IsActive = true, CreatedAt = pitEffectiveFrom, Note = "Baseline weekend night OT config." },
+                new OvertimeRateConfig { Id = 6, Code = "VN_OT_HOLIDAY_NIGHT_2020", OvertimeType = OvertimeType.HolidayNight, BaseMultiplier = 3.0m, NightAllowanceRate = 0.3m, NightOvertimeExtraRate = 0.2m, EffectiveFrom = pitEffectiveFrom, Version = 1, IsActive = true, CreatedAt = pitEffectiveFrom, Note = "Baseline holiday night OT config." }
+            );
         }
         
 

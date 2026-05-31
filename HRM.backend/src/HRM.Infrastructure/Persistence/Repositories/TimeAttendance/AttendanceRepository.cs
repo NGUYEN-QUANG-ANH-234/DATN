@@ -20,7 +20,22 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.TimeAttend
             var end = start.AddDays(1);
 
             return await _dbSet
-                .Where(l => l.EmployeeId == employeeId && l.CheckIn >= start && l.CheckIn < end)
+                .Where(l => l.EmployeeId == employeeId && l.WorkDate >= start && l.WorkDate < end)
+                .OrderByDescending(l => l.CheckIn)
+                .FirstOrDefaultAsync(ct);
+        }
+
+        public async Task<AttendanceLog?> GetOpenLogAsync(int employeeId, DateTime now, int maxOpenHours, CancellationToken ct = default)
+        {
+            var minCheckIn = now.AddHours(-Math.Max(1, maxOpenHours));
+
+            return await _dbSet
+                .Include(l => l.WorkShift)
+                .Where(l => l.EmployeeId == employeeId &&
+                            l.CheckOut == null &&
+                            l.CheckIn != null &&
+                            l.CheckIn >= minCheckIn &&
+                            l.CheckIn <= now)
                 .OrderByDescending(l => l.CheckIn)
                 .FirstOrDefaultAsync(ct);
         }
@@ -29,7 +44,7 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.TimeAttend
         {
             // Lọc log quẹt thẻ theo ngày CheckIn
             return await _dbSet
-                .Where(l => l.CheckIn >= startDate && l.CheckIn <= endDate)
+                .Where(l => l.WorkDate >= startDate.Date && l.WorkDate <= endDate.Date)
                 .ToListAsync();
         }
 
@@ -40,8 +55,8 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.TimeAttend
                 .ThenInclude(e => e!.Department)
                 .Include(l => l.WorkShift)
                 .Where(l => l.EmployeeId.HasValue &&
-                            l.CheckIn >= startDate &&
-                            l.CheckIn < endDate)
+                            l.WorkDate >= startDate.Date &&
+                            l.WorkDate < endDate.Date)
                 .ToListAsync(ct);
         }
 
@@ -59,19 +74,17 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.TimeAttend
 
             var existingLogs = await _dbSet
                 .Where(l => l.EmployeeId == empId &&
-                            l.CheckIn.HasValue &&
-                            l.CheckIn >= start &&
-                            l.CheckIn < end)
+                            l.WorkDate >= start &&
+                            l.WorkDate < end)
                 .ToListAsync();
 
-            foreach (var log in existingLogs.Where(l => normalizedDates.Contains(l.CheckIn!.Value.Date)))
+            foreach (var log in existingLogs.Where(l => normalizedDates.Contains(l.WorkDate.Date)))
             {
                 log.Status = status;
             }
 
             var existingDates = existingLogs
-                .Where(l => l.CheckIn.HasValue)
-                .Select(l => l.CheckIn!.Value.Date)
+                .Select(l => l.WorkDate.Date)
                 .ToHashSet();
 
             var logs = normalizedDates
@@ -79,6 +92,7 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.TimeAttend
                 .Select(date => new AttendanceLog
             {
                 EmployeeId = empId,
+                WorkDate = date,
                 CheckIn = date, // Dùng CheckIn làm mốc ngày nghỉ
                 Status = status
             });

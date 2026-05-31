@@ -112,7 +112,7 @@ namespace HRM.backend.src.HRM.API.Controllers.TimeAttendance
         }
 
         [HttpGet("pending-director")]
-        [RequirePermission("OVERTIME_DIRECTOR_REVIEW", GroupName = SystemModules.TimekeepingLeave, Description = "Xem va duyet truc tiep yeu cau OT cua HR/Truong phong")]
+        [RequirePermission("OVERTIME_DIRECTOR_REVIEW", GroupName = SystemModules.TimekeepingLeave, Description = "Xem và duyệt trực tiếp yêu cầu OT của HR/Trưởng phòng")]
         public async Task<IActionResult> GetPendingDirector(CancellationToken ct)
         {
             try
@@ -180,13 +180,13 @@ namespace HRM.backend.src.HRM.API.Controllers.TimeAttendance
         }
 
         [HttpPatch("{id}/director-review")]
-        [RequirePermission("OVERTIME_DIRECTOR_REVIEW", GroupName = SystemModules.TimekeepingLeave, Description = "Giam doc duyet truc tiep yeu cau OT cua HR/Truong phong")]
+        [RequirePermission("OVERTIME_DIRECTOR_REVIEW", GroupName = SystemModules.TimekeepingLeave, Description = "Giám đốc duyệt trực tiếp yêu cầu OT của HR/Trưởng phòng")]
         public async Task<IActionResult> ReviewByDirector(int id, [FromBody] ReviewOvertimeRequestDto dto, CancellationToken ct)
         {
             try
             {
                 await _useCase.ReviewByDirectorAsync(id, dto, GetAccountId(), GetRole(), ct);
-                return Ok(new { Success = true, Message = "Da xu ly yeu cau OT o cap Giam doc." });
+                return Ok(new { Success = true, Message = "Đã xử lý yêu cầu OT ở cấp Giám đốc." });
             }
             catch (UnauthorizedAccessException ex)
             {
@@ -219,7 +219,7 @@ namespace HRM.backend.src.HRM.API.Controllers.TimeAttendance
 
         private int GetAccountId()
         {
-            return int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+            return User.GetAccountIdOrThrow();
         }
 
         private string GetRole()

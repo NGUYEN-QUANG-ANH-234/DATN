@@ -25,7 +25,7 @@ namespace HRM.backend.src.HRM.API.Controllers.EmployeeProfile
             return Created($"api/v1/addendums/{result.Id}", new
             {
                 Success = true,
-                Message = "Ban thao phu luc hop dong da san sang.",
+                Message = "Bản thảo phụ lục hợp đồng đã sẵn sàng.",
                 Data = result
             });
         }
@@ -79,7 +79,7 @@ namespace HRM.backend.src.HRM.API.Controllers.EmployeeProfile
             return Ok(new
             {
                 Success = true,
-                Message = "Ban nhap phu luc hop dong da duoc cap nhat.",
+                Message = "Bản nháp phụ lục hợp đồng đã được cập nhật.",
                 Data = result
             });
         }
@@ -88,7 +88,7 @@ namespace HRM.backend.src.HRM.API.Controllers.EmployeeProfile
         public async Task<IActionResult> Submit(int id, CancellationToken ct)
         {
             await _useCase.SubmitAsync(id, ct);
-            return Ok(new { Success = true, Message = "Phu luc da duoc gui Truong phong xac nhan." });
+            return Ok(new { Success = true, Message = "Phụ lục đã được gửi Trưởng phòng xác nhận." });
         }
 
         [HttpPatch("addendums/{id}/dept-review")]
@@ -99,8 +99,8 @@ namespace HRM.backend.src.HRM.API.Controllers.EmployeeProfile
             {
                 Success = true,
                 Message = dto.IsApproved
-                    ? "Truong phong da xac nhan phu luc, chuyen HR kiem tra chinh sach."
-                    : "Truong phong da tu choi phu luc."
+                    ? "Trưởng phòng đã xác nhận phụ lục, chuyển HR kiểm tra chính sách."
+                    : "Trưởng phòng đã từ chối phụ lục."
             });
         }
 
@@ -112,8 +112,8 @@ namespace HRM.backend.src.HRM.API.Controllers.EmployeeProfile
             {
                 Success = true,
                 Message = dto.IsApproved
-                    ? "HR da xac nhan chinh sach, chuyen nguoi lao dong xac nhan dieu khoan."
-                    : "HR da tu choi phu luc."
+                    ? "HR đã xác nhận chính sách, chuyển người lao động xác nhận điều khoản."
+                    : "HR đã từ chối phụ lục."
             });
         }
 
@@ -125,8 +125,8 @@ namespace HRM.backend.src.HRM.API.Controllers.EmployeeProfile
             {
                 Success = true,
                 Message = dto.IsApproved
-                    ? "Da xac nhan dieu khoan phu luc, cho Giam doc phe duyet."
-                    : "Da tu choi dieu khoan phu luc."
+                    ? "Đã xác nhận điều khoản phụ lục, chờ Giám đốc phê duyệt."
+                    : "Đã từ chối điều khoản phụ lục."
             });
         }
 
@@ -134,19 +134,19 @@ namespace HRM.backend.src.HRM.API.Controllers.EmployeeProfile
         public async Task<IActionResult> Approve(int id, CancellationToken ct)
         {
             await _useCase.ApproveAsync(id, GetAccountId(), GetRole(), ct);
-            return Ok(new { Success = true, Message = "Phu luc hop dong da co hieu luc." });
+            return Ok(new { Success = true, Message = "Phụ lục hợp đồng đã có hiệu lực." });
         }
 
         [HttpPatch("addendums/{id}/reject")]
         public async Task<IActionResult> Reject(int id, [FromBody] ReviewContractAddendumDto dto, CancellationToken ct)
         {
             await _useCase.RejectAsync(id, GetAccountId(), GetRole(), dto.RejectReason, ct);
-            return Ok(new { Success = true, Message = "Phu luc hop dong da bi tu choi." });
+            return Ok(new { Success = true, Message = "Phụ lục hợp đồng đã bị từ chối." });
         }
 
         private int GetAccountId()
         {
-            return int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+            return User.GetAccountIdOrThrow();
         }
 
         private string GetRole()

@@ -49,9 +49,13 @@ namespace HRM.backend.src.HRM.Core.Entities.EmployeeProfile
         [ForeignKey("DeptId")] public virtual Department? Department { get; set; }
         public int? PositionId { get; set; }
         [ForeignKey("PositionId")] public virtual Position? Position { get; set; }
+        public int? JobLevelId { get; set; }
+        [ForeignKey("JobLevelId")] public virtual JobLevel? JobLevel { get; set; }
 
         public EmployeeType Type { get; set; } = EmployeeType.Probation;
         public EmployeeStatus Status { get; set; } = EmployeeStatus.Probation;
+        public ResidenceStatus ResidenceStatus { get; set; } = ResidenceStatus.Resident;
+        public TaxCodeStatus TaxCodeStatus { get; set; } = TaxCodeStatus.Unknown;
         public DateTime? JoinedDate { get; set; }
 
         // --- Hồ sơ giấy tờ ---

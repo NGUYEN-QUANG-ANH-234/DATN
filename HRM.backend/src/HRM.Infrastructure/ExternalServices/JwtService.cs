@@ -54,7 +54,7 @@ namespace HRM.backend.src.HRM.Infrastructure.ExternalServices
                 issuer: _config["JwtSettings:Issuer"],
                 audience: _config["JwtSettings:Audience"],
                 claims: claims,
-                expires: DateTime.Now.AddMinutes(expiryMinutes),
+                expires: DateTime.UtcNow.AddMinutes(expiryMinutes),
                 signingCredentials: new SigningCredentials(key, SecurityAlgorithms.HmacSha256)
             );
 
@@ -104,7 +104,7 @@ namespace HRM.backend.src.HRM.Infrastructure.ExternalServices
                 issuer: _config["JwtSettings:Issuer"],
                 audience: _config["JwtSettings:Audience"],
                 claims: claims,
-                expires: DateTime.Now.AddMinutes(5),
+                expires: DateTime.UtcNow.AddMinutes(5),
                 signingCredentials: new SigningCredentials(key, SecurityAlgorithms.HmacSha256)
             );
 

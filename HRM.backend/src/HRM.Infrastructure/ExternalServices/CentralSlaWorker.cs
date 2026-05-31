@@ -9,21 +9,24 @@ namespace HRM.backend.src.HRM.Infrastructure.ExternalServices
     public class CentralSlaWorker : BackgroundService
     {
         private readonly IServiceProvider _serviceProvider;
+        private readonly ILogger<CentralSlaWorker> _logger;
 
-        public CentralSlaWorker(IServiceProvider serviceProvider)
+        public CentralSlaWorker(IServiceProvider serviceProvider, ILogger<CentralSlaWorker> logger)
         {
             _serviceProvider = serviceProvider;
+            _logger = logger;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             while (!stoppingToken.IsCancellationRequested)
             {
-                using (var scope = _serviceProvider.CreateScope())
+                try
                 {
+                    using var scope = _serviceProvider.CreateScope();
                     var slaRepo = scope.ServiceProvider.GetRequiredService<IBaseRepository<SlaTrackingTask>>();
                     var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
-                    var mediator = scope.ServiceProvider.GetRequiredService<IMediator>(); // Gọi MediatR
+                    var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
 
                     var violatedTasks = await slaRepo.FindAsync(t =>
                         t.Status == SlaTaskStatus.Pending &&
@@ -36,17 +39,26 @@ namespace HRM.backend.src.HRM.Infrastructure.ExternalServices
                             task.Status = SlaTaskStatus.Violated;
                             await slaRepo.UpdateAsync(task, stoppingToken);
 
-                            // Bắn sự kiện ra toàn hệ thống
                             await mediator.Publish(new SlaViolatedEvent
                             {
                                 ModuleType = task.ModuleType,
                                 ReferenceId = task.ReferenceId
                             }, stoppingToken);
                         }
+
                         await unitOfWork.CommitAsync(stoppingToken);
                     }
                 }
-                await Task.Delay(TimeSpan.FromHours(24), stoppingToken); // Chạy 1 ngày/lần theo sơ đồ
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Central SLA worker cycle failed.");
+                }
+
+                await Task.Delay(TimeSpan.FromHours(24), stoppingToken);
             }
         }
     }

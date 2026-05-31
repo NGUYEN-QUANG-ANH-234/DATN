@@ -27,8 +27,13 @@ namespace HRM.backend.src.HRM.API.Controllers.System
         {
             try
             {
-                var newId = await _useCase.CreateAccountAsync(dto, ct);
-                return CreatedAtAction(nameof(CreateAccount), new { id = newId }, new { success = true, message = "Khởi tạo tài khoản thành công." });
+                var result = await _useCase.CreateAccountAsync(dto, ct);
+                return CreatedAtAction(nameof(CreateAccount), new { id = result.AccountId }, new
+                {
+                    success = true,
+                    message = "Khởi tạo tài khoản thành công.",
+                    data = result
+                });
             }
             catch (Exception ex)
             {
@@ -55,8 +60,13 @@ namespace HRM.backend.src.HRM.API.Controllers.System
         {
             try
             {
-                await _useCase.ResetPasswordManuallyAsync(id, ct);
-                return Ok(new { success = true, message = "Mật khẩu mới đã được khởi tạo và gửi tới Email." });
+                var result = await _useCase.ResetPasswordManuallyAsync(id, ct);
+                return Ok(new
+                {
+                    success = true,
+                    message = "Mật khẩu mới đã được khởi tạo và gửi tới Email.",
+                    data = result
+                });
             }
             catch (Exception ex)
             {
@@ -77,7 +87,7 @@ namespace HRM.backend.src.HRM.API.Controllers.System
             try
             {
                 // Lấy ID của người đang thực hiện thao tác từ Token
-                int actorId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+                int actorId = User.GetAccountIdOrThrow();
 
                 await _useCase.UpdateAccountRoleAsync(id, newRoleId, actorId, ct);
                 return Ok(new { success = true, message = "Cập nhật quyền hạn thành công." });

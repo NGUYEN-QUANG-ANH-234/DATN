@@ -6,7 +6,6 @@ using HRM.backend.src.HRM.Core.Enums;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.EmployeeProfile;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.System;
-using HRM.backend.src.HRM.Core.Interfaces.Repositories.System.HRM.backend.src.HRM.Infrastructure.Repositories.Interfaces.System;
 using MediatR;
 
 namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
@@ -59,9 +58,9 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
 
             var emp = await _employeeRepo.GetByAccountIdAsync(accountId, ct);
             if (emp == null)
-                throw new ArgumentException("Khong tim thay ho so nhan vien.");
+                throw new ArgumentException("Không tìm thấy hồ sơ nhân viên.");
             if (!emp.DeptId.HasValue)
-                throw new ArgumentException("Nhan vien chua duoc phan phong ban, khong the yeu cau hop dong.");
+                throw new ArgumentException("Nhân viên chưa được phân phòng ban, không thể yêu cầu hợp đồng.");
 
             return await _lockService.GetWithLockAsync($"contract_request_create_{emp.Id}", async (innerCt) =>
             {
@@ -85,7 +84,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                              managerAccountIds.Contains(e.AccountId.Value), innerCt)).FirstOrDefault();
 
                     if (!skipsDepartmentStep && managerEmployee?.AccountId == null)
-                        throw new ArgumentException("Phong ban cua ban hien chua co Truong phong de duyet hop dong.");
+                        throw new ArgumentException("Phòng ban của bạn hiện chưa có Trưởng phòng để duyệt hợp đồng.");
 
                     var contract = new Core.Entities.EmployeeProfile.Contract
                     {
@@ -96,7 +95,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                     };
 
                     await _contractRepo.AddAsync(contract, innerCt);
-                    await _auditLogRepo.LogSystemEventAsync("CONTRACT_REQUESTED", accountId, "contract", "Gui yeu cau hop dong moi");
+                    await _auditLogRepo.LogSystemEventAsync("CONTRACT_REQUESTED", accountId, "contract", "Gửi yêu cầu hợp đồng mới");
                     await _unitOfWork.CommitAsync(innerCt);
 
                     contractId = contract.Id;
@@ -117,16 +116,16 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
             {
                 var contract = await _contractRepo.GetByIdAsync(contractId, innerCt);
                 if (contract == null || contract.Status != ContractStatus.PendingDept)
-                    throw new InvalidOperationException("Hop dong khong hop le hoac khong o trang thai cho Truong phong.");
+                    throw new InvalidOperationException("Hợp đồng không hợp lệ hoặc không ở trạng thái chờ Trưởng phòng.");
                 if (!contract.EmployeeId.HasValue)
-                    throw new InvalidOperationException("Hop dong chua gan nhan vien.");
+                    throw new InvalidOperationException("Hợp đồng chưa gắn nhân viên.");
 
                 await _approvalConflictGuard.EnsureNotSelfApprovalForEmployeeAsync(contract.EmployeeId.Value, approverAccountId, innerCt);
 
                 var note = dto.IsApproved
-                    ? "Truong phong xac nhan yeu cau hop dong."
+                    ? "Trưởng phòng xác nhận yêu cầu hợp đồng."
                     : string.IsNullOrWhiteSpace(dto.RejectReason)
-                        ? "Truong phong tu choi yeu cau hop dong."
+                        ? "Trưởng phòng từ chối yêu cầu hợp đồng."
                         : dto.RejectReason;
 
                 await _approvalService.ProcessStepAsync(
@@ -150,9 +149,9 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                     var contract = await _contractRepo.GetByIdAsync(contractId, innerCt);
                     if (contract == null ||
                         (contract.Status != ContractStatus.PendingHR && contract.Status != ContractStatus.Negotiating))
-                        throw new InvalidOperationException("Hop dong khong hop le hoac khong o trang thai HR co the soan thao.");
+                        throw new InvalidOperationException("Hợp đồng không hợp lệ hoặc không ở trạng thái HR có thể soạn thảo.");
                     if (!contract.EmployeeId.HasValue)
-                        throw new InvalidOperationException("Hop dong chua gan nhan vien.");
+                        throw new InvalidOperationException("Hợp đồng chưa gắn nhân viên.");
 
                     EnsureHrDirectorOrAdmin(actorRoleName);
                     if (!IsDirector(actorRoleName) && !IsAdmin(actorRoleName))
@@ -167,7 +166,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                         isNegotiationUpdate ? "CONTRACT_DRAFT_UPDATED" : "CONTRACT_DRAFT_CREATED",
                         actorAccountId,
                         "contract",
-                        $"HR {(isNegotiationUpdate ? "cap nhat" : "tao")} ban nhap hop dong ID {contractId}, phien ban v{contract.Version}");
+                        $"HR {(isNegotiationUpdate ? "cập nhật" : "tạo")} bản nháp hợp đồng ID {contractId}, phiên bản v{contract.Version}");
                     await _unitOfWork.CommitAsync(innerCt);
                 }, innerCt);
                 return true;
@@ -183,9 +182,9 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                     var contract = await _contractRepo.GetByIdAsync(contractId, innerCt);
                     if (contract == null ||
                         (contract.Status != ContractStatus.PendingHR && contract.Status != ContractStatus.Negotiating))
-                        throw new InvalidOperationException("Hop dong khong hop le hoac khong o trang thai cho HR.");
+                        throw new InvalidOperationException("Hợp đồng không hợp lệ hoặc không ở trạng thái chờ HR.");
                     if (!contract.EmployeeId.HasValue)
-                        throw new InvalidOperationException("Hop dong chua gan nhan vien.");
+                        throw new InvalidOperationException("Hợp đồng chưa gắn nhân viên.");
 
                     EnsureHrDirectorOrAdmin(actorRoleName);
                     if (!IsDirector(actorRoleName) && !IsAdmin(actorRoleName))
@@ -196,7 +195,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
 
                     await _contractRepo.UpdateAsync(contract, innerCt);
                     await _slaTrackingService.ResolveTaskAsync(SlaModuleType.ContractRenewal, contractId, innerCt);
-                    await _auditLogRepo.LogSystemEventAsync("CONTRACT_HR_REJECTED", actorAccountId, "contract", $"HR tu choi hop dong ID {contractId}: {reason}");
+                    await _auditLogRepo.LogSystemEventAsync("CONTRACT_HR_REJECTED", actorAccountId, "contract", $"HR từ chối hợp đồng ID {contractId}: {reason}");
                     await _unitOfWork.CommitAsync(innerCt);
                 }, innerCt);
                 return true;
@@ -206,7 +205,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
         public async Task NegotiateAsync(int contractId, int actorAccountId, NegotiateDto dto, CancellationToken ct)
         {
             if (string.IsNullOrWhiteSpace(dto.NegotiationNote))
-                throw new ArgumentException("Noi dung thuong luong khong duoc de trong.");
+                throw new ArgumentException("Nội dung thương lượng không được để trống.");
 
             await _lockService.GetWithLockAsync($"contract_{contractId}", async (innerCt) =>
             {
@@ -214,7 +213,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                 {
                     var contract = await _contractRepo.GetByIdAsync(contractId, innerCt);
                     if (contract == null || contract.Status != ContractStatus.Draft)
-                        throw new InvalidOperationException("Khong the thuong luong luc nay.");
+                        throw new InvalidOperationException("Không thể thương lượng lúc này.");
                     await EnsureEmployeeOwnsContractAsync(contract, actorAccountId, innerCt);
 
                     contract.Status = ContractStatus.Negotiating;
@@ -222,7 +221,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
 
                     await _contractRepo.UpdateAsync(contract, innerCt);
                     await _slaTrackingService.ResolveTaskAsync(SlaModuleType.ContractRenewal, contractId, innerCt);
-                    await _auditLogRepo.LogSystemEventAsync("CONTRACT_NEGOTIATED", actorAccountId, "contract", $"Nhan vien yeu cau dieu chinh hop dong ID {contractId}");
+                    await _auditLogRepo.LogSystemEventAsync("CONTRACT_NEGOTIATED", actorAccountId, "contract", $"Nhân viên yêu cầu điều chỉnh hợp đồng ID {contractId}");
                     await _unitOfWork.CommitAsync(innerCt);
                 }, innerCt);
                 return true;
@@ -239,20 +238,20 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                 {
                     var contract = await _contractRepo.GetByIdAsync(contractId, innerCt);
                     if (contract == null || contract.Status != ContractStatus.Draft)
-                        throw new InvalidOperationException("Hop dong khong hop le.");
+                        throw new InvalidOperationException("Hợp đồng không hợp lệ.");
                     await EnsureEmployeeOwnsContractAsync(contract, actorAccountId, innerCt);
 
                     var directorIds = await _accountRepo.GetAccountIdsByRoleAsync("Director", innerCt);
                     directorId = directorIds.FirstOrDefault();
                     if (directorId == 0)
-                        throw new InvalidOperationException("He thong chua co Giam doc de duyet hop dong.");
+                        throw new InvalidOperationException("Hệ thống chưa có Giám đốc để duyệt hợp đồng.");
 
                     contract.Status = ContractStatus.PendingDirector;
 
                     await _contractRepo.UpdateAsync(contract, innerCt);
                     await _slaTrackingService.ResolveTaskAsync(SlaModuleType.ContractRenewal, contractId, innerCt);
                     await _slaTrackingService.CreateTaskAsync(SlaModuleType.DirectorContractApproval, contract.Id, innerCt);
-                    await _auditLogRepo.LogSystemEventAsync("CONTRACT_ACCEPTED", actorAccountId, "contract", $"Nhan vien dong y ban nhap hop dong ID {contractId}");
+                    await _auditLogRepo.LogSystemEventAsync("CONTRACT_ACCEPTED", actorAccountId, "contract", $"Nhân viên đồng ý bản nháp hợp đồng ID {contractId}");
                     await _unitOfWork.CommitAsync(innerCt);
                 }, innerCt);
                 return true;
@@ -267,16 +266,16 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
             {
                 var contract = await _contractRepo.GetByIdAsync(contractId, innerCt);
                 if (contract == null || contract.Status != ContractStatus.PendingDirector)
-                    throw new InvalidOperationException("Hop dong khong hop le hoac khong o trang thai cho Giam doc.");
+                    throw new InvalidOperationException("Hợp đồng không hợp lệ hoặc không ở trạng thái chờ Giám đốc.");
                 if (!contract.EmployeeId.HasValue)
-                    throw new InvalidOperationException("Hop dong chua gan nhan vien.");
+                    throw new InvalidOperationException("Hợp đồng chưa gắn nhân viên.");
 
                 await _approvalConflictGuard.EnsureNotSelfApprovalForEmployeeAsync(contract.EmployeeId.Value, approverAccountId, innerCt);
 
                 var note = dto.IsApproved
-                    ? "Giam doc phe duyet hop dong."
+                    ? "Giám đốc phê duyệt hợp đồng."
                     : string.IsNullOrWhiteSpace(dto.RejectReason)
-                        ? "Giam doc tu choi phe duyet hop dong."
+                        ? "Giám đốc từ chối phê duyệt hợp đồng."
                         : dto.RejectReason;
 
                 await _approvalService.ProcessStepAsync(
@@ -347,7 +346,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                 return ContractType.Definite;
             if (Enum.TryParse<ContractType>(contractType, true, out var parsed))
                 return parsed;
-            throw new ArgumentException("Loai hop dong khong hop le.");
+            throw new ArgumentException("Loại hợp đồng không hợp lệ.");
         }
 
         private static string ToContractTypeDto(ContractType contractType) =>
@@ -356,19 +355,19 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
         private async Task EnsureEmployeeOwnsContractAsync(Core.Entities.EmployeeProfile.Contract contract, int actorAccountId, CancellationToken ct)
         {
             if (!contract.EmployeeId.HasValue)
-                throw new InvalidOperationException("Hop dong chua gan nhan vien.");
+                throw new InvalidOperationException("Hợp đồng chưa gắn nhân viên.");
 
             var employee = await _employeeRepo.GetProfileByIdAsync(contract.EmployeeId.Value, ct)
-                ?? throw new InvalidOperationException("Khong tim thay nhan vien cua hop dong.");
+                ?? throw new InvalidOperationException("Không tìm thấy nhân viên của hợp đồng.");
 
             if (!employee.AccountId.HasValue || employee.AccountId.Value != actorAccountId)
-                throw new UnauthorizedAccessException("Chi nguoi lao dong cua hop dong moi duoc xac nhan dieu khoan.");
+                throw new UnauthorizedAccessException("Chỉ người lao động của hợp đồng mới được xác nhận điều khoản.");
         }
 
         private static void EnsureHrDirectorOrAdmin(string actorRoleName)
         {
             if (!IsHr(actorRoleName) && !IsDirector(actorRoleName) && !IsAdmin(actorRoleName))
-                throw new UnauthorizedAccessException("Chi HR, Giam doc hoac Admin duoc xu ly ban nhap hop dong.");
+                throw new UnauthorizedAccessException("Chỉ HR, Giám đốc hoặc Admin được xử lý bản nháp hợp đồng.");
         }
 
         private static bool IsHr(string? role) => string.Equals(role, "HR", StringComparison.OrdinalIgnoreCase);

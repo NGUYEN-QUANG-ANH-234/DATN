@@ -47,6 +47,16 @@ namespace HRM.backend.src.HRM.Application.DTOs.Organization
         public string LeaveTypeName { get; set; } = string.Empty;
         public short Year { get; set; }
         public decimal TotalDays { get; set; }
+
+        // Thông tin kỳ công
+        public byte? Month { get; set; }
+        public decimal? StandardWorkDays { get; set; }
+        public decimal? StandardHoursPerDay { get; set; }
+        public bool IncludePaidLeaveInWorkDays { get; set; }
+        public string? WorkingDaysOfWeek { get; set; }
+        public string? HolidayDatesJson { get; set; }
+        public bool IsWorkCalendarLocked { get; set; }
+        public string? CalendarNote { get; set; }
     }
 
     public class DeptLeaveConfigDto

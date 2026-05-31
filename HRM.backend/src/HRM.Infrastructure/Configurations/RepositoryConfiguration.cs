@@ -6,15 +6,16 @@ using HRM.backend.src.HRM.Application.Services.System;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.EmployeeProfile;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.Organization;
+using HRM.backend.src.HRM.Core.Interfaces.Repositories.PayrollAllowances;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.Recruitment;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.System;
-using HRM.backend.src.HRM.Core.Interfaces.Repositories.System.HRM.backend.src.HRM.Infrastructure.Repositories.Interfaces.System;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.TasksTraining;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.TimeAttendance;
 using HRM.backend.src.HRM.Infrastructure.ExternalServices;
 using HRM.backend.src.HRM.Infrastructure.Persistence.Repositories;
 using HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.EmployeeProfile;
 using HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.Organization;
+using HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.PayrollAllowances;
 using HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.Recruitment;
 using HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.System;
 using HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.TasksTraining;
@@ -46,8 +47,8 @@ namespace HRM.backend.src.HRM.Infrastructure.Configurations
             services.AddScoped<IConfigurationRepository, ConfigurationRepository>();
             services.AddScoped<IMfaRecoveryCodeRepository, MfaRecoveryCodeRepository>();
             services.AddScoped<ISourceCatalogRepository, SourceCatalogRepository>();
+            services.AddScoped<IPayrollPolicyRepository, PayrollPolicyRepository>();
             services.AddScoped<IRbacRepository, RbacRepository>();
-            services.AddScoped<IAuditLogRepository, AuditLogRepository>();
             services.AddScoped<IRoleRepository, RoleRepository>();
             services.AddScoped<ILeaveTypeRepository, LeaveTypeRepository>();
             services.AddScoped<ISlaTrackingRepository, SlaTrackingRepository>();
@@ -59,6 +60,7 @@ namespace HRM.backend.src.HRM.Infrastructure.Configurations
 
             // Attendence
             services.AddScoped<IWorkShiftRepository, WorkShiftRepository>();
+            services.AddScoped<IWorkCalendarConfigRepository, WorkCalendarConfigRepository>();
             services.AddScoped<IAttendanceRepository, AttendanceRepository>();
             services.AddScoped<IAttendanceSummaryRepository, AttendanceSummaryRepository>();
             services.AddScoped<IOvertimeRequestRepository, OvertimeRequestRepository>();
@@ -67,13 +69,14 @@ namespace HRM.backend.src.HRM.Infrastructure.Configurations
 
             // Profile
             services.AddScoped<IEmployeeRepository, EmployeeRepository>();
+            services.AddScoped<IDependentRepository, DependentRepository>();
+            services.AddScoped<IDependentUpdateRequestRepository, DependentUpdateRequestRepository>();
             services.AddScoped<IContractRepository, ContractRepository>();
             services.AddScoped<IContractAddendumRepository, ContractAddendumRepository>();
             services.AddScoped<IHistoryTrackingRepository, HistoryTrackingRepository>();
 
             // Recruitment
             services.AddScoped<IRecruitmentRequestRepository, RecruitmentRequestRepository>();
-            services.AddScoped<IPositionRepository, PositionRepository>();
             services.AddScoped<ICandidateRepository, CandidateRepository>();
 
             // Tasks & Training
@@ -86,6 +89,9 @@ namespace HRM.backend.src.HRM.Infrastructure.Configurations
             services.AddScoped<ITaskProgressRepository, TaskProgressRepository>();
             services.AddScoped<ITaskFeedbackRepository, TaskFeedbackRepository>();
             services.AddScoped<ITrainingRepository, TrainingRepository>();
+
+            // Payroll
+            services.AddScoped<IPayrollRepository, PayrollRepository>();
 
 
             return services;
