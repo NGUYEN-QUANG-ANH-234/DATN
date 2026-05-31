@@ -2,7 +2,10 @@ import React from "react";
 import { useMyProfileData } from "../hooks/useMyProfileData";
 
 export const MyContracts: React.FC = () => {
-  const { contracts, loadingContracts } = useMyProfileData();
+  const { contracts, loadingContracts } = useMyProfileData({
+    includeProfile: false,
+    includeDependents: false,
+  });
 
   if (loadingContracts)
     return (

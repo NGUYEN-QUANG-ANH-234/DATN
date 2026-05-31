@@ -1,19 +1,75 @@
-import React, { useState, useEffect } from "react";
+import type { FormEvent } from "react";
+import { useState } from "react";
+import { CalendarDays, History, Save } from "lucide-react";
+import { PageHeader } from "../../../components/layout";
+import { Badge, Button, Card, DataTable } from "../../../components/ui";
+import type { DataTableColumn } from "../../../components/ui";
 import { useScheduleConfig } from "../hooks/useScheduleConfig";
+import type {
+  ConfiguredScheduleItem,
+  ScheduleChangeHistoryItem,
+} from "../types/scheduleConfig";
 import type { DepartmentTree } from "../../organization/types/department";
 
-export const ScheduleConfiguration: React.FC = () => {
+const currentDate = new Date();
+
+const parseHolidayDates = (value?: string | null): string[] => {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((item): item is string => typeof item === "string")
+      .filter(Boolean)
+      .sort();
+  } catch {
+    return [];
+  }
+};
+
+const stringifyHolidayDates = (dates: string[]) =>
+  JSON.stringify([...new Set(dates.filter(Boolean))].sort());
+
+const flattenDepartments = (
+  nodes: DepartmentTree[],
+  level = 0,
+): { id: number; name: string }[] =>
+  nodes.reduce(
+    (acc, curr) => [
+      ...acc,
+      { id: curr.id, name: `${"-- ".repeat(level)}${curr.deptName}` },
+      ...flattenDepartments(curr.children, level + 1),
+    ],
+    [] as { id: number; name: string }[],
+  );
+
+const formatTime = (value?: string | null) => (value ? value.substring(0, 5) : "--:--");
+
+const extractHistoryMessage = (value?: string | null) => {
+  if (!value) return "";
+  try {
+    const parsed = JSON.parse(value) as { Message?: string; message?: string };
+    return parsed.Message || parsed.message || value;
+  } catch {
+    return value;
+  }
+};
+
+const toDateLabel = (date: string) => new Date(date).toLocaleDateString("vi-VN");
+
+export const ScheduleConfiguration = () => {
   const {
     departments,
     leaveTypes,
     configuredSchedules,
+    history,
     loading,
     submitting,
     handleSaveConfig,
   } = useScheduleConfig();
 
   const [formData, setFormData] = useState({
-    shiftName: "Ca Hành Chính",
+    shiftName: "Ca Hành chính",
     startTime: "08:00",
     endTime: "17:00",
     hasBreak: true,
@@ -23,374 +79,539 @@ export const ScheduleConfiguration: React.FC = () => {
     earlyLeaveThresholdMins: 0,
     deptId: "",
     leaveTypeId: "",
-    year: new Date().getFullYear(),
+    year: currentDate.getFullYear(),
+    month: currentDate.getMonth() + 1,
+    standardWorkDays: 22,
+    standardHoursPerDay: 8,
+    includePaidLeaveInWorkDays: true,
+    workingDaysOfWeek: "1,2,3,4,5",
+    holidayDatesJson: "[]",
+    lockWorkCalendar: false,
+    calendarNote: "",
     totalDays: 12,
   });
-
-  const flattenDepartments = (
-    nodes: DepartmentTree[],
-    level = 0,
-  ): { id: number; name: string }[] => {
-    return nodes.reduce(
-      (acc, curr) => {
-        const indent = "— ".repeat(level);
-        return [
-          ...acc,
-          { id: curr.id, name: `${indent}${curr.deptName}` },
-          ...flattenDepartments(curr.children, level + 1),
-        ];
-      },
-      [] as { id: number; name: string }[],
-    );
-  };
+  const [holidayDateInput, setHolidayDateInput] = useState("");
 
   const flatDepts = flattenDepartments(departments);
+  const selectedDeptId = formData.deptId || flatDepts[0]?.id.toString() || "";
+  const selectedLeaveTypeId = formData.leaveTypeId || leaveTypes[0]?.id.toString() || "";
+  const holidayDates = parseHolidayDates(formData.holidayDatesJson);
 
-  useEffect(() => {
-    if (flatDepts.length > 0 && !formData.deptId) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setFormData((p) => ({ ...p, deptId: flatDepts[0].id.toString() }));
-    }
-    if (leaveTypes.length > 0 && !formData.leaveTypeId) {
-      setFormData((p) => ({ ...p, leaveTypeId: leaveTypes[0].id.toString() }));
-    }
-  }, [flatDepts, formData.deptId, formData.leaveTypeId, leaveTypes]);
+  const updateHolidayDates = (dates: string[]) => {
+    setFormData((prev) => ({
+      ...prev,
+      holidayDatesJson: stringifyHolidayDates(dates),
+    }));
+  };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const addHolidayDate = () => {
+    if (!holidayDateInput) return;
+    updateHolidayDates([...holidayDates, holidayDateInput]);
+    setHolidayDateInput("");
+  };
 
-    const payload = {
+  const removeHolidayDate = (date: string) => {
+    updateHolidayDates(holidayDates.filter((item) => item !== date));
+  };
+
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+
+    await handleSaveConfig({
       ...formData,
-      deptId: Number(formData.deptId),
-      leaveTypeId: Number(formData.leaveTypeId),
+      deptId: Number(selectedDeptId),
+      leaveTypeId: Number(selectedLeaveTypeId),
       year: Number(formData.year),
+      month: Number(formData.month),
+      standardWorkDays: Number(formData.standardWorkDays),
+      standardHoursPerDay: Number(formData.standardHoursPerDay),
+      includePaidLeaveInWorkDays: formData.includePaidLeaveInWorkDays,
       totalDays: Number(formData.totalDays),
       startTime: `${formData.startTime}:00`,
       endTime: `${formData.endTime}:00`,
-      breakStartTime: formData.hasBreak
-        ? `${formData.breakStartTime}:00`
-        : null,
+      breakStartTime: formData.hasBreak ? `${formData.breakStartTime}:00` : null,
       breakEndTime: formData.hasBreak ? `${formData.breakEndTime}:00` : null,
-    };
-
-    await handleSaveConfig(payload);
+      holidayDatesJson: stringifyHolidayDates(holidayDates),
+      calendarNote: formData.calendarNote || null,
+    });
   };
 
-  if (loading)
+  const scheduleColumns: Array<DataTableColumn<ConfiguredScheduleItem>> = [
+    {
+      key: "dept",
+      header: "Phòng ban",
+      render: (row) => (
+        <div>
+          <p className="font-semibold text-[var(--hicas-text-main)]">{row.deptName}</p>
+          <p className="mt-1 text-xs text-[var(--hicas-text-secondary)]">
+            Kỳ {row.month ? `${row.month}/${row.year}` : row.year}
+          </p>
+        </div>
+      ),
+    },
+    {
+      key: "shift",
+      header: "Ca làm việc",
+      render: (row) => (
+        <div>
+          <p className="font-semibold">{row.shiftName}</p>
+          <p className="mt-1 text-xs text-[var(--hicas-text-secondary)]">
+            {formatTime(row.startTime)} - {formatTime(row.endTime)}
+          </p>
+          <p className="text-xs text-[var(--hicas-text-secondary)]">
+            Nghỉ:{" "}
+            {row.breakStartTime && row.breakEndTime
+              ? `${formatTime(row.breakStartTime)} - ${formatTime(row.breakEndTime)}`
+              : "Không cấu hình"}
+          </p>
+        </div>
+      ),
+    },
+    {
+      key: "workdays",
+      header: "Quỹ công",
+      render: (row) => (
+        <div>
+          <p className="font-bold text-[var(--hicas-orange-dark)]">
+            {row.standardWorkDays ?? "--"} ngày
+          </p>
+          <p className="text-xs text-[var(--hicas-text-secondary)]">
+            {row.standardHoursPerDay ?? 8}h/ngày
+          </p>
+        </div>
+      ),
+    },
+    {
+      key: "threshold",
+      header: "Ngưỡng",
+      render: (row) => (
+        <div className="text-sm">
+          <p>Muộn: {row.lateThresholdMins} phút</p>
+          <p>Sớm: {row.earlyLeaveThresholdMins} phút</p>
+        </div>
+      ),
+    },
+    {
+      key: "leave",
+      header: "Quỹ phép",
+      render: (row) => (
+        <div>
+          <p className="font-semibold">{row.leaveTypeName}</p>
+          <p className="text-sm text-[var(--hicas-text-secondary)]">{row.totalDays} ngày/năm</p>
+        </div>
+      ),
+    },
+    {
+      key: "status",
+      header: "Trạng thái",
+      render: (row) => (
+        <Badge variant={row.isWorkCalendarLocked ? "warning" : "success"}>
+          {row.isWorkCalendarLocked ? "Đã khóa" : "Đang mở"}
+        </Badge>
+      ),
+    },
+  ];
+
+  const historyColumns: Array<DataTableColumn<ScheduleChangeHistoryItem>> = [
+    {
+      key: "message",
+      header: "Nội dung thay đổi",
+      render: (row) => (
+        <div>
+          <p className="font-semibold text-[var(--hicas-text-main)]">
+            {extractHistoryMessage(row.message)}
+          </p>
+          <p className="mt-1 text-xs text-[var(--hicas-text-secondary)]">
+            {row.actorName || "Hệ thống"} - {new Date(row.timestamp).toLocaleString("vi-VN")}
+          </p>
+        </div>
+      ),
+    },
+    {
+      key: "action",
+      header: "Loại",
+      render: (row) => <Badge variant="neutral">{row.actionType}</Badge>,
+    },
+  ];
+
+  if (loading) {
     return (
-      <div className="p-8 text-center text-gray-500 animate-pulse">
-        Đang tải biểu mẫu cấu hình...
-      </div>
+      <Card>
+        <div className="py-10 text-center text-sm text-[var(--hicas-text-secondary)]">
+          Đang tải cấu hình lịch làm việc...
+        </div>
+      </Card>
     );
+  }
 
   return (
-    <div className="flex min-h-full flex-col items-center gap-6 rounded-lg bg-gray-50 px-4 py-6 sm:px-6">
-      <div className="w-full max-w-6xl rounded-lg border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
-        <h2 className="text-2xl font-bold text-gray-800 mb-2">
-          Cấu hình Lịch trình & Quỹ phép bộ phận
-        </h2>
-        <p className="text-gray-500 text-sm mb-6">
-          Thiết lập khung giờ làm việc và áp số ngày nghỉ định biên hàng loạt
-          cho nhân sự thuộc bộ phận.
-        </p>
+    <div className="space-y-6">
+      <PageHeader
+        title="F0.6 Cấu hình lịch trình làm việc"
+        description="Thiết lập ca làm việc, kỳ công, ngày nghỉ lễ và quỹ phép theo phòng ban. Dữ liệu này là nền cho chấm công, bảng công và tính lương."
+        breadcrumb={[
+          { label: "Module 0" },
+          { label: "Cấu hình hệ thống" },
+          { label: "Lịch trình làm việc" },
+        ]}
+      />
 
+      <Card
+        title="Thiết lập ca, kỳ công và quỹ phép"
+        description="Các thay đổi sẽ được ghi nhận vào lịch sử để phục vụ audit và đối chiếu payroll."
+        actions={<CalendarDays size={20} className="text-[var(--hicas-orange)]" />}
+      >
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="bg-blue-50/50 p-4 rounded-lg border border-blue-100 grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 uppercase mb-1">
-                Phòng ban áp dụng (*)
-              </label>
+          <section className="grid gap-4 md:grid-cols-3">
+            <label className="block">
+              <span className="mb-2 block text-sm font-semibold">Phòng ban</span>
               <select
                 required
-                className="w-full border p-2 rounded bg-white text-sm"
-                value={formData.deptId}
-                onChange={(e) =>
-                  setFormData({ ...formData, deptId: e.target.value })
-                }
+                className="hicas-select w-full"
+                value={selectedDeptId}
+                onChange={(event) => setFormData({ ...formData, deptId: event.target.value })}
               >
-                {flatDepts.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name}
+                {flatDepts.map((dept) => (
+                  <option key={dept.id} value={dept.id}>
+                    {dept.name}
                   </option>
                 ))}
               </select>
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 uppercase mb-1">
-                Loại ngày nghỉ (*)
-              </label>
-              <select
-                required
-                className="w-full border p-2 rounded bg-white text-sm"
-                value={formData.leaveTypeId}
-                onChange={(e) =>
-                  setFormData({ ...formData, leaveTypeId: e.target.value })
-                }
-              >
-                {leaveTypes.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.typeName}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 uppercase mb-1">
-                Năm cấu hình / Số ngày định biên
-              </label>
-              <div className="flex gap-2">
-                <input
-                  required
-                  type="number"
-                  className="w-20 border p-2 rounded text-sm text-center"
-                  value={formData.year}
-                  onChange={(e) =>
-                    setFormData({ ...formData, year: Number(e.target.value) })
-                  }
-                />
-                <input
-                  required
-                  type="number"
-                  step="0.5"
-                  className="w-full border p-2 rounded text-sm text-center font-bold text-blue-600"
-                  value={formData.totalDays}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      totalDays: Number(e.target.value),
-                    })
-                  }
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="border border-gray-200 rounded-lg p-5 space-y-4">
-            <h3 className="font-bold text-gray-700 text-sm border-b pb-2">
-              ⏱️ Khung giờ Ca làm việc
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Tên Ca (*)
-                </label>
-                <input
-                  required
-                  type="text"
-                  className="w-full border p-2 rounded text-sm"
-                  value={formData.shiftName}
-                  onChange={(e) =>
-                    setFormData({ ...formData, shiftName: e.target.value })
-                  }
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Giờ bắt đầu (*)
-                </label>
-                <input
-                  required
-                  type="time"
-                  className="w-full border p-2 rounded text-sm"
-                  value={formData.startTime}
-                  onChange={(e) =>
-                    setFormData({ ...formData, startTime: e.target.value })
-                  }
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Giờ kết thúc (*)
-                </label>
-                <input
-                  required
-                  type="time"
-                  className="w-full border p-2 rounded text-sm"
-                  value={formData.endTime}
-                  onChange={(e) =>
-                    setFormData({ ...formData, endTime: e.target.value })
-                  }
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 pt-2">
+            </label>
+            <label className="block">
+              <span className="mb-2 block text-sm font-semibold">Năm</span>
               <input
-                type="checkbox"
-                id="hasBreak"
-                checked={formData.hasBreak}
-                onChange={(e) =>
-                  setFormData({ ...formData, hasBreak: e.target.checked })
+                required
+                type="number"
+                className="hicas-input w-full"
+                value={formData.year}
+                onChange={(event) =>
+                  setFormData({ ...formData, year: Number(event.target.value) })
                 }
               />
-              <label
-                htmlFor="hasBreak"
-                className="text-sm font-medium text-gray-700 select-none"
-              >
-                Có cấu hình giờ nghỉ trưa
+            </label>
+            <label className="block">
+              <span className="mb-2 block text-sm font-semibold">Tháng kỳ công</span>
+              <input
+                required
+                type="number"
+                min="1"
+                max="12"
+                className="hicas-input w-full"
+                value={formData.month}
+                onChange={(event) =>
+                  setFormData({ ...formData, month: Number(event.target.value) })
+                }
+              />
+            </label>
+          </section>
+
+          <section className="rounded-2xl border border-[var(--hicas-border)] p-4">
+            <h3 className="mb-4 text-sm font-bold uppercase text-[var(--hicas-text-secondary)]">
+              Ca làm việc trong ngày
+            </h3>
+            <div className="grid gap-4 md:grid-cols-3">
+              <label className="block">
+                <span className="mb-2 block text-sm font-semibold">Tên ca</span>
+                <input
+                  required
+                  className="hicas-input w-full"
+                  value={formData.shiftName}
+                  onChange={(event) =>
+                    setFormData({ ...formData, shiftName: event.target.value })
+                  }
+                />
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-sm font-semibold">Giờ bắt đầu</span>
+                <input
+                  required
+                  type="time"
+                  className="hicas-input w-full"
+                  value={formData.startTime}
+                  onChange={(event) =>
+                    setFormData({ ...formData, startTime: event.target.value })
+                  }
+                />
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-sm font-semibold">Giờ kết thúc</span>
+                <input
+                  required
+                  type="time"
+                  className="hicas-input w-full"
+                  value={formData.endTime}
+                  onChange={(event) =>
+                    setFormData({ ...formData, endTime: event.target.value })
+                  }
+                />
               </label>
             </div>
 
+            <label className="mt-4 flex items-center gap-2 text-sm font-medium">
+              <input
+                type="checkbox"
+                checked={formData.hasBreak}
+                onChange={(event) =>
+                  setFormData({ ...formData, hasBreak: event.target.checked })
+                }
+                className="accent-[var(--hicas-orange)]"
+              />
+              Có giờ nghỉ giữa ca
+            </label>
+
             {formData.hasBreak && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-3 rounded border border-dashed animate-fadeIn">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                    Bắt đầu nghỉ trưa
-                  </label>
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                <label className="block">
+                  <span className="mb-2 block text-sm font-semibold">Bắt đầu nghỉ</span>
                   <input
                     type="time"
-                    className="w-full border p-2 rounded text-sm bg-white"
+                    className="hicas-input w-full"
                     value={formData.breakStartTime}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        breakStartTime: e.target.value,
-                      })
+                    onChange={(event) =>
+                      setFormData({ ...formData, breakStartTime: event.target.value })
                     }
                   />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                    Kết thúc nghỉ trưa
-                  </label>
+                </label>
+                <label className="block">
+                  <span className="mb-2 block text-sm font-semibold">Kết thúc nghỉ</span>
                   <input
                     type="time"
-                    className="w-full border p-2 rounded text-sm bg-white"
+                    className="hicas-input w-full"
                     value={formData.breakEndTime}
-                    onChange={(e) =>
-                      setFormData({ ...formData, breakEndTime: e.target.value })
+                    onChange={(event) =>
+                      setFormData({ ...formData, breakEndTime: event.target.value })
                     }
                   />
-                </div>
+                </label>
               </div>
             )}
-          </div>
+          </section>
 
-          <div className="border border-gray-200 rounded-lg p-5 space-y-4">
-            <h3 className="font-bold text-gray-700 text-sm border-b pb-2">
-              🚨 Quy tắc đi muộn / Về sớm
+          <section className="rounded-2xl border border-[var(--hicas-border)] p-4">
+            <h3 className="mb-4 text-sm font-bold uppercase text-[var(--hicas-text-secondary)]">
+              Quỹ thời gian và quy đổi công
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Ngưỡng cho phép đi muộn (phút)
-                </label>
+            <div className="grid gap-4 md:grid-cols-4">
+              <label className="block">
+                <span className="mb-2 block text-sm font-semibold">Ngày công chuẩn</span>
+                <input
+                  required
+                  type="number"
+                  min="1"
+                  max="31"
+                  step="0.5"
+                  className="hicas-input w-full"
+                  value={formData.standardWorkDays}
+                  onChange={(event) =>
+                    setFormData({ ...formData, standardWorkDays: Number(event.target.value) })
+                  }
+                />
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-sm font-semibold">Giờ chuẩn/ngày</span>
+                <input
+                  type="number"
+                  min="1"
+                  max="24"
+                  step="0.25"
+                  className="hicas-input w-full"
+                  value={formData.standardHoursPerDay}
+                  onChange={(event) =>
+                    setFormData({ ...formData, standardHoursPerDay: Number(event.target.value) })
+                  }
+                />
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-sm font-semibold">Ngưỡng đi muộn</span>
                 <input
                   type="number"
                   min="0"
-                  className="w-full border p-2 rounded text-sm"
+                  className="hicas-input w-full"
                   value={formData.lateThresholdMins}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      lateThresholdMins: Number(e.target.value),
-                    })
+                  onChange={(event) =>
+                    setFormData({ ...formData, lateThresholdMins: Number(event.target.value) })
                   }
                 />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Ngưỡng cho phép về sớm (phút)
-                </label>
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-sm font-semibold">Ngưỡng về sớm</span>
                 <input
                   type="number"
                   min="0"
-                  className="w-full border p-2 rounded text-sm"
+                  className="hicas-input w-full"
                   value={formData.earlyLeaveThresholdMins}
-                  onChange={(e) =>
+                  onChange={(event) =>
                     setFormData({
                       ...formData,
-                      earlyLeaveThresholdMins: Number(e.target.value),
+                      earlyLeaveThresholdMins: Number(event.target.value),
                     })
                   }
                 />
+              </label>
+            </div>
+
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <label className="block">
+                <span className="mb-2 block text-sm font-semibold">Ngày làm trong tuần</span>
+                <input
+                  className="hicas-input w-full"
+                  value={formData.workingDaysOfWeek}
+                  onChange={(event) =>
+                    setFormData({ ...formData, workingDaysOfWeek: event.target.value })
+                  }
+                  placeholder="1,2,3,4,5"
+                />
+              </label>
+              <div className="rounded-2xl border border-[var(--hicas-border)] bg-[var(--hicas-orange-lighter)] p-4 text-sm text-[var(--hicas-text-secondary)]">
+                Ngày công = phút làm thực tế / giờ chuẩn, tối đa 1 công/ngày. Phần vượt giờ
+                chuẩn được xử lý riêng ở OT.
               </div>
             </div>
-          </div>
 
-          <div className="flex justify-end gap-3 pt-4 border-t">
-            <button
-              type="button"
-              className="px-5 py-2 border rounded text-sm hover:bg-gray-100"
-            >
-              Hủy bỏ
-            </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="px-6 py-2 bg-blue-600 text-white rounded font-medium text-sm hover:bg-blue-700 disabled:bg-blue-400 shadow transition-colors"
-            >
-              {submitting ? "Đang cập nhật..." : "Áp dụng cấu hình"}
-            </button>
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <div>
+                <span className="mb-2 block text-sm font-semibold">Ngày nghỉ lễ trong kỳ</span>
+                <div className="flex gap-2">
+                  <input
+                    type="date"
+                    className="hicas-input w-full"
+                    value={holidayDateInput}
+                    onChange={(event) => setHolidayDateInput(event.target.value)}
+                  />
+                  <Button type="button" variant="secondary" onClick={addHolidayDate}>
+                    Thêm
+                  </Button>
+                </div>
+                <div className="mt-3 flex min-h-10 flex-wrap gap-2">
+                  {holidayDates.length === 0 ? (
+                    <span className="text-sm text-[var(--hicas-text-muted)]">
+                      Chưa có ngày nghỉ lễ trong kỳ.
+                    </span>
+                  ) : (
+                    holidayDates.map((date) => (
+                      <button
+                        key={date}
+                        type="button"
+                        onClick={() => removeHolidayDate(date)}
+                        className="rounded-full bg-[var(--hicas-orange-soft)] px-3 py-1 text-xs font-semibold text-[var(--hicas-orange-dark)]"
+                      >
+                        {toDateLabel(date)} x
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+              <label className="block">
+                <span className="mb-2 block text-sm font-semibold">Ghi chú kỳ công</span>
+                <textarea
+                  className="hicas-textarea min-h-[90px] w-full"
+                  value={formData.calendarNote}
+                  onChange={(event) =>
+                    setFormData({ ...formData, calendarNote: event.target.value })
+                  }
+                />
+              </label>
+            </div>
+
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <label className="flex items-center gap-2 text-sm font-medium">
+                <input
+                  type="checkbox"
+                  checked={formData.includePaidLeaveInWorkDays}
+                  onChange={(event) =>
+                    setFormData({
+                      ...formData,
+                      includePaidLeaveInWorkDays: event.target.checked,
+                    })
+                  }
+                  className="accent-[var(--hicas-orange)]"
+                />
+                Nghỉ phép có lương được tính vào ngày công
+              </label>
+              <label className="flex items-center gap-2 text-sm font-medium">
+                <input
+                  type="checkbox"
+                  checked={formData.lockWorkCalendar}
+                  onChange={(event) =>
+                    setFormData({ ...formData, lockWorkCalendar: event.target.checked })
+                  }
+                  className="accent-[var(--hicas-orange)]"
+                />
+                Khóa kỳ công sau khi chốt
+              </label>
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-[var(--hicas-border)] p-4">
+            <h3 className="mb-4 text-sm font-bold uppercase text-[var(--hicas-text-secondary)]">
+              Quỹ nghỉ phép định biên
+            </h3>
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="block">
+                <span className="mb-2 block text-sm font-semibold">Loại nghỉ phép</span>
+                <select
+                  required
+                  className="hicas-select w-full"
+                  value={selectedLeaveTypeId}
+                  onChange={(event) =>
+                    setFormData({ ...formData, leaveTypeId: event.target.value })
+                  }
+                >
+                  {leaveTypes.map((type) => (
+                    <option key={type.id} value={type.id}>
+                      {type.typeName}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-sm font-semibold">Số ngày cấp trong năm</span>
+                <input
+                  required
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  className="hicas-input w-full"
+                  value={formData.totalDays}
+                  onChange={(event) =>
+                    setFormData({ ...formData, totalDays: Number(event.target.value) })
+                  }
+                />
+              </label>
+            </div>
+          </section>
+
+          <div className="flex justify-end">
+            <Button type="submit" isLoading={submitting} iconLeft={<Save size={17} />}>
+              Áp dụng cấu hình
+            </Button>
           </div>
         </form>
-      </div>
+      </Card>
 
-      <div className="w-full max-w-6xl rounded-lg border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
-        <h3 className="text-lg font-bold text-gray-800 mb-4">
-          Danh sách cấu hình hiện tại
-        </h3>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm border-collapse">
-            <thead>
-              <tr className="bg-gray-100 text-gray-700 text-xs uppercase font-semibold">
-                <th className="p-3 rounded-l">Phòng ban</th>
-                <th className="p-3">Tên Ca làm việc</th>
-                <th className="p-3">Khung giờ ca</th>
-                <th className="p-3">Nghỉ trưa</th>
-                <th className="p-3">Đi muộn/Về sớm</th>
-                <th className="p-3 rounded-r">Quỹ Phép Định Biên</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {configuredSchedules.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="p-6 text-center text-gray-400">
-                    Chưa có phòng ban nào được thiết lập lịch trình.
-                  </td>
-                </tr>
-              ) : (
-                configuredSchedules.map((item, index) => (
-                  <tr
-                    key={index}
-                    className="hover:bg-gray-50/70 transition-colors"
-                  >
-                    <td className="p-3 font-semibold text-gray-800">
-                      {item.deptName}
-                    </td>
-                    <td className="p-3 text-gray-600">
-                      <span className="bg-blue-50 text-blue-700 text-xs px-2 py-1 rounded font-medium">
-                        {item.shiftName}
-                      </span>
-                    </td>
-                    <td className="p-3 text-gray-700 font-medium">
-                      {item.startTime.substring(0, 5)} -{" "}
-                      {item.endTime.substring(0, 5)}
-                    </td>
-                    <td className="p-3 text-gray-500 text-xs">
-                      {item.breakStartTime && item.breakEndTime
-                        ? `${item.breakStartTime.substring(0, 5)} - ${item.breakEndTime.substring(0, 5)}`
-                        : "Không nghỉ"}
-                    </td>
-                    <td className="p-3 text-xs text-gray-500">
-                      <div>Muộn: {item.lateThresholdMins}m</div>
-                      <div>Sớm: {item.earlyLeaveThresholdMins}m</div>
-                    </td>
-                    <td className="p-3">
-                      <div className="text-xs font-bold text-blue-600">
-                        {item.leaveTypeName} ({item.year})
-                      </div>
-                      <div className="text-sm font-extrabold text-gray-800">
-                        {item.totalDays} ngày phép
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <DataTable
+        columns={scheduleColumns}
+        data={configuredSchedules}
+        loading={loading}
+        rowKey={(row) => row.deptId}
+        emptyTitle="Chưa có cấu hình lịch trình"
+        emptyDescription="Hãy thiết lập ca làm việc và kỳ công cho phòng ban đầu tiên."
+      />
+
+      <Card
+        title="Lịch sử thay đổi"
+        description="Các biến động cấu hình ca, kỳ công và quỹ phép gần đây."
+        actions={<History size={20} className="text-[var(--hicas-orange)]" />}
+      >
+        <DataTable
+          columns={historyColumns}
+          data={history}
+          rowKey={(row) => row.id}
+          className="border-0 shadow-none"
+          emptyTitle="Chưa có lịch sử thay đổi"
+        />
+      </Card>
     </div>
   );
 };

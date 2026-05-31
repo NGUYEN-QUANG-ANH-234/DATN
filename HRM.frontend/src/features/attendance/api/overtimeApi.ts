@@ -30,19 +30,31 @@ export interface OvertimeRequest {
   departmentName: string | null;
   requestedByAccountId: number;
   workDate: string;
+  startAt: string;
+  endAt: string;
   startTime: string;
   endTime: string;
   reason: string;
   projectCode: string | null;
-  status: "PendingManager" | "PendingHR" | "PendingDirector" | "Approved" | "Rejected" | "Cancelled";
+  status: "PendingManager" | "PendingHR" | "PendingDirector" | "Approved" | "Reconciled" | "PayrollLocked" | "Rejected" | "Cancelled";
   managerNote: string | null;
   hrNote: string | null;
+  directorNote: string | null;
   approvedMinutes: number;
   actualOtMinutes: number;
   isPayrollLocked: boolean;
   payrollPeriod: string | null;
   createdAt: string;
   reconciledAt: string | null;
+  segments: OvertimeSegment[];
+}
+
+export interface OvertimeSegment {
+  segmentStartAt: string;
+  segmentEndAt: string;
+  minutes: number;
+  policyCode: string;
+  rateMultiplierSnapshot: number;
 }
 
 export interface OvertimeEmployeeOption {

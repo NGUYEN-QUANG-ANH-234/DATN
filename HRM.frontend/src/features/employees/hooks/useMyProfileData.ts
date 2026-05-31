@@ -1,12 +1,26 @@
 import { useState, useEffect, useCallback } from "react";
 import { myProfileApi } from "../api/myProfileApi";
+import { dependentApi } from "../api/dependentApi";
 import type { MyProfileDto, MyContractDto } from "../types/myProfile";
+import type { DependentDto } from "../types/dependent";
 
-export const useMyProfileData = () => {
+interface UseMyProfileDataOptions {
+  includeProfile?: boolean;
+  includeContracts?: boolean;
+  includeDependents?: boolean;
+}
+
+export const useMyProfileData = ({
+  includeProfile = true,
+  includeContracts = true,
+  includeDependents = true,
+}: UseMyProfileDataOptions = {}) => {
   const [profile, setProfile] = useState<MyProfileDto | null>(null);
   const [contracts, setContracts] = useState<MyContractDto[]>([]);
+  const [dependents, setDependents] = useState<DependentDto[]>([]);
   const [loadingProfile, setLoadingProfile] = useState(false);
   const [loadingContracts, setLoadingContracts] = useState(false);
+  const [loadingDependents, setLoadingDependents] = useState(false);
 
   const fetchProfile = useCallback(async () => {
     setLoadingProfile(true);
@@ -32,16 +46,39 @@ export const useMyProfileData = () => {
     }
   }, []);
 
+  const fetchDependents = useCallback(async () => {
+    setLoadingDependents(true);
+    try {
+      const res = await dependentApi.getMyDependents();
+      setDependents(res.data || []);
+    } catch (error) {
+      console.error("Lỗi tải danh sách người phụ thuộc:", error);
+    } finally {
+      setLoadingDependents(false);
+    }
+  }, []);
+
   useEffect(() => {
-    fetchProfile();
-    fetchContracts();
-  }, [fetchProfile, fetchContracts]);
+    if (includeProfile) fetchProfile();
+    if (includeContracts) fetchContracts();
+    if (includeDependents) fetchDependents();
+  }, [
+    fetchProfile,
+    fetchContracts,
+    fetchDependents,
+    includeProfile,
+    includeContracts,
+    includeDependents,
+  ]);
 
   return {
     profile,
     contracts,
+    dependents,
     loadingProfile,
     loadingContracts,
+    loadingDependents,
     refreshProfile: fetchProfile,
+    refreshDependents: fetchDependents,
   };
 };

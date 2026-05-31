@@ -18,7 +18,7 @@ import { overtimeApi, type OvertimeRequest } from "../../attendance/api/overtime
 import { leaveRequestApi, type LeaveRequest } from "../../attendance/api/leaveRequestApi";
 import type { CandidateHistoryDto } from "../../recruitment/types/candidate";
 import type { ActiveJob } from "../../recruitment/types/recruitment";
-import type { ApprovalModule, TrackingItem } from "../types";
+import type { ApprovalTrackingFilters, TrackingItem } from "../types";
 import { APPROVAL_MODULES } from "../types";
 import {
   formatDate,
@@ -29,13 +29,7 @@ import {
   unwrapData,
 } from "../utils";
 
-type Filters = {
-  module: "ALL" | ApprovalModule;
-  status: string;
-  query: string;
-};
-
-const defaultFilters: Filters = {
+const defaultFilters: ApprovalTrackingFilters = {
   module: "ALL",
   status: "ALL",
   query: "",
@@ -46,7 +40,7 @@ export const ApprovalTrackingPage = () => {
   const role = getRole(user?.role);
   const [items, setItems] = useState<TrackingItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [filters, setFilters] = useState<Filters>(defaultFilters);
+  const [filters, setFilters] = useState<ApprovalTrackingFilters>(defaultFilters);
 
   const fetchItems = useCallback(async () => {
     setLoading(true);
@@ -122,7 +116,7 @@ export const ApprovalTrackingPage = () => {
               onChange={(event) =>
                 setFilters({
                   ...filters,
-                  module: event.target.value as Filters["module"],
+                  module: event.target.value as ApprovalTrackingFilters["module"],
                 })
               }
             >

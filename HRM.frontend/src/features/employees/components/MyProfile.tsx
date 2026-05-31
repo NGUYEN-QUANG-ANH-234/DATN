@@ -3,7 +3,9 @@ import { useMyProfileData } from "../hooks/useMyProfileData";
 import { BACKEND_URL } from "../../../core/api/config";
 
 export const MyProfile: React.FC = () => {
-  const { profile, loadingProfile } = useMyProfileData();
+  const { profile, dependents, loadingDependents, loadingProfile } = useMyProfileData({
+    includeContracts: false,
+  });
 
   if (loadingProfile)
     return (
@@ -20,6 +22,9 @@ export const MyProfile: React.FC = () => {
 
   const getGenderText = (g: number | null) =>
     g === 0 ? "Nam" : g === 1 ? "Nữ" : "Khác";
+
+  const getDependentRelationText = (value: number) =>
+    ["Con", "Cha/Mẹ", "Vợ/Chồng", "Khác"][value] ?? "Khác";
 
   return (
     <div className="min-h-full bg-gray-50 px-4 py-6 sm:px-6">
@@ -243,6 +248,73 @@ export const MyProfile: React.FC = () => {
             )}
           </div>
         </div>
+
+        <div className="pt-6 border-t">
+          <h3 className="font-bold text-gray-700 text-sm mb-3 uppercase">
+            Người phụ thuộc
+          </h3>
+          {loadingDependents ? (
+            <p className="text-sm text-gray-500">Đang tải người phụ thuộc...</p>
+          ) : dependents.length === 0 ? (
+            <p className="rounded border border-dashed bg-gray-50 p-4 text-sm text-gray-500">
+              Chưa có người phụ thuộc đang hiệu lực.
+            </p>
+          ) : (
+            <div className="overflow-hidden rounded border border-gray-200">
+              <table className="min-w-full divide-y divide-gray-200 text-sm">
+                <thead className="bg-gray-50 text-left text-xs font-semibold uppercase text-gray-500">
+                  <tr>
+                    <th className="px-4 py-3">Họ tên</th>
+                    <th className="px-4 py-3">Quan hệ</th>
+                    <th className="px-4 py-3">MST phụ thuộc</th>
+                    <th className="px-4 py-3">Hiệu lực</th>
+                    <th className="px-4 py-3">Trạng thái</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 bg-white">
+                  {dependents.map((item) => (
+                    <tr key={item.id}>
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-gray-800">
+                          {item.fullName}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {item.idNumber || "Chưa có CCCD"}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        {getDependentRelationText(item.relationship)}
+                      </td>
+                      <td className="px-4 py-3">
+                        {item.taxDependentCode || "-"}
+                      </td>
+                      <td className="px-4 py-3">
+                        {item.validFrom
+                          ? new Date(item.validFrom).toLocaleDateString("vi-VN")
+                          : "-"}
+                        {item.validTo
+                          ? ` - ${new Date(item.validTo).toLocaleDateString("vi-VN")}`
+                          : ""}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`rounded-full px-2 py-1 text-xs font-medium ${
+                            item.isActive
+                              ? "bg-green-50 text-green-700"
+                              : "bg-gray-100 text-gray-500"
+                          }`}
+                        >
+                          {item.isActive ? "Đang hiệu lực" : "Ngừng hiệu lực"}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
       </div>
     </div>
   );

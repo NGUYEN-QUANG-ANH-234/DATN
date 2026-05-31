@@ -1,11 +1,16 @@
 import React, { useState, useEffect } from "react";
 import { hrProfileApi } from "../api/hrProfileApi";
+import { dependentApi } from "../api/dependentApi";
 import type { PendingProfileRequest } from "../types/profileRequest";
+import type { PendingDependentRequest } from "../types/dependent";
 import { BACKEND_URL } from "../../../core/api/config";
 import { useNotification } from "../../../core/context/NotificationContext";
 
 export const HRProfileReviewList: React.FC = () => {
   const [requests, setRequests] = useState<PendingProfileRequest[]>([]);
+  const [dependentRequests, setDependentRequests] = useState<
+    PendingDependentRequest[]
+  >([]);
   const [loading, setLoading] = useState(false);
   const [processingId, setProcessingId] = useState<number | null>(null);
   const { triggerAlert } = useNotification();
@@ -13,13 +18,19 @@ export const HRProfileReviewList: React.FC = () => {
   // States quản lý Input Từ chối ngay trên UI (Thay cho window.prompt)
   const [rejectingId, setRejectingId] = useState<number | null>(null);
   const [rejectReason, setRejectReason] = useState("");
+  const [dependentRejectingId, setDependentRejectingId] = useState<number | null>(null);
+  const [dependentRejectReason, setDependentRejectReason] = useState("");
 
   useEffect(() => {
     const fetchRequests = async () => {
       setLoading(true);
       try {
-        const res = await hrProfileApi.getPendingRequests();
-        setRequests(res.data || res || []);
+        const [profileRes, dependentRes] = await Promise.all([
+          hrProfileApi.getPendingRequests(),
+          dependentApi.getPendingRequests(),
+        ]);
+        setRequests(profileRes.data || profileRes || []);
+        setDependentRequests(dependentRes.data || dependentRes || []);
       } catch (error) {
         console.error("Lỗi tải danh sách:", error);
       } finally {
@@ -60,6 +71,36 @@ export const HRProfileReviewList: React.FC = () => {
         "Lỗi xử lý",
         "Giao diện gặp lỗi, nhưng backend có thể đã xử lý. Vui lòng tải lại trang để kiểm tra dữ liệu.",
       );
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const executeDependentReview = async (
+    id: number,
+    isApproved: boolean,
+    reason?: string,
+  ) => {
+    setProcessingId(id);
+    try {
+      const response = await dependentApi.reviewRequest(id, {
+        isApproved,
+        rejectReason: reason,
+      });
+      triggerAlert(
+        "success",
+        "Thành công",
+        response.message || "Đã xử lý yêu cầu người phụ thuộc.",
+      );
+      setDependentRequests((prev) => prev.filter((r) => r.id !== id));
+      setDependentRejectingId(null);
+      setDependentRejectReason("");
+    } catch (error: unknown) {
+      const msg =
+        error instanceof Error
+          ? error.message
+          : "Không thể xử lý yêu cầu người phụ thuộc.";
+      triggerAlert("error", "Lỗi xử lý", msg);
     } finally {
       setProcessingId(null);
     }
@@ -161,6 +202,45 @@ export const HRProfileReviewList: React.FC = () => {
       );
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (e) {
+      return <span className="text-red-500 text-sm">Lỗi giải mã dữ liệu</span>;
+    }
+  };
+
+  const renderDependentChanges = (jsonString: string, evidenceUrl?: string | null) => {
+    try {
+      const data = JSON.parse(jsonString);
+      return (
+        <ul className="list-disc pl-5 text-sm text-gray-700 space-y-1">
+          <li>
+            Họ tên: <b className="text-blue-700">{data.FullName}</b>
+          </li>
+          <li>Quan hệ: {["Con", "Cha/Mẹ", "Vợ/Chồng", "Khác"][data.Relationship] ?? "Khác"}</li>
+          {data.IdNumber && <li>CCCD: {data.IdNumber}</li>}
+          {data.TaxDependentCode && <li>MST phụ thuộc: {data.TaxDependentCode}</li>}
+          {data.ValidFrom && (
+            <li>
+              Hiệu lực từ: {new Date(data.ValidFrom).toLocaleDateString("vi-VN")}
+            </li>
+          )}
+          {data.ValidTo && (
+            <li>Hiệu lực đến: {new Date(data.ValidTo).toLocaleDateString("vi-VN")}</li>
+          )}
+          {data.Note && <li>Ghi chú: {data.Note}</li>}
+          {evidenceUrl && (
+            <li>
+              <a
+                href={`${BACKEND_URL}${evidenceUrl}`}
+                target="_blank"
+                rel="noreferrer"
+                className="text-blue-500 hover:underline"
+              >
+                Xem minh chứng
+              </a>
+            </li>
+          )}
+        </ul>
+      );
+    } catch {
       return <span className="text-red-500 text-sm">Lỗi giải mã dữ liệu</span>;
     }
   };
@@ -279,6 +359,126 @@ export const HRProfileReviewList: React.FC = () => {
             ))}
           </div>
         )}
+
+        <div className="mt-8 border-t pt-6">
+          <h3 className="mb-4 text-lg font-bold text-gray-800">
+            Yêu cầu người phụ thuộc
+          </h3>
+          {dependentRequests.length === 0 ? (
+            <div className="rounded border border-dashed bg-gray-50 py-6 text-center text-gray-500">
+              Không có yêu cầu người phụ thuộc đang chờ duyệt.
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {dependentRequests.map((req) => (
+                <div
+                  key={req.id}
+                  className="flex flex-col gap-4 rounded-lg border border-gray-200 bg-white p-5 transition hover:shadow-md md:flex-row md:justify-between"
+                >
+                  <div className="border-b border-gray-100 pb-4 md:w-1/3 md:border-b-0 md:border-r md:pb-0 md:pr-4">
+                    <h4 className="font-bold text-gray-800">
+                      {req.employeeName}
+                    </h4>
+                    <p className="mt-1 text-sm text-gray-500">
+                      Mã NV: {req.employeeCode}
+                    </p>
+                    <span className="mt-2 inline-block rounded border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">
+                      {req.actionType === "CREATE"
+                        ? "Thêm mới"
+                        : req.actionType === "UPDATE"
+                          ? "Cập nhật"
+                          : "Ngừng hiệu lực"}
+                    </span>
+                  </div>
+
+                  <div className="md:w-1/2">
+                    <h4 className="mb-2 text-sm font-semibold uppercase text-gray-700">
+                      Nội dung đề xuất:
+                    </h4>
+                    <div className="rounded border border-gray-100 bg-gray-50 p-3">
+                      {renderDependentChanges(
+                        req.requestedDataJson,
+                        req.evidenceUrl,
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col justify-center gap-2 md:w-1/6">
+                    {dependentRejectingId === req.id ? (
+                      <div className="flex flex-col gap-2">
+                        <input
+                          type="text"
+                          autoFocus
+                          placeholder="Lý do từ chối..."
+                          value={dependentRejectReason}
+                          onChange={(e) =>
+                            setDependentRejectReason(e.target.value)
+                          }
+                          className="w-full rounded border border-red-300 p-2 text-sm outline-none focus:ring-1 focus:ring-red-400"
+                        />
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() =>
+                              executeDependentReview(
+                                req.id,
+                                false,
+                                dependentRejectReason.trim(),
+                              )
+                            }
+                            disabled={
+                              processingId === req.id ||
+                              !dependentRejectReason.trim()
+                            }
+                            className="flex-1 rounded bg-red-600 py-1.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                          >
+                            Chốt
+                          </button>
+                          <button
+                            onClick={() => {
+                              setDependentRejectingId(null);
+                              setDependentRejectReason("");
+                            }}
+                            disabled={processingId === req.id}
+                            className="flex-1 rounded bg-gray-200 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300 disabled:opacity-50"
+                          >
+                            Hủy
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() =>
+                            executeDependentReview(req.id, true)
+                          }
+                          disabled={
+                            processingId === req.id ||
+                            dependentRejectingId !== null
+                          }
+                          className="w-full rounded bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-green-700 disabled:opacity-50"
+                        >
+                          {processingId === req.id
+                            ? "Đang xử lý..."
+                            : "Phê duyệt"}
+                        </button>
+                        <button
+                          onClick={() => setDependentRejectingId(req.id)}
+                          disabled={
+                            processingId === req.id ||
+                            dependentRejectingId !== null
+                          }
+                          className="w-full rounded border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-100 disabled:opacity-50"
+                        >
+                          Từ chối
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

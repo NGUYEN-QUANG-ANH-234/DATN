@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { Button, Card } from "../../../components/ui";
 import { FeaturePage } from "../../../core/components/FeatureShell";
 import { useCurrentUser } from "../../../core/auth/hooks/useCurrentUser";
 import { useNotification } from "../../../core/context/NotificationContext";
@@ -15,9 +16,7 @@ export const OvertimeApprovalPage = () => {
   const [loading, setLoading] = useState(false);
   const [managerRequests, setManagerRequests] = useState<OvertimeRequest[]>([]);
   const [hrRequests, setHrRequests] = useState<OvertimeRequest[]>([]);
-  const [approvedRequests, setApprovedRequests] = useState<OvertimeRequest[]>(
-    [],
-  );
+  const [approvedRequests, setApprovedRequests] = useState<OvertimeRequest[]>([]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -104,9 +103,9 @@ export const OvertimeApprovalPage = () => {
       width="wide"
     >
       {loading && (
-        <div className="rounded border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+        <Card className="border-[var(--hicas-info)] bg-[var(--hicas-info-soft)] text-sm text-[var(--hicas-info)]">
           Đang tải danh sách phê duyệt OT...
-        </div>
+        </Card>
       )}
 
       {isManager && (
@@ -144,26 +143,22 @@ export const OvertimeApprovalPage = () => {
           emptyText="Chưa có OT đã duyệt trong danh sách."
           renderActions={(item) =>
             item.isPayrollLocked ? (
-              <span className="text-xs font-semibold text-gray-500">
+              <span className="text-xs font-semibold text-[var(--hicas-text-secondary)]">
                 Đã khóa lương
               </span>
             ) : (
-              <button
-                type="button"
-                onClick={() => reconcile(item.id)}
-                className="rounded bg-slate-700 px-3 py-1 text-xs font-semibold text-white hover:bg-slate-800"
-              >
+              <Button size="sm" variant="secondary" onClick={() => reconcile(item.id)}>
                 Đối chiếu
-              </button>
+              </Button>
             )
           }
         />
       )}
 
       {!isManager && !isHr && (
-        <div className="rounded border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <Card className="border-[var(--hicas-warning)] bg-[var(--hicas-warning-soft)] text-sm text-amber-800">
           Vai trò hiện tại không có quyền phê duyệt OT.
-        </div>
+        </Card>
       )}
     </FeaturePage>
   );

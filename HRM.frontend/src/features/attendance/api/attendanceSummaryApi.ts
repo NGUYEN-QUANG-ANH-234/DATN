@@ -9,6 +9,9 @@ export interface AttendanceSummary {
   month: number;
   year: number;
   workDays: number;
+  workedMinutes: number;
+  workedHours: number;
+  payableWorkHours: number;
   lateMinutes: number;
   earlyLeaveMinutes: number;
   actualOtMinutes: number;

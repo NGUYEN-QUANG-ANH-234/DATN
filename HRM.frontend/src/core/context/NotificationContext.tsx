@@ -1,4 +1,11 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 // Định nghĩa kiểu dữ liệu cho thông báo
 interface AlertConfig {
@@ -27,16 +34,21 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const [config, setConfig] = useState<AlertConfig | null>(null);
 
-  const triggerAlert = (
+  const triggerAlert = useCallback((
     type: AlertConfig["type"],
     title: string,
     message: string,
     onConfirm?: () => void,
   ) => {
     setConfig({ type, title, message, onConfirm });
-  };
+  }, []);
 
-  const closeAlert = () => setConfig(null);
+  const closeAlert = useCallback(() => setConfig(null), []);
+
+  const contextValue = useMemo(
+    () => ({ triggerAlert, closeAlert }),
+    [triggerAlert, closeAlert],
+  );
 
   // Tự động đóng Toast sau 3 giây (trừ Modal xác nhận)
   useEffect(() => {
@@ -44,10 +56,10 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
       const timer = setTimeout(() => closeAlert(), 3000);
       return () => clearTimeout(timer);
     }
-  }, [config]);
+  }, [config, closeAlert]);
 
   return (
-    <NotificationContext.Provider value={{ triggerAlert, closeAlert }}>
+    <NotificationContext.Provider value={contextValue}>
       {children}
 
       {/* RENDER POPUP ĐỒNG NHẤT Ở ĐÂY - LUÔN NẰM TRÊN CÙNG HỆ THỐNG */}

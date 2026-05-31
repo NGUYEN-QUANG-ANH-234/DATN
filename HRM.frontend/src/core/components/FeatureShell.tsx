@@ -17,18 +17,18 @@ type FeatureCardProps = {
 };
 
 export const fieldClass =
-  "w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500";
+  "hicas-input w-full disabled:cursor-not-allowed disabled:bg-[var(--hicas-bg-soft)] disabled:text-[var(--hicas-text-muted)]";
 
 export const textareaClass = `${fieldClass} min-h-24 resize-y`;
 
 export const primaryButtonClass =
-  "inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60";
+  "hicas-btn-primary inline-flex min-h-[42px] items-center justify-center gap-2 px-[18px] text-sm disabled:cursor-not-allowed disabled:opacity-60";
 
 export const secondaryButtonClass =
-  "inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60";
+  "hicas-btn-secondary inline-flex min-h-[42px] items-center justify-center gap-2 px-[18px] text-sm disabled:cursor-not-allowed disabled:opacity-60";
 
 export const dangerButtonClass =
-  "inline-flex items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60";
+  "inline-flex min-h-[42px] items-center justify-center gap-2 rounded-[var(--radius-md)] border border-[var(--hicas-danger)] bg-[var(--hicas-danger-soft)] px-[18px] text-sm font-semibold text-[var(--hicas-danger)] transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60";
 
 export const FeaturePage = ({
   title,
@@ -37,16 +37,16 @@ export const FeaturePage = ({
   children,
   width = "wide",
 }: FeaturePageProps) => {
-  const maxWidth = width === "wide" ? "max-w-6xl" : "max-w-4xl";
+  const maxWidth = width === "wide" ? "max-w-none" : "max-w-5xl";
 
   return (
-    <div className="min-h-full bg-gray-50 px-4 py-6 sm:px-6">
+    <div className="min-h-full">
       <div className={`mx-auto w-full ${maxWidth} space-y-6`}>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
+            <h1 className="text-2xl font-bold text-[var(--hicas-text-main)]">{title}</h1>
             {description && (
-              <p className="mt-1 max-w-3xl text-sm leading-6 text-gray-500">
+              <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--hicas-text-secondary)]">
                 {description}
               </p>
             )}
@@ -67,14 +67,18 @@ export const FeatureCard = ({
   className = "",
 }: FeatureCardProps) => (
   <section
-    className={`rounded-lg border border-gray-200 bg-white p-5 shadow-sm ${className}`}
+    className={`hicas-card hicas-card-padded ${className}`}
   >
     {(title || description || actions) && (
-      <div className="mb-5 flex flex-col gap-3 border-b border-gray-100 pb-4 sm:flex-row sm:items-start sm:justify-between">
+      <div className="mb-5 flex flex-col gap-3 border-b border-[var(--hicas-border-soft)] pb-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          {title && <h2 className="text-lg font-semibold text-gray-900">{title}</h2>}
+          {title && (
+            <h2 className="text-lg font-semibold text-[var(--hicas-text-main)]">{title}</h2>
+          )}
           {description && (
-            <p className="mt-1 text-sm leading-6 text-gray-500">{description}</p>
+            <p className="mt-1 text-sm leading-6 text-[var(--hicas-text-secondary)]">
+              {description}
+            </p>
           )}
         </div>
         {actions && <div className="shrink-0">{actions}</div>}
@@ -92,7 +96,9 @@ export const EmptyState = ({
   description?: string;
 }) => (
   <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 px-6 py-10 text-center">
-    <p className="font-medium text-gray-700">{title}</p>
-    {description && <p className="mt-1 text-sm text-gray-500">{description}</p>}
+    <p className="font-medium text-[var(--hicas-text-main)]">{title}</p>
+    {description && (
+      <p className="mt-1 text-sm text-[var(--hicas-text-secondary)]">{description}</p>
+    )}
   </div>
 );

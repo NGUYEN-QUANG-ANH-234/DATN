@@ -53,6 +53,39 @@ export interface TrackingItem {
   scopeLabel: string;
 }
 
+export type PendingApprovalDto = {
+  moduleCode: string;
+  referenceId: number;
+  level: number;
+  createdAt?: string;
+  title?: string;
+  description?: string;
+  departmentName?: string;
+  positionName?: string;
+  quantity?: number;
+  deadline?: string;
+  cvFilePath?: string;
+};
+
+export type RoleOption = {
+  id: number;
+  name: string;
+  roleName?: string;
+};
+
+export type ApprovalWorkspaceFilters = {
+  module: "ALL" | ApprovalModule;
+  query: string;
+  fromDate: string;
+  toDate: string;
+};
+
+export type ApprovalTrackingFilters = {
+  module: "ALL" | ApprovalModule;
+  status: string;
+  query: string;
+};
+
 export const APPROVAL_MODULES: Array<{
   value: "ALL" | ApprovalModule;
   label: string;

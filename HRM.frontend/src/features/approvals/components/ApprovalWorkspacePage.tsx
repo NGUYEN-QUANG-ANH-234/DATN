@@ -13,6 +13,7 @@ import { useCurrentUser } from "../../../core/auth/hooks/useCurrentUser";
 import { useNotification } from "../../../core/context/NotificationContext";
 import { recruitmentApi } from "../../recruitment/api/recruitmentApi";
 import { hrProfileApi } from "../../employees/api/hrProfileApi";
+import { dependentApi } from "../../employees/api/dependentApi";
 import { onboardingApi } from "../../employees/api/onboardingApi";
 import { contractApi } from "../../employees/api/contractApi";
 import { contractAddendumApi } from "../../employees/api/contractAddendumApi";
@@ -20,6 +21,7 @@ import { overtimeApi } from "../../attendance/api/overtimeApi";
 import { leaveRequestApi } from "../../attendance/api/leaveRequestApi";
 import { accountApi } from "../../system/api/accountApi";
 import type { PendingProfileRequest } from "../../employees/types/profileRequest";
+import type { PendingDependentRequest } from "../../employees/types/dependent";
 import type { PendingOnboardingRequest } from "../../employees/types/onboarding";
 import type { ContractDto } from "../../employees/api/contractApi";
 import type { ContractAddendumDto } from "../../employees/api/contractAddendumApi";
@@ -29,6 +31,9 @@ import type {
   ApprovalItem,
   ApprovalModule,
   ApprovalAction,
+  PendingApprovalDto,
+  RoleOption,
+  ApprovalWorkspaceFilters,
 } from "../types";
 import { APPROVAL_MODULES } from "../types";
 import {
@@ -41,30 +46,7 @@ import {
   unwrapData,
 } from "../utils";
 
-type PendingApprovalDto = {
-  moduleCode: string;
-  referenceId: number;
-  level: number;
-  createdAt?: string;
-  title?: string;
-  description?: string;
-  departmentName?: string;
-  positionName?: string;
-  quantity?: number;
-  deadline?: string;
-  cvFilePath?: string;
-};
-
-type RoleOption = { id: number; name: string; roleName?: string };
-
-type Filters = {
-  module: "ALL" | ApprovalModule;
-  query: string;
-  fromDate: string;
-  toDate: string;
-};
-
-const defaultFilters: Filters = {
+const defaultFilters: ApprovalWorkspaceFilters = {
   module: "ALL",
   query: "",
   fromDate: "",
@@ -81,7 +63,7 @@ export const ApprovalWorkspacePage = () => {
 
   const [items, setItems] = useState<ApprovalItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [filters, setFilters] = useState<Filters>(defaultFilters);
+  const [filters, setFilters] = useState<ApprovalWorkspaceFilters>(defaultFilters);
   const [roleOptions, setRoleOptions] = useState<RoleOption[]>([]);
   const [onboardingRoleById, setOnboardingRoleById] = useState<
     Record<number, number>
@@ -100,6 +82,7 @@ export const ApprovalWorkspacePage = () => {
       await Promise.all([
         loadCentralApprovals(next),
         loadProfileApprovals(next),
+        loadDependentApprovals(next),
         loadOnboardingApprovals(next),
         loadContractWorkItems(next),
         loadAddendumApprovals(next),
@@ -189,6 +172,49 @@ export const ApprovalWorkspacePage = () => {
       });
     } catch {
       // Bỏ qua nếu API không khả dụng cho role hiện tại.
+    }
+  };
+
+  const loadDependentApprovals = async (target: ApprovalItem[]) => {
+    if (!["Admin", "HR", "Director"].includes(role)) return;
+
+    try {
+      const res = await dependentApi.getPendingRequests();
+      unwrapData<PendingDependentRequest>(res).forEach((item) => {
+        target.push({
+          id: `dependent-${item.id}`,
+          module: "PROFILE",
+          moduleLabel: "Hồ sơ",
+          source: "DEPENDENT_UPDATE",
+          title: `Người phụ thuộc: ${item.employeeName}`,
+          subtitle: `${item.employeeCode} - ${dependentActionLabel(item.actionType)}`,
+          owner: item.employeeName,
+          status: item.status || "Pending_HR",
+          statusLabel: statusLabel(item.status || "Pending_HR"),
+          date: item.createdAt,
+          details: <JsonPreview value={item.requestedDataJson} />,
+          actions: [
+            {
+              kind: "approve",
+              label: "Duyệt",
+              tone: "primary",
+              run: () => dependentApi.reviewRequest(item.id, { isApproved: true }),
+            },
+            {
+              kind: "reject",
+              label: "Từ chối",
+              tone: "danger",
+              run: () =>
+                dependentApi.reviewRequest(item.id, {
+                  isApproved: false,
+                  rejectReason: "Từ chối yêu cầu người phụ thuộc.",
+                }),
+            },
+          ],
+        });
+      });
+    } catch {
+      // Bỏ qua nếu role hiện tại không có quyền xem yêu cầu người phụ thuộc.
     }
   };
 
@@ -386,7 +412,7 @@ export const ApprovalWorkspacePage = () => {
           target.push(mapOvertimeItem(item, "director")),
         );
       } catch {
-        // Bá» qua.
+        // Bỏ qua.
       }
     }
   };
@@ -719,8 +745,8 @@ const FilterPanel = ({
   filters,
   setFilters,
 }: {
-  filters: Filters;
-  setFilters: (value: Filters) => void;
+  filters: ApprovalWorkspaceFilters;
+  setFilters: (value: ApprovalWorkspaceFilters) => void;
 }) => (
   <FeatureCard title="Bộ lọc">
     <div className="grid gap-4 md:grid-cols-4">
@@ -732,7 +758,7 @@ const FilterPanel = ({
           className={fieldClass}
           value={filters.module}
           onChange={(event) =>
-            setFilters({ ...filters, module: event.target.value as Filters["module"] })
+            setFilters({ ...filters, module: event.target.value as ApprovalWorkspaceFilters["module"] })
           }
         >
           {APPROVAL_MODULES.map((module) => (
@@ -885,6 +911,13 @@ const centralSubtitle = (item: PendingApprovalDto) =>
   [item.positionName, item.departmentName, item.description]
     .filter(Boolean)
     .join(" · ");
+
+const dependentActionLabel = (actionType: string) => {
+  if (actionType === "CREATE") return "Thêm mới";
+  if (actionType === "UPDATE") return "Cập nhật";
+  if (actionType === "DEACTIVATE") return "Ngừng hiệu lực";
+  return actionType;
+};
 
 const getErrorMessage = (error: unknown) =>
   error instanceof Error ? error.message : "Đã có lỗi xảy ra.";

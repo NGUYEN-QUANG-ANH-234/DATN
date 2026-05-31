@@ -1,4 +1,8 @@
-import React, { useMemo, useState } from "react";
+import type { FormEvent } from "react";
+import { useMemo, useState } from "react";
+import { MapPin, Plus, Save, Trash2 } from "lucide-react";
+import { PageHeader } from "../../../components/layout";
+import { Badge, Button, Card } from "../../../components/ui";
 import { useAttendanceConfig } from "../hooks/useAttendanceConfig";
 import type {
   AttendanceConfig,
@@ -25,7 +29,7 @@ const toOfficeLocations = (
 
   return [
     {
-      name: "Co so chinh",
+      name: "Cơ sở chính",
       latitude: config.latitude,
       longitude: config.longitude,
       radiusInMeters: config.radiusInMeters,
@@ -35,9 +39,14 @@ const toOfficeLocations = (
   ];
 };
 
-export const AttendanceConfigManager: React.FC = () => {
+type MessageState = {
+  type: "success" | "error";
+  text: string;
+};
+
+export const AttendanceConfigManager = () => {
   const { config, loading, updateConfig } = useAttendanceConfig();
-  const [message, setMessage] = useState<string>("");
+  const [message, setMessage] = useState<MessageState | null>(null);
   const [draftOffices, setDraftOffices] = useState<AttendanceOfficeLocation[]>([
     emptyOffice(),
   ]);
@@ -47,23 +56,16 @@ export const AttendanceConfigManager: React.FC = () => {
   const offices = isDirty ? draftOffices : configuredOffices;
 
   const updateDraftOffices = (
-    updater: (
-      current: AttendanceOfficeLocation[],
-    ) => AttendanceOfficeLocation[],
+    updater: (current: AttendanceOfficeLocation[]) => AttendanceOfficeLocation[],
   ) => {
     setIsDirty(true);
-    setDraftOffices((current) =>
-      updater(isDirty ? current : configuredOffices),
-    );
+    setDraftOffices((current) => updater(isDirty ? current : configuredOffices));
   };
 
-  const updateOffice = (
-    index: number,
-    patch: Partial<AttendanceOfficeLocation>,
-  ) => {
+  const updateOffice = (index: number, patch: Partial<AttendanceOfficeLocation>) => {
     updateDraftOffices((current) =>
-      current.map((office, i) =>
-        i === index ? { ...office, ...patch } : office,
+      current.map((office, officeIndex) =>
+        officeIndex === index ? { ...office, ...patch } : office,
       ),
     );
   };
@@ -79,12 +81,12 @@ export const AttendanceConfigManager: React.FC = () => {
 
   const removeOffice = (index: number) => {
     updateDraftOffices((current) =>
-      current.length === 1 ? current : current.filter((_, i) => i !== index),
+      current.length === 1 ? current : current.filter((_, officeIndex) => officeIndex !== index),
     );
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault();
     try {
       const normalizedOffices = offices.map((office) => ({
         ...office,
@@ -92,13 +94,11 @@ export const AttendanceConfigManager: React.FC = () => {
         latitude: Number(office.latitude),
         longitude: Number(office.longitude),
         radiusInMeters: Number(office.radiusInMeters),
-        allowedIpRanges: office.allowedIpRanges
-          .map((ip) => ip.trim())
-          .filter(Boolean),
+        allowedIpRanges: office.allowedIpRanges.map((ip) => ip.trim()).filter(Boolean),
       }));
 
-      const primaryOffice = normalizedOffices.find((office) => office.isActive) ??
-        normalizedOffices[0];
+      const primaryOffice =
+        normalizedOffices.find((office) => office.isActive) ?? normalizedOffices[0];
 
       const payload: AttendanceConfig = {
         latitude: primaryOffice.latitude,
@@ -111,161 +111,182 @@ export const AttendanceConfigManager: React.FC = () => {
       const res = (await updateConfig(payload)) as { message?: string };
       setDraftOffices(normalizedOffices);
       setIsDirty(true);
-      setMessage(res.message || "Luu cau hinh thanh cong.");
+      setMessage({
+        type: "success",
+        text: res.message || "Đã lưu cấu hình chấm công.",
+      });
     } catch (error: unknown) {
-      setMessage(`Loi: ${error instanceof Error ? error.message : String(error)}`);
+      setMessage({
+        type: "error",
+        text: error instanceof Error ? error.message : String(error),
+      });
     }
   };
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
-      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-xl font-bold text-gray-900">
-            Cau hinh tham so cham cong
-          </h2>
-          <p className="mt-1 text-sm text-gray-500">
-            Moi co so co toa do GPS, ban kinh va danh sach IP/CIDR rieng.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() =>
-            updateDraftOffices((current) => [...current, emptyOffice()])
-          }
-          className="rounded bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+    <div className="space-y-6">
+      <PageHeader
+        title="F0.4 Cấu hình tham số chấm công"
+        description="Thiết lập IP public, tọa độ GPS và bán kính hợp lệ cho từng cơ sở làm việc để kiểm tra điều kiện check-in/check-out."
+        breadcrumb={[
+          { label: "Module 0" },
+          { label: "Cấu hình hệ thống" },
+          { label: "Tham số chấm công" },
+        ]}
+        actions={
+          <Button
+            variant="secondary"
+            iconLeft={<Plus size={17} />}
+            onClick={() => updateDraftOffices((current) => [...current, emptyOffice()])}
+          >
+            Thêm cơ sở
+          </Button>
+        }
+      />
+
+      {message && (
+        <div
+          className={`rounded-2xl border px-4 py-3 text-sm font-medium ${
+            message.type === "error"
+              ? "border-[var(--hicas-danger)] bg-[var(--hicas-danger-soft)] text-[var(--hicas-danger)]"
+              : "border-[var(--hicas-success)] bg-[var(--hicas-success-soft)] text-[var(--hicas-success)]"
+          }`}
         >
-          Them co so
-        </button>
-      </div>
+          {message.text}
+        </div>
+      )}
 
       {loading && !config ? (
-        <p>Dang tai du lieu...</p>
+        <Card>
+          <div className="py-10 text-center text-sm text-[var(--hicas-text-secondary)]">
+            Đang tải cấu hình chấm công...
+          </div>
+        </Card>
       ) : (
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {offices.map((office, index) => (
-            <section
-              key={index}
-              className="rounded-lg border border-gray-200 p-4"
-            >
-              <div className="mb-4 flex items-center justify-between gap-3">
-                <h3 className="font-semibold text-gray-900">
-                  Co so #{index + 1}
-                </h3>
-                <button
-                  type="button"
-                  onClick={() => removeOffice(index)}
-                  disabled={offices.length === 1}
-                  className="rounded border border-red-200 px-3 py-1 text-sm font-medium text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  Xoa
-                </button>
-              </div>
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="grid gap-5 xl:grid-cols-2">
+            {offices.map((office, index) => (
+              <Card
+                key={index}
+                title={`Cơ sở #${index + 1}`}
+                description="Tọa độ, bán kính và danh sách IP/CIDR cho phép."
+                actions={
+                  <div className="flex items-center gap-2">
+                    <Badge variant={office.isActive ? "success" : "neutral"}>
+                      {office.isActive ? "Đang áp dụng" : "Tạm tắt"}
+                    </Badge>
+                    <button
+                      type="button"
+                      onClick={() => removeOffice(index)}
+                      disabled={offices.length === 1}
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--hicas-border)] text-[var(--hicas-danger)] transition hover:bg-[var(--hicas-danger-soft)] disabled:cursor-not-allowed disabled:opacity-40"
+                      aria-label="Xóa cơ sở"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                }
+              >
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="block md:col-span-2">
+                    <span className="mb-2 block text-sm font-semibold">Tên cơ sở *</span>
+                    <input
+                      required
+                      value={office.name}
+                      onChange={(event) => updateOffice(index, { name: event.target.value })}
+                      className="hicas-input w-full"
+                      placeholder="Ví dụ: Trụ sở Hà Nội"
+                    />
+                  </label>
 
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-sm font-medium">
-                    Ten co so *
+                  <label className="flex items-center gap-2 rounded-2xl border border-[var(--hicas-border)] px-4 py-3 text-sm font-medium md:col-span-2">
+                    <input
+                      type="checkbox"
+                      checked={office.isActive}
+                      onChange={(event) =>
+                        updateOffice(index, { isActive: event.target.checked })
+                      }
+                      className="accent-[var(--hicas-orange)]"
+                    />
+                    Cho phép chấm công tại cơ sở này
                   </label>
-                  <input
-                    required
-                    value={office.name}
-                    onChange={(e) => updateOffice(index, { name: e.target.value })}
-                    className="w-full rounded border p-2"
-                    placeholder="VD: Tru so Ha Noi"
-                  />
-                </div>
-                <label className="flex items-end gap-2 text-sm font-medium">
-                  <input
-                    type="checkbox"
-                    checked={office.isActive}
-                    onChange={(e) =>
-                      updateOffice(index, { isActive: e.target.checked })
-                    }
-                    className="mb-3"
-                  />
-                  Dang ap dung
-                </label>
-                <div>
-                  <label className="mb-1 block text-sm font-medium">
-                    Vi do (Latitude) *
-                  </label>
-                  <input
-                    required
-                    type="number"
-                    step="any"
-                    value={office.latitude}
-                    onChange={(e) =>
-                      updateOffice(index, { latitude: Number(e.target.value) })
-                    }
-                    className="w-full rounded border p-2"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium">
-                    Kinh do (Longitude) *
-                  </label>
-                  <input
-                    required
-                    type="number"
-                    step="any"
-                    value={office.longitude}
-                    onChange={(e) =>
-                      updateOffice(index, { longitude: Number(e.target.value) })
-                    }
-                    className="w-full rounded border p-2"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium">
-                    Ban kinh cho phep (m) *
-                  </label>
-                  <input
-                    required
-                    type="number"
-                    min="1"
-                    value={office.radiusInMeters}
-                    onChange={(e) =>
-                      updateOffice(index, {
-                        radiusInMeters: Number(e.target.value),
-                      })
-                    }
-                    className="w-full rounded border p-2"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium">
-                    IP Public/CIDR hop le *
-                  </label>
-                  <textarea
-                    required
-                    rows={4}
-                    value={office.allowedIpRanges.join("\n")}
-                    onChange={(e) => updateIpRanges(index, e.target.value)}
-                    className="w-full rounded border p-2 font-mono text-sm"
-                    placeholder={"123.16.84.230\n123.16.84.0/24"}
-                  />
-                </div>
-              </div>
-            </section>
-          ))}
 
-          <button
-            type="submit"
-            className="rounded bg-purple-600 px-4 py-2 font-semibold text-white hover:bg-purple-700"
-          >
-            Luu cau hinh cham cong
-          </button>
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-semibold">Vĩ độ *</span>
+                    <input
+                      required
+                      type="number"
+                      step="any"
+                      value={office.latitude}
+                      onChange={(event) =>
+                        updateOffice(index, { latitude: Number(event.target.value) })
+                      }
+                      className="hicas-input w-full"
+                    />
+                  </label>
 
-          {message && (
-            <p
-              className={`text-sm font-medium ${
-                message.startsWith("Loi") ? "text-red-600" : "text-green-600"
-              }`}
-            >
-              {message}
-            </p>
-          )}
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-semibold">Kinh độ *</span>
+                    <input
+                      required
+                      type="number"
+                      step="any"
+                      value={office.longitude}
+                      onChange={(event) =>
+                        updateOffice(index, { longitude: Number(event.target.value) })
+                      }
+                      className="hicas-input w-full"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-semibold">
+                      Bán kính cho phép (m) *
+                    </span>
+                    <input
+                      required
+                      type="number"
+                      min="1"
+                      value={office.radiusInMeters}
+                      onChange={(event) =>
+                        updateOffice(index, { radiusInMeters: Number(event.target.value) })
+                      }
+                      className="hicas-input w-full"
+                    />
+                  </label>
+
+                  <div className="rounded-2xl border border-[var(--hicas-border)] bg-[var(--hicas-orange-lighter)] p-4 text-sm text-[var(--hicas-text-secondary)]">
+                    <div className="mb-2 flex items-center gap-2 font-semibold text-[var(--hicas-text-main)]">
+                      <MapPin size={17} className="text-[var(--hicas-orange)]" />
+                      Điều kiện xác thực
+                    </div>
+                    Check-in hợp lệ khi thiết bị nằm trong bán kính GPS và IP public thuộc
+                    danh sách cho phép.
+                  </div>
+
+                  <label className="block md:col-span-2">
+                    <span className="mb-2 block text-sm font-semibold">
+                      IP Public/CIDR hợp lệ *
+                    </span>
+                    <textarea
+                      required
+                      rows={4}
+                      value={office.allowedIpRanges.join("\n")}
+                      onChange={(event) => updateIpRanges(index, event.target.value)}
+                      className="hicas-textarea w-full font-mono text-sm"
+                      placeholder={"123.16.84.230\n123.16.84.0/24"}
+                    />
+                  </label>
+                </div>
+              </Card>
+            ))}
+          </div>
+
+          <div className="flex justify-end">
+            <Button type="submit" iconLeft={<Save size={17} />}>
+              Lưu cấu hình chấm công
+            </Button>
+          </div>
         </form>
       )}
     </div>

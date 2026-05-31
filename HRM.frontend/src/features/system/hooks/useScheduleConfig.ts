@@ -4,6 +4,7 @@ import type {
   ConfiguredScheduleItem,
   LeaveTypeSelect,
   ConfigureWorkScheduleDto,
+  ScheduleChangeHistoryItem,
 } from "../types/scheduleConfig";
 import type { DepartmentTree } from "../../organization/types/department";
 import { useNotification } from "../../../core/context/NotificationContext";
@@ -14,6 +15,7 @@ export const useScheduleConfig = () => {
   const [configuredSchedules, setConfiguredSchedules] = useState<
     ConfiguredScheduleItem[]
   >([]);
+  const [history, setHistory] = useState<ScheduleChangeHistoryItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const { triggerAlert } = useNotification();
@@ -21,14 +23,16 @@ export const useScheduleConfig = () => {
   const loadMasterData = useCallback(async () => {
     setLoading(true);
     try {
-      const [deptRes, leaveRes, configRes] = await Promise.all([
+      const [deptRes, leaveRes, configRes, historyRes] = await Promise.all([
         scheduleApi.getDepartments(),
         scheduleApi.getLeaveTypes(),
         scheduleApi.getConfiguredSchedules(),
+        scheduleApi.getScheduleHistory(),
       ]);
       setDepartments(deptRes.data || []);
       setLeaveTypes(leaveRes.data || []);
       setConfiguredSchedules(configRes.data || []);
+      setHistory(historyRes.data || []);
     } catch (error) {
       console.error("Lỗi hệ thống:", error);
     } finally {
@@ -47,7 +51,9 @@ export const useScheduleConfig = () => {
       );
 
       const configRes = await scheduleApi.getConfiguredSchedules();
+      const historyRes = await scheduleApi.getScheduleHistory();
       setConfiguredSchedules(configRes.data || []);
+      setHistory(historyRes.data || []);
       return true;
     } catch (error: unknown) {
       const message =
@@ -74,6 +80,7 @@ export const useScheduleConfig = () => {
     departments,
     leaveTypes,
     configuredSchedules,
+    history,
     loading,
     submitting,
     handleSaveConfig,

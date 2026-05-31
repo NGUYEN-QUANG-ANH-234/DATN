@@ -19,6 +19,17 @@ export interface MfaConfirmResponse {
   recoveryCodes: string[];
 }
 
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+}
+
+export interface ChangePasswordResponse {
+  message?: string;
+  Message?: string;
+}
+
 // Định nghĩa kiểu dữ liệu của Token trả về từ C#
 export interface JwtPayload {
   // Thay vì email, .NET dùng chuẩn URL cho các claim mặc định.

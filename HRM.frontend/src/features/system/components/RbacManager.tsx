@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
+import { Button, Card, EmptyState } from "../../../components/ui";
 import { useRbac } from "../hooks/useRbac";
 
 type RolePermission = {
@@ -18,22 +19,16 @@ type PermissionModule = {
 };
 
 export const RbacManager: React.FC = () => {
-  // 1. Bổ sung availableModules từ hook
   const { roles, availableModules, loading, updatePermissions } = useRbac();
-  const availableModulesTyped = availableModules as
-    | PermissionModule[]
-    | undefined;
+  const availableModulesTyped = availableModules as PermissionModule[] | undefined;
 
-  const [selectedRoleId, setSelectedRoleId] = useState<string | number | null>(
-    null,
-  );
+  const [selectedRoleId, setSelectedRoleId] = useState<string | number | null>(null);
   const [currentPermissions, setCurrentPermissions] = useState<string[]>([]);
   const [message, setMessage] = useState<string>("");
 
   useEffect(() => {
     if (selectedRoleId !== null) {
-      const role = roles.find((r) => r.roleId === selectedRoleId);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+      const role = roles.find((item) => item.roleId === selectedRoleId);
       setCurrentPermissions(role ? [...role.permissions] : []);
       setMessage("");
     }
@@ -41,26 +36,22 @@ export const RbacManager: React.FC = () => {
 
   const handleCheckboxChange = (code: string) => {
     setCurrentPermissions((prev) =>
-      prev.includes(code) ? prev.filter((p) => p !== code) : [...prev, code],
+      prev.includes(code) ? prev.filter((permission) => permission !== code) : [...prev, code],
     );
   };
 
-  // 2. Cập nhật hàm xử lý đầu vào là mảng Object thay vì mảng String
   const handleSelectAll = (moduleCodes: PermissionItem[]) => {
-    const codesOnly = moduleCodes.map((c) => c.code); // Tách lấy mảng chuỗi code
-    const isAllSelected = codesOnly.every((code) =>
-      currentPermissions.includes(code),
-    );
+    const codesOnly = moduleCodes.map((item) => item.code);
+    const isAllSelected = codesOnly.every((code) => currentPermissions.includes(code));
 
     if (isAllSelected) {
       setCurrentPermissions((prev) =>
-        prev.filter((p) => !codesOnly.includes(p)),
+        prev.filter((permission) => !codesOnly.includes(permission)),
       );
-    } else {
-      setCurrentPermissions((prev) =>
-        Array.from(new Set([...prev, ...codesOnly])),
-      );
+      return;
     }
+
+    setCurrentPermissions((prev) => Array.from(new Set([...prev, ...codesOnly])));
   };
 
   const handleSubmit = async () => {
@@ -72,150 +63,142 @@ export const RbacManager: React.FC = () => {
         permissionCodes: currentPermissions,
       });
 
-      const message =
+      const responseMessage =
         typeof res === "object" && res !== null && "message" in res
           ? String((res as { message?: unknown }).message || "")
           : "";
 
-      setMessage(message || "Cập nhật quyền thành công!");
+      setMessage(responseMessage || "Cập nhật quyền thành công!");
     } catch (error: unknown) {
       setMessage(`Lỗi: ${error}`);
     }
   };
 
-  const selectedRole = roles.find((r) => r.roleId === selectedRoleId);
+  const selectedRole = roles.find((role) => role.roleId === selectedRoleId);
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
-      <h2 className="text-xl font-bold mb-4">Phân quyền Hệ thống (RBAC)</h2>
-
+    <Card
+      title="Phân quyền hệ thống (RBAC)"
+      description="Quản lý ma trận quyền truy cập theo vai trò và chức năng trong từng phân hệ."
+    >
       {loading && roles.length === 0 ? (
-        <p>Đang tải dữ liệu...</p>
+        <p className="text-sm text-[var(--hicas-text-secondary)]">Đang tải dữ liệu...</p>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          {/* Cột trái: Danh sách Vai trò */}
-          <div className="col-span-1 border-r pr-4">
-            <h3 className="font-semibold mb-3">Chọn Vai trò</h3>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[260px_1fr]">
+          <aside className="border-b border-[var(--hicas-border-soft)] pb-4 lg:border-b-0 lg:border-r lg:pr-4">
+            <h3 className="mb-3 text-sm font-semibold text-[var(--hicas-text-main)]">
+              Chọn vai trò
+            </h3>
             <div className="space-y-2">
               {roles.map((role: RolePermission) => (
                 <button
                   key={role.roleId}
+                  type="button"
                   onClick={() => setSelectedRoleId(role.roleId)}
-                  className={`w-full text-left p-2 rounded border ${
+                  className={`min-h-10 w-full rounded-[var(--radius-md)] border px-3 text-left text-sm transition ${
                     selectedRoleId === role.roleId
-                      ? "bg-purple-50 border-purple-400 text-purple-700 font-medium"
-                      : "hover:bg-gray-50"
+                      ? "border-[var(--hicas-orange)] bg-[var(--hicas-orange-soft)] font-semibold text-[var(--hicas-orange-dark)]"
+                      : "border-[var(--hicas-border)] text-[var(--hicas-text-main)] hover:border-[var(--hicas-orange)] hover:bg-[var(--hicas-orange-lighter)]"
                   }`}
                 >
                   {role.roleName}
                   {role.roleId === 1 && (
-                    <span className="ml-2 text-xs text-red-500">(Root)</span>
+                    <span className="ml-2 text-xs text-[var(--hicas-danger)]">(Root)</span>
                   )}
                 </button>
               ))}
             </div>
-          </div>
+          </aside>
 
-          {/* Cột phải: Ma trận Quyền Động */}
-          <div className="col-span-3">
+          <section>
             {!selectedRole ? (
-              <p className="text-gray-500 italic mt-4">
-                Vui lòng chọn một vai trò bên trái để cấu hình.
-              </p>
+              <EmptyState
+                title="Chưa chọn vai trò"
+                description="Chọn một vai trò ở danh sách bên trái để cấu hình quyền."
+              />
             ) : (
-              <div>
-                <div className="flex justify-between items-center mb-4 border-b pb-2">
-                  <h3 className="font-semibold text-lg text-purple-800">
+              <div className="space-y-5">
+                <div className="flex flex-col gap-3 border-b border-[var(--hicas-border-soft)] pb-4 sm:flex-row sm:items-center sm:justify-between">
+                  <h3 className="text-lg font-semibold text-[var(--hicas-text-main)]">
                     Quyền hạn của: {selectedRole.roleName}
                   </h3>
-                  <button
+                  <Button
                     onClick={handleSubmit}
-                    disabled={selectedRole.roleId === 1} // Khóa SuperAdmin
-                    className={`px-4 py-2 rounded text-white ${
-                      selectedRole.roleId === 1
-                        ? "bg-gray-400 cursor-not-allowed"
-                        : "bg-purple-600 hover:bg-purple-700"
-                    }`}
+                    disabled={selectedRole.roleId === 1}
+                    variant={selectedRole.roleId === 1 ? "secondary" : "primary"}
                   >
-                    Lưu Thay Đổi
-                  </button>
+                    Lưu thay đổi
+                  </Button>
                 </div>
 
                 {selectedRole.roleId === 1 && (
-                  <p className="text-sm text-red-600 mb-4 bg-red-50 p-2 rounded">
-                    Bảo mật: Hệ thống không cho phép chỉnh sửa quyền của tài
-                    khoản Root (Super Admin).
-                  </p>
+                  <div className="rounded-[var(--radius-md)] border border-[var(--hicas-danger)] bg-[var(--hicas-danger-soft)] px-4 py-3 text-sm text-[var(--hicas-danger)]">
+                    Bảo mật: hệ thống không cho phép chỉnh sửa quyền của tài khoản Root (Super Admin).
+                  </div>
                 )}
 
                 {message && (
                   <p
-                    className={`mb-4 text-sm font-medium ${
+                    className={`text-sm font-medium ${
                       message.startsWith("Lỗi")
-                        ? "text-red-600"
-                        : "text-green-600"
+                        ? "text-[var(--hicas-danger)]"
+                        : "text-[var(--hicas-success)]"
                     }`}
                   >
                     {message}
                   </p>
                 )}
 
-                {/* 3. Render danh sách từ availableModules */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {availableModulesTyped?.map(
-                    (module: PermissionModule, idx: number) => (
-                      <div key={idx} className="border p-4 rounded bg-gray-50">
-                        <div className="flex justify-between items-center mb-3">
-                          <h4 className="font-medium text-gray-800">
-                            {module.group}
-                          </h4>
-                          <button
-                            type="button"
-                            onClick={() => handleSelectAll(module.codes)}
-                            disabled={selectedRole.roleId === 1}
-                            className="text-xs text-blue-600 hover:underline"
-                          >
-                            Chọn/Bỏ chọn tất cả
-                          </button>
-                        </div>
-
-                        <div className="space-y-2">
-                          {module.codes.map((item: PermissionItem) => (
-                            <label
-                              key={item.code}
-                              className="flex flex-col cursor-pointer"
-                            >
-                              <div className="flex items-center space-x-2">
-                                <input
-                                  type="checkbox"
-                                  checked={currentPermissions.includes(
-                                    item.code,
-                                  )}
-                                  onChange={() =>
-                                    handleCheckboxChange(item.code)
-                                  }
-                                  disabled={selectedRole.roleId === 1}
-                                  className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500"
-                                />
-                                <span className="text-sm text-gray-700 font-bold">
-                                  {item.code}
-                                </span>
-                              </div>
-                              <span className="text-xs text-gray-500 ml-6">
-                                {item.desc}
-                              </span>
-                            </label>
-                          ))}
-                        </div>
+                <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                  {availableModulesTyped?.map((module: PermissionModule) => (
+                    <div
+                      key={module.group}
+                      className="rounded-[var(--radius-lg)] border border-[var(--hicas-border)] bg-[var(--hicas-bg)] p-4"
+                    >
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <h4 className="font-semibold text-[var(--hicas-text-main)]">
+                          {module.group}
+                        </h4>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleSelectAll(module.codes)}
+                          disabled={selectedRole.roleId === 1}
+                        >
+                          Chọn/Bỏ chọn tất cả
+                        </Button>
                       </div>
-                    ),
-                  )}
+
+                      <div className="space-y-3">
+                        {module.codes.map((item: PermissionItem) => (
+                          <label key={item.code} className="flex cursor-pointer flex-col">
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={currentPermissions.includes(item.code)}
+                                onChange={() => handleCheckboxChange(item.code)}
+                                disabled={selectedRole.roleId === 1}
+                                className="h-4 w-4 rounded border-[var(--hicas-border)] accent-[var(--hicas-orange)]"
+                              />
+                              <span className="text-sm font-semibold text-[var(--hicas-text-main)]">
+                                {item.code}
+                              </span>
+                            </div>
+                            <span className="ml-6 text-xs leading-5 text-[var(--hicas-text-secondary)]">
+                              {item.desc}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
-          </div>
+          </section>
         </div>
       )}
-    </div>
+    </Card>
   );
 };

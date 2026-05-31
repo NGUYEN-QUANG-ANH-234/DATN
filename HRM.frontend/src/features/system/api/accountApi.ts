@@ -1,7 +1,19 @@
 import axiosClient from "../../../core/api/axiosClient";
-import type { CreateAccountDto, AccountStatus } from "../types/account";
+import type {
+  CreateAccountDto,
+  AccountStatus,
+  CreateAccountResultDto,
+  ResetPasswordResultDto,
+} from "../types/account";
 
 const ENDPOINT = "/accounts";
+
+const accountStatusValue: Record<AccountStatus, number> = {
+  Active: 0,
+  Inactive: 1,
+  Locked: 2,
+  Suspended: 3,
+};
 
 export const accountApi = {
   // Giả định bạn đã (hoặc sẽ) có 1 hàm GET danh sách User ở Backend
@@ -15,16 +27,21 @@ export const accountApi = {
   },
 
   createAccount: async (data: CreateAccountDto) => {
-    return await axiosClient.post(ENDPOINT, data);
+    return await axiosClient.post<unknown, { data?: CreateAccountResultDto }>(
+      ENDPOINT,
+      data,
+    );
   },
 
   toggleStatus: async (id: number, status: AccountStatus) => {
     return await axiosClient.patch(`${ENDPOINT}/${id}/status`, {
-      status,
+      status: accountStatusValue[status],
     });
   },
 
   resetPassword: async (id: number) => {
-    return await axiosClient.post(`${ENDPOINT}/${id}/reset-password`);
+    return await axiosClient.post<unknown, { data?: ResetPasswordResultDto }>(
+      `${ENDPOINT}/${id}/reset-password`,
+    );
   },
 };

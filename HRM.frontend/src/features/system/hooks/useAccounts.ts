@@ -46,11 +46,14 @@ export const useAccounts = () => {
 
   const handleCreateAccount = async (data: CreateAccountDto) => {
     try {
-      await accountApi.createAccount(data);
+      const response = await accountApi.createAccount(data);
+      const temporaryPassword = response.data?.temporaryPassword;
       triggerAlert(
         "success",
         "Đã tạo tài khoản",
-        "Mật khẩu đã được gửi qua email nhân viên.",
+        temporaryPassword
+          ? `Mật khẩu tạm thời: ${temporaryPassword}`
+          : "Tài khoản đã được tạo với mật khẩu bạn đã nhập.",
       );
       fetchData();
       return true;
@@ -64,7 +67,8 @@ export const useAccounts = () => {
     id: number,
     currentStatus: AccountStatus,
   ) => {
-    const newStatus = currentStatus === "Active" ? "Inactive" : "Active";
+    const newStatus: AccountStatus =
+      currentStatus === "Active" ? "Locked" : "Active";
     triggerAlert(
       "confirm",
       "Xác nhận đổi trạng thái",
@@ -96,11 +100,14 @@ export const useAccounts = () => {
       "Cấp lại mật khẩu mới cho nhân viên này?",
       async () => {
         try {
-          await accountApi.resetPassword(id);
+          const response = await accountApi.resetPassword(id);
+          const temporaryPassword = response.data?.temporaryPassword;
           triggerAlert(
             "success",
             "Đã cấp lại mật khẩu",
-            "Mật khẩu mới đã được tạo và gửi vào email nhân viên.",
+            temporaryPassword
+              ? `Mật khẩu mới: ${temporaryPassword}`
+              : "Mật khẩu mới đã được tạo và gửi vào email nhân viên.",
           );
         } catch (error: unknown) {
           triggerAlert(

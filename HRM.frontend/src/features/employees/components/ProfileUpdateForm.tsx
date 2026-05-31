@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import axiosClient from "../../../core/api/axiosClient";
 import type { ProfileUpdateFormState } from "../types/profile";
 import { useNotification } from "../../../core/context/NotificationContext";
+import { useMyProfileData } from "../hooks/useMyProfileData";
+import { DependentManagement } from "./DependentManagement";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "application/pdf"];
@@ -10,6 +12,10 @@ const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png"];
 export const ProfileUpdateForm: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const { triggerAlert } = useNotification();
+  const { dependents, loadingDependents, refreshDependents } = useMyProfileData({
+    includeProfile: false,
+    includeContracts: false,
+  });
 
   const [formState, setFormState] = useState<ProfileUpdateFormState>({
     fullName: "",
@@ -483,6 +489,12 @@ export const ProfileUpdateForm: React.FC = () => {
             </button>
           </div>
         </form>
+
+        <DependentManagement
+          dependents={dependents}
+          loading={loadingDependents}
+          onRefresh={refreshDependents}
+        />
       </div>
     </div>
   );

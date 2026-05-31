@@ -10,6 +10,14 @@ export interface ConfigureWorkScheduleDto {
   leaveTypeId: number;
   year: number;
   totalDays: number;
+  month: number;
+  standardWorkDays: number;
+  standardHoursPerDay: number;
+  includePaidLeaveInWorkDays: boolean;
+  workingDaysOfWeek?: string | null;
+  holidayDatesJson?: string | null;
+  lockWorkCalendar: boolean;
+  calendarNote?: string | null;
 }
 
 export interface ConfiguredScheduleItem {
@@ -25,9 +33,31 @@ export interface ConfiguredScheduleItem {
   leaveTypeName: string;
   year: number;
   totalDays: number;
+  month?: number | null;
+  standardWorkDays?: number | null;
+  standardHoursPerDay?: number | null;
+  includePaidLeaveInWorkDays: boolean;
+  workingDaysOfWeek?: string | null;
+  holidayDatesJson?: string | null;
+  isWorkCalendarLocked: boolean;
+  calendarNote?: string | null;
 }
 
 export interface LeaveTypeSelect {
   id: number;
   typeName: string;
+  category: string;
+  isPaid: boolean;
+  countsAsUnpaidForInsurance: boolean;
+  countsAsWorkday: boolean;
+  deductAnnualLeave: boolean;
+  affectsKpiPenalty: boolean;
+}
+
+export interface ScheduleChangeHistoryItem {
+  id: number;
+  actionType: string;
+  actorName?: string | null;
+  message?: string | null;
+  timestamp: string;
 }

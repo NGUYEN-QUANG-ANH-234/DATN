@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import {
-  FeatureCard,
-  FeaturePage,
-  primaryButtonClass,
-} from "../../../core/components/FeatureShell";
+import { Button, Card, DataTable, StatusBadge } from "../../../components/ui";
+import type { DataTableColumn } from "../../../components/ui";
 import { useCurrentUser } from "../../../core/auth/hooks/useCurrentUser";
 import { useNotification } from "../../../core/context/NotificationContext";
+import { FeaturePage } from "../../../core/components/FeatureShell";
+import { formatDate } from "../../../utils";
 import {
   leaveRequestApi,
   type LeaveRequest,
@@ -29,6 +28,8 @@ export const LeaveRequestPage = () => {
     endDate: today,
     reason: "",
   });
+  const selectedLeaveType = leaveTypes.find((type) => type.id.toString() === form.leaveTypeId);
+  const isMaternityLeave = selectedLeaveType?.category === "Maternity";
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -89,24 +90,19 @@ export const LeaveRequestPage = () => {
       width="wide"
     >
       {!isAdmin && (
-        <FeatureCard title="Tạo đơn nghỉ phép">
-          <form
-            className="grid gap-4 md:grid-cols-2 xl:grid-cols-5"
-            onSubmit={submit}
-          >
+        <Card title="Tạo đơn nghỉ phép">
+          <form className="grid gap-4 md:grid-cols-2 xl:grid-cols-5" onSubmit={submit}>
             <Field label="Loại phép">
               <select
                 required
                 value={form.leaveTypeId}
-                onChange={(event) =>
-                  setForm({ ...form, leaveTypeId: event.target.value })
-                }
-                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                onChange={(event) => setForm({ ...form, leaveTypeId: event.target.value })}
+                className="hicas-input w-full"
               >
                 <option value="">Chọn loại phép</option>
                 {leaveTypes.map((type) => (
                   <option key={type.id} value={type.id}>
-                    {type.typeName}
+                    {type.typeName}{type.category === "Maternity" ? " - Thai sản" : ""}
                   </option>
                 ))}
               </select>
@@ -116,10 +112,8 @@ export const LeaveRequestPage = () => {
                 type="date"
                 required
                 value={form.startDate}
-                onChange={(event) =>
-                  setForm({ ...form, startDate: event.target.value })
-                }
-                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                onChange={(event) => setForm({ ...form, startDate: event.target.value })}
+                className="hicas-input w-full"
               />
             </Field>
             <Field label="Đến ngày">
@@ -127,10 +121,8 @@ export const LeaveRequestPage = () => {
                 type="date"
                 required
                 value={form.endDate}
-                onChange={(event) =>
-                  setForm({ ...form, endDate: event.target.value })
-                }
-                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                onChange={(event) => setForm({ ...form, endDate: event.target.value })}
+                className="hicas-input w-full"
               />
             </Field>
             <div className="md:col-span-2 xl:col-span-5">
@@ -138,42 +130,42 @@ export const LeaveRequestPage = () => {
                 <textarea
                   required
                   value={form.reason}
-                  onChange={(event) =>
-                    setForm({ ...form, reason: event.target.value })
-                  }
+                  onChange={(event) => setForm({ ...form, reason: event.target.value })}
                   rows={3}
-                  className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                  className="hicas-input min-h-[104px] w-full py-3"
                 />
               </Field>
             </div>
+            {isMaternityLeave && (
+              <div className="md:col-span-2 xl:col-span-5 rounded-2xl border border-[var(--hicas-orange)]/30 bg-[var(--hicas-orange-lighter)] px-4 py-3 text-sm text-[var(--hicas-text-main)]">
+                Đơn nghỉ thai sản sau khi được duyệt sẽ tự động ghi nhận hồ sơ thai sản,
+                cập nhật trạng thái nhân sự và đồng bộ bảng công/payroll theo loại nghỉ thai sản.
+              </div>
+            )}
             <div className="md:col-span-2 xl:col-span-5">
-              <button
-                type="submit"
-                disabled={loading}
-                className={primaryButtonClass}
-              >
+              <Button type="submit" isLoading={loading}>
                 Gửi đơn nghỉ phép
-              </button>
+              </Button>
             </div>
           </form>
-        </FeatureCard>
+        </Card>
       )}
 
       {!isAdmin && (
         <LeaveTable
           title="Đơn nghỉ phép của tôi"
           data={myRequests}
+          loading={loading}
           emptyText="Bạn chưa có đơn nghỉ phép nào."
         />
       )}
 
       {isAdmin && (
-        <FeatureCard title="Nghỉ phép">
-          <p className="text-sm text-gray-600">
-            Admin xử lý phê duyệt và theo dõi trạng thái nghỉ phép tại mục
-            Phê duyệt.
+        <Card title="Nghỉ phép">
+          <p className="text-sm text-[var(--hicas-text-secondary)]">
+            Admin xử lý phê duyệt và theo dõi trạng thái nghỉ phép tại mục Phê duyệt.
           </p>
-        </FeatureCard>
+        </Card>
       )}
     </FeaturePage>
   );
@@ -181,7 +173,7 @@ export const LeaveRequestPage = () => {
 
 const Field = ({ label, children }: { label: string; children: ReactNode }) => (
   <label className="block">
-    <span className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+    <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--hicas-text-secondary)]">
       {label}
     </span>
     {children}
@@ -191,70 +183,62 @@ const Field = ({ label, children }: { label: string; children: ReactNode }) => (
 const LeaveTable = ({
   title,
   data,
+  loading,
   emptyText,
 }: {
   title: string;
   data: LeaveRequest[];
+  loading: boolean;
   emptyText: string;
-}) => (
-  <FeatureCard title={title}>
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[840px] text-left text-sm">
-        <thead className="border-b bg-gray-50 text-xs uppercase text-gray-500">
-          <tr>
-            <th className="px-3 py-2">Loại phép</th>
-            <th className="px-3 py-2">Thời gian</th>
-            <th className="px-3 py-2">Số ngày</th>
-            <th className="px-3 py-2">Lý do</th>
-            <th className="px-3 py-2">Trạng thái</th>
-          </tr>
-        </thead>
-        <tbody>
-          {data.map((item) => (
-            <tr key={item.id} className="border-b">
-              <td className="px-3 py-3">{item.leaveTypeName}</td>
-              <td className="px-3 py-3">
-                {formatDate(item.startDate)} - {formatDate(item.endDate)}
-              </td>
-              <td className="px-3 py-3">{item.requestedDays}</td>
-              <td className="max-w-[320px] px-3 py-3 text-gray-600">
-                {item.reason}
-              </td>
-              <td className="px-3 py-3">{formatStatus(item.status)}</td>
-            </tr>
-          ))}
-          {data.length === 0 && (
-            <tr>
-              <td colSpan={5} className="px-3 py-6 text-center text-gray-500">
-                {emptyText}
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-    </div>
-  </FeatureCard>
-);
+}) => {
+  const columns: Array<DataTableColumn<LeaveRequest>> = [
+    { key: "type", header: "Loại phép", render: (item) => item.leaveTypeName },
+    {
+      key: "category",
+      header: "Nhóm nghỉ",
+      render: (item) => getLeaveCategoryLabel(item.leaveCategory),
+    },
+    {
+      key: "period",
+      header: "Thời gian",
+      render: (item) => `${formatDate(item.startDate)} - ${formatDate(item.endDate)}`,
+    },
+    { key: "days", header: "Số ngày", render: (item) => item.requestedDays },
+    {
+      key: "reason",
+      header: "Lý do",
+      render: (item) => (
+        <span className="line-clamp-2 text-[var(--hicas-text-secondary)]">{item.reason}</span>
+      ),
+    },
+    { key: "status", header: "Trạng thái", render: (item) => <StatusBadge status={item.status} /> },
+  ];
 
-const formatDate = (value: string) => {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Không xác định";
-  return date.toLocaleDateString("vi-VN");
-};
-
-const formatStatus = (status: string) => {
-  const map: Record<string, string> = {
-    PendingDept: "Chờ Trưởng phòng",
-    PendingDirector: "Chờ Giám đốc",
-    RejectedByDept: "Trưởng phòng từ chối",
-    RejectedByDirector: "Giám đốc từ chối",
-    Approved: "Đã duyệt",
-    AutoDeptApproved: "Tự duyệt cấp phòng",
-    AutoFinalApproved: "Tự duyệt cuối",
-  };
-
-  return map[status] || status;
+  return (
+    <Card title={title}>
+      <DataTable
+        columns={columns}
+        data={data}
+        loading={loading}
+        rowKey={(row) => row.id}
+        emptyTitle={emptyText}
+        className="border-0 shadow-none"
+      />
+    </Card>
+  );
 };
 
 const getErrorMessage = (error: unknown) =>
   error instanceof Error ? error.message : "Đã có lỗi xảy ra.";
+
+const getLeaveCategoryLabel = (category: string) => {
+  const map: Record<string, string> = {
+    AnnualPaid: "Phép năm",
+    Unpaid: "Không lương",
+    Sick: "Ốm đau",
+    Maternity: "Thai sản",
+    SpecialPaid: "Nghỉ hưởng lương khác",
+  };
+
+  return map[category] ?? "Khác";
+};

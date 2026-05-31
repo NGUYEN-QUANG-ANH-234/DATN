@@ -12,7 +12,7 @@ export const useRbac = () => {
     try {
       const [rolesRes, permsRes] = await Promise.all([
         rbacApi.getRoles(),
-        rbacApi.getAllPermissions(), // GỌI API MỚI
+        rbacApi.getAllPermissions(),
       ]);
 
       const parsedRoles = Array.isArray(rolesRes)
@@ -34,7 +34,7 @@ export const useRbac = () => {
   const updatePermissions = async (payload: UpdateRolePermissions) => {
     try {
       const res = (await rbacApi.updatePermissions(payload)) as unknown;
-      await fetchAllData(); // Tải lại danh sách để đồng bộ UI
+      await fetchAllData();
       return res;
     } catch (error: unknown) {
       throw (
@@ -48,6 +48,5 @@ export const useRbac = () => {
     fetchAllData();
   }, [fetchAllData]);
 
-  // NHỚ TRẢ VỀ availableModules
   return { roles, availableModules, loading, updatePermissions };
 };

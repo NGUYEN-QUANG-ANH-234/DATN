@@ -18,3 +18,13 @@ export interface CreateAccountDto {
   roleId: number;
   password?: string;
 }
+
+export interface CreateAccountResultDto {
+  accountId: number;
+  temporaryPassword?: string | null;
+  isGeneratedPassword: boolean;
+}
+
+export interface ResetPasswordResultDto {
+  temporaryPassword: string;
+}

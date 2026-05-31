@@ -3,6 +3,7 @@ import type {
   ConfiguredScheduleItem,
   ConfigureWorkScheduleDto,
   LeaveTypeSelect,
+  ScheduleChangeHistoryItem,
 } from "../types/scheduleConfig";
 
 const WORK_SHIFT_ENDPOINT = "/system/work-shifts";
@@ -29,5 +30,12 @@ export const scheduleApi = {
     data: ConfiguredScheduleItem[];
   }> => {
     return await axiosClient.get(`${WORK_SHIFT_ENDPOINT}/configs`);
+  },
+
+  getScheduleHistory: async (): Promise<{
+    success: boolean;
+    data: ScheduleChangeHistoryItem[];
+  }> => {
+    return await axiosClient.get(`${WORK_SHIFT_ENDPOINT}/history`);
   },
 };

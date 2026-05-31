@@ -1,5 +1,5 @@
 import axiosClient from "../../api/axiosClient";
-import type { AuthResponse } from "../types";
+import type { AuthResponse, ChangePasswordRequest, ChangePasswordResponse } from "../types";
 
 export const authApi = {
   googleLogin: (code: string): Promise<AuthResponse> => {
@@ -30,6 +30,10 @@ export const authApi = {
 
   logout: async () => {
     return await axiosClient.post("/auth/logout");
+  },
+
+  changePassword: async (payload: ChangePasswordRequest): Promise<ChangePasswordResponse> => {
+    return await axiosClient.post("/auth/change-password", payload);
   },
 
   basicLogin: (email: string, password: string): Promise<AuthResponse> => {

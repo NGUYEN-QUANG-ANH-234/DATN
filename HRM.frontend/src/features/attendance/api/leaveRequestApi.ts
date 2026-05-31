@@ -3,6 +3,12 @@ import axiosClient from "../../../core/api/axiosClient";
 export interface LeaveTypeOption {
   id: number;
   typeName: string;
+  category: string;
+  isPaid: boolean;
+  countsAsUnpaidForInsurance: boolean;
+  countsAsWorkday: boolean;
+  deductAnnualLeave: boolean;
+  affectsKpiPenalty: boolean;
 }
 
 export interface LeaveRequest {
@@ -14,6 +20,7 @@ export interface LeaveRequest {
   leaveTypeId: number;
   leaveTypeName: string;
   isPaidLeave: boolean;
+  leaveCategory: string;
   startDate: string;
   endDate: string;
   requestedDays: number;

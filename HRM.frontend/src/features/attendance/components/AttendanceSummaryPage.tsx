@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { Download } from "lucide-react";
-import {
-  FeatureCard,
-  FeaturePage,
-  primaryButtonClass,
-} from "../../../core/components/FeatureShell";
+import { Button, Card, DataTable, StatusBadge } from "../../../components/ui";
+import type { DataTableColumn } from "../../../components/ui";
+import { FeaturePage } from "../../../core/components/FeatureShell";
 import { useNotification } from "../../../core/context/NotificationContext";
+import { formatDateTime, formatMinutesAsHours } from "../../../utils";
 import {
   attendanceSummaryApi,
   type AttendanceSummary,
@@ -83,16 +82,55 @@ export const AttendanceSummaryPage = () => {
     triggerAlert("success", "Đã xuất Excel", "File bảng công đã được tạo thành công.");
   };
 
+  const columns: Array<DataTableColumn<AttendanceSummary>> = [
+    {
+      key: "employee",
+      header: "Nhân viên",
+      render: (item) => (
+        <div>
+          <p className="font-semibold text-[var(--hicas-text-main)]">{item.employeeName}</p>
+          <p className="text-xs text-[var(--hicas-text-secondary)]">{item.employeeCode}</p>
+        </div>
+      ),
+    },
+    { key: "department", header: "Phòng ban", render: (item) => item.departmentName || "Chưa có phòng ban" },
+    { key: "workDays", header: "Ngày công", render: (item) => item.workDays },
+    { key: "workedHours", header: "Giờ làm", render: (item) => `${item.workedHours.toFixed(2)} giờ` },
+    {
+      key: "payableHours",
+      header: "Giờ tính lương",
+      render: (item) => (
+        <div>
+          <p>{item.payableWorkHours.toFixed(2)} giờ</p>
+          <p className="text-xs text-[var(--hicas-text-secondary)]">Quy đổi ngày công</p>
+        </div>
+      ),
+    },
+    { key: "late", header: "Đi muộn", render: (item) => formatMinutes(item.lateMinutes) },
+    { key: "early", header: "Về sớm", render: (item) => formatMinutes(item.earlyLeaveMinutes) },
+    { key: "ot", header: "OT hợp lệ", render: (item) => formatMinutes(item.actualOtMinutes) },
+    {
+      key: "status",
+      header: "Trạng thái",
+      render: (item) => (
+        <StatusBadge
+          status={item.isPayrollLocked ? "PayrollLocked" : "Open"}
+          label={item.isPayrollLocked ? "Đã khóa lương" : "Có thể cập nhật"}
+        />
+      ),
+    },
+  ];
+
   return (
     <FeaturePage
       title="Tổng hợp bảng công"
       description="Dữ liệu tổng hợp tháng dùng làm cầu nối sang công thức lương: ngày công, đi muộn, về sớm và OT hợp lệ."
       width="wide"
     >
-      <FeatureCard title="Kỳ tổng hợp">
+      <Card title="Kỳ tổng hợp">
         <div className="grid gap-4 md:grid-cols-[160px_160px_auto_auto]">
           <label className="block">
-            <span className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+            <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--hicas-text-secondary)]">
               Tháng
             </span>
             <input
@@ -101,11 +139,11 @@ export const AttendanceSummaryPage = () => {
               max={12}
               value={month}
               onChange={(event) => setMonth(Number(event.target.value))}
-              className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+              className="hicas-input w-full"
             />
           </label>
           <label className="block">
-            <span className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+            <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--hicas-text-secondary)]">
               Năm
             </span>
             <input
@@ -114,81 +152,38 @@ export const AttendanceSummaryPage = () => {
               max={2100}
               value={year}
               onChange={(event) => setYear(Number(event.target.value))}
-              className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+              className="hicas-input w-full"
             />
           </label>
           <div className="flex items-end">
-            <button
-              type="button"
-              disabled={loading}
-              onClick={generate}
-              className={primaryButtonClass}
-            >
+            <Button type="button" disabled={loading} isLoading={loading} onClick={generate}>
               Tổng hợp lại
-            </button>
+            </Button>
           </div>
           <div className="flex items-end">
-            <button
+            <Button
               type="button"
+              variant="secondary"
               disabled={loading || summaries.length === 0}
               onClick={exportExcel}
-              className={`${primaryButtonClass} inline-flex items-center gap-2`}
             >
               <Download size={16} />
               Xuất Excel
-            </button>
+            </Button>
           </div>
         </div>
-      </FeatureCard>
+      </Card>
 
-      <FeatureCard title="Bảng công tổng hợp">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[920px] text-left text-sm">
-            <thead className="border-b bg-gray-50 text-xs uppercase text-gray-500">
-              <tr>
-                <th className="px-3 py-2">Nhân viên</th>
-                <th className="px-3 py-2">Phòng ban</th>
-                <th className="px-3 py-2">Ngày công</th>
-                <th className="px-3 py-2">Đi muộn</th>
-                <th className="px-3 py-2">Về sớm</th>
-                <th className="px-3 py-2">OT hợp lệ</th>
-                <th className="px-3 py-2">Trạng thái</th>
-              </tr>
-            </thead>
-            <tbody>
-              {summaries.map((item) => (
-                <tr key={item.id} className="border-b">
-                  <td className="px-3 py-3">
-                    <p className="font-semibold text-gray-900">{item.employeeName}</p>
-                    <p className="text-xs text-gray-500">{item.employeeCode}</p>
-                  </td>
-                  <td className="px-3 py-3">
-                    {item.departmentName || "Chưa có phòng ban"}
-                  </td>
-                  <td className="px-3 py-3">{item.workDays}</td>
-                  <td className="px-3 py-3">{formatMinutes(item.lateMinutes)}</td>
-                  <td className="px-3 py-3">
-                    {formatMinutes(item.earlyLeaveMinutes)}
-                  </td>
-                  <td className="px-3 py-3">
-                    {formatMinutes(item.actualOtMinutes)}
-                  </td>
-                  <td className="px-3 py-3">
-                    {item.isPayrollLocked ? "Đã khóa lương" : "Có thể cập nhật"}
-                  </td>
-                </tr>
-              ))}
-              {summaries.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="px-3 py-6 text-center text-gray-500">
-                    Chưa có bảng công cho kỳ này.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </FeatureCard>
+      <Card title="Bảng công tổng hợp">
+        <DataTable
+          columns={columns}
+          data={summaries}
+          loading={loading}
+          rowKey={(row) => row.id}
+          emptyTitle="Chưa có bảng công cho kỳ này."
+          className="border-0 shadow-none"
+        />
+      </Card>
     </FeaturePage>
   );
 };
@@ -218,12 +213,15 @@ const buildExcelHtml = (
           <td>${item.month}</td>
           <td>${item.year}</td>
           <td>${item.workDays}</td>
+          <td>${item.workedMinutes}</td>
+          <td>${item.workedHours.toFixed(2)}</td>
+          <td>${item.payableWorkHours.toFixed(2)}</td>
           <td>${item.lateMinutes}</td>
           <td>${item.earlyLeaveMinutes}</td>
           <td>${item.actualOtMinutes}</td>
-          <td>${(item.actualOtMinutes / 60).toFixed(2)}</td>
+          <td>${formatMinutesAsHours(item.actualOtMinutes)}</td>
           <td>${item.isPayrollLocked ? "Đã khóa lương" : "Có thể cập nhật"}</td>
-          <td>${formatExcelDate(item.generatedAt)}</td>
+          <td>${formatDateTime(item.generatedAt, "")}</td>
         </tr>`,
     )
     .join("");
@@ -241,8 +239,8 @@ const buildExcelHtml = (
       </head>
       <body>
         <table>
-          <tr><td class="title" colspan="13">Bảng công tổng hợp tháng ${String(month).padStart(2, "0")}/${year}</td></tr>
-          <tr><td colspan="13">Ngày xuất: ${new Date().toLocaleString("vi-VN")}</td></tr>
+          <tr><td class="title" colspan="16">Bảng công tổng hợp tháng ${String(month).padStart(2, "0")}/${year}</td></tr>
+          <tr><td colspan="16">Ngày xuất: ${formatDateTime(new Date())}</td></tr>
           <tr>
             <th>STT</th>
             <th>Mã nhân viên</th>
@@ -251,6 +249,9 @@ const buildExcelHtml = (
             <th>Tháng</th>
             <th>Năm</th>
             <th>Ngày công</th>
+            <th>Giờ làm (phút)</th>
+            <th>Giờ làm</th>
+            <th>Giờ tính lương</th>
             <th>Đi muộn (phút)</th>
             <th>Về sớm (phút)</th>
             <th>OT hợp lệ (phút)</th>
@@ -271,9 +272,3 @@ const escapeHtml = (value: string) =>
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
-
-const formatExcelDate = (value: string) => {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleString("vi-VN");
-};
