@@ -1,0 +1,325 @@
+@import "tailwindcss";
+@import "./tokens.css";
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  min-width: 320px;
+  background: var(--hicas-bg);
+  color: var(--hicas-text-main);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-regular);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: none;
+  border-color: var(--hicas-orange);
+  box-shadow: 0 0 0 3px rgba(255, 122, 0, 0.14);
+}
+
+::selection {
+  background: var(--hicas-orange-soft);
+  color: var(--hicas-orange-dark);
+}
+
+.hicas-app-shell {
+  min-height: 100vh;
+  background: var(--hicas-bg);
+  color: var(--hicas-text-main);
+}
+
+.hicas-sidebar {
+  width: var(--sidebar-width);
+  background: linear-gradient(180deg, var(--hicas-black) 0%, var(--hicas-charcoal) 100%);
+  color: var(--hicas-text-inverse);
+  border-right: 1px solid rgba(255, 122, 0, 0.16);
+  box-shadow: 12px 0 32px rgba(17, 24, 39, 0.22);
+}
+
+.hicas-sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 52px;
+  padding: 0 18px;
+  border-radius: 10px;
+  color: rgba(255, 255, 255, 0.82);
+  font-weight: var(--font-weight-medium);
+  transition: all 0.2s ease;
+}
+
+.hicas-sidebar-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--hicas-white);
+}
+
+.hicas-sidebar-item-active {
+  background: linear-gradient(135deg, var(--hicas-orange) 0%, var(--hicas-orange-hover) 100%);
+  color: var(--hicas-white);
+  box-shadow: var(--shadow-orange);
+}
+
+.hicas-page {
+  min-height: 100%;
+  background: var(--hicas-bg);
+  padding: 28px 32px;
+}
+
+.hicas-card {
+  background: var(--hicas-card);
+  border: 1px solid var(--hicas-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-card);
+}
+
+.hicas-card-padded {
+  padding: var(--space-5);
+}
+
+.hicas-card-hover {
+  transition: all 0.2s ease;
+}
+
+.hicas-card-hover:hover {
+  box-shadow: var(--shadow-hover);
+  transform: translateY(-1px);
+}
+
+.hicas-focus:focus,
+.hicas-input:focus,
+.hicas-select:focus,
+.hicas-textarea:focus {
+  outline: none;
+  border-color: var(--hicas-orange);
+  box-shadow: 0 0 0 3px rgba(255, 122, 0, 0.12);
+}
+
+.hicas-input,
+.hicas-select {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 14px;
+  border: 1px solid var(--hicas-border);
+  border-radius: var(--radius-md);
+  background: var(--hicas-white);
+  color: var(--hicas-text-main);
+}
+
+.hicas-input.hicas-input-icon-left {
+  padding-left: 48px;
+}
+
+.hicas-input.hicas-input-icon-right {
+  padding-right: 48px;
+}
+
+.hicas-textarea {
+  width: 100%;
+  min-height: 96px;
+  padding: 12px 14px;
+  border: 1px solid var(--hicas-border);
+  border-radius: var(--radius-md);
+  background: var(--hicas-white);
+  color: var(--hicas-text-main);
+  resize: vertical;
+}
+
+.hicas-btn-primary,
+.hicas-btn-secondary,
+.hicas-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 18px;
+  border-radius: var(--radius-md);
+  font-weight: var(--font-weight-semibold);
+  transition: all 0.2s ease;
+}
+
+.hicas-btn-primary {
+  border: 0;
+  background: linear-gradient(135deg, var(--hicas-orange) 0%, var(--hicas-orange-hover) 100%);
+  color: var(--hicas-white);
+  box-shadow: 0 6px 14px rgba(255, 122, 0, 0.22);
+}
+
+.hicas-btn-primary:hover {
+  background: linear-gradient(135deg, var(--hicas-orange-dark) 0%, var(--hicas-orange) 100%);
+}
+
+.hicas-btn-secondary {
+  border: 1px solid var(--hicas-border);
+  background: var(--hicas-white);
+  color: var(--hicas-text-main);
+}
+
+.hicas-btn-secondary:hover {
+  border-color: var(--hicas-orange);
+  background: var(--hicas-orange-soft);
+  color: var(--hicas-orange-dark);
+}
+
+.hicas-btn-ghost {
+  border: 0;
+  background: transparent;
+  color: var(--hicas-text-secondary);
+}
+
+.hicas-btn-ghost:hover {
+  background: var(--hicas-orange-soft);
+  color: var(--hicas-orange-dark);
+}
+
+.hicas-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+}
+
+.hicas-badge-success {
+  background: var(--hicas-success-soft);
+  color: var(--hicas-success);
+}
+
+.hicas-badge-warning {
+  background: var(--hicas-warning-soft);
+  color: #b45309;
+}
+
+.hicas-badge-danger {
+  background: var(--hicas-danger-soft);
+  color: var(--hicas-danger);
+}
+
+.hicas-badge-info {
+  background: var(--hicas-info-soft);
+  color: var(--hicas-info);
+}
+
+.hicas-badge-orange {
+  background: var(--hicas-orange-soft);
+  color: var(--hicas-orange-dark);
+}
+
+.hicas-badge-neutral {
+  background: var(--hicas-bg-soft);
+  color: var(--hicas-text-secondary);
+}
+
+.hicas-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.hicas-table th,
+.hicas-table td {
+  vertical-align: middle;
+}
+
+.hicas-table th {
+  height: 44px;
+  background: #f9fafb;
+  color: var(--hicas-text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+}
+
+.hicas-table td {
+  min-height: 52px;
+  border-bottom: 1px solid var(--hicas-border-soft);
+  color: var(--hicas-text-main);
+  font-size: var(--font-size-sm);
+}
+
+.hicas-table tr:hover td {
+  background: #fff8f1;
+}
+
+.scrollbar-sidebar::-webkit-scrollbar {
+  width: 5px;
+}
+
+.scrollbar-sidebar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-sidebar::-webkit-scrollbar-thumb {
+  background-color: #3a3d3f;
+  border-radius: 10px;
+}
+
+.scrollbar-sidebar::-webkit-scrollbar-thumb:hover {
+  background-color: #54585a;
+}
+
+.scrollbar-sidebar {
+  scrollbar-width: thin;
+  scrollbar-color: #3a3d3f transparent;
+}
+
+@media (max-width: 768px) {
+  .hicas-page {
+    padding: 20px 16px;
+  }
+}
+
+@media (max-width: 767px) {
+  .hicas-sidebar {
+    max-width: min(88vw, var(--sidebar-width));
+  }
+
+  .hicas-card-padded {
+    padding: var(--space-4);
+  }
+
+  .hicas-btn-primary,
+  .hicas-btn-secondary,
+  .hicas-btn-ghost {
+    min-height: 42px;
+  }
+}
+
+@media (min-width: 768px) {
+  .hicas-sidebar {
+    box-shadow: none;
+  }
+}

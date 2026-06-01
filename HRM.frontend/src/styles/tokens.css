@@ -1,0 +1,82 @@
+:root {
+  /* Brand */
+  --hicas-orange: #ff7a00;
+  --hicas-orange-hover: #ff8a1f;
+  --hicas-orange-dark: #e96500;
+  --hicas-orange-soft: #fff1e6;
+  --hicas-orange-lighter: #fff7ed;
+
+  /* Black / Charcoal */
+  --hicas-black: #111111;
+  --hicas-charcoal: #181a1b;
+  --hicas-sidebar: #151718;
+  --hicas-sidebar-hover: #242729;
+
+  /* Base */
+  --hicas-white: #ffffff;
+  --hicas-bg: #f8f9fb;
+  --hicas-bg-soft: #f3f4f6;
+  --hicas-card: #ffffff;
+
+  /* Border */
+  --hicas-border: #e5e7eb;
+  --hicas-border-soft: #f0f1f3;
+
+  /* Text */
+  --hicas-text-main: #111827;
+  --hicas-text-secondary: #6b7280;
+  --hicas-text-muted: #9ca3af;
+  --hicas-text-inverse: #ffffff;
+
+  /* Status */
+  --hicas-success: #2f9e44;
+  --hicas-success-soft: #eaf7ec;
+  --hicas-warning: #f59e0b;
+  --hicas-warning-soft: #fff7e6;
+  --hicas-danger: #ef4444;
+  --hicas-danger-soft: #feecec;
+  --hicas-info: #2563eb;
+  --hicas-info-soft: #eaf1ff;
+
+  /* Typography */
+  --font-sans: Inter, Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-size-xs: 12px;
+  --font-size-sm: 14px;
+  --font-size-md: 16px;
+  --font-size-lg: 20px;
+  --font-size-xl: 24px;
+  --font-size-2xl: 28px;
+  --font-size-3xl: 32px;
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* Radius */
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
+
+  /* Shadow */
+  --shadow-card: 0 8px 24px rgba(17, 24, 39, 0.04);
+  --shadow-hover: 0 12px 28px rgba(17, 24, 39, 0.08);
+  --shadow-orange: 0 8px 20px rgba(255, 122, 0, 0.24);
+
+  /* Layout */
+  --sidebar-width: 280px;
+  --sidebar-collapsed-width: 88px;
+  --topbar-height: 72px;
+}

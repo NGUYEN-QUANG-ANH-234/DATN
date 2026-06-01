@@ -215,7 +215,7 @@ export const MENU_ITEMS: MenuItem[] = [
   },
   {
     label: "Module 5 - Hiệu suất & Đào tạo",
-    roles: ["Admin", "HR", "Manager", "Employee", "Intern"],
+    roles: ["Admin", "HR", "Manager", "Director", "Employee", "Intern"],
     children: [
       {
         path: "/performance-training/criteria",

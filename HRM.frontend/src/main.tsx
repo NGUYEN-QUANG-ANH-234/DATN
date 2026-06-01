@@ -4,10 +4,16 @@ import App from "./App.tsx";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import "./styles/globals.css";
 
+const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
+
+if (!googleClientId) {
+  console.warn("Missing VITE_GOOGLE_CLIENT_ID. Google login will not work until it is configured.");
+}
+
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     {/* Dán Client ID bạn lấy từ Google Cloud Console vào đây */}
-    <GoogleOAuthProvider clientId="838887932315-qeot1elujhg3tci16priaf4scql22nuo.apps.googleusercontent.com">
+    <GoogleOAuthProvider clientId={googleClientId}>
       <App />
     </GoogleOAuthProvider>
   </React.StrictMode>,
