@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Globalization;
 using HRM.backend.src.HRM.Application.DTOs.EmployeeProfile;
+using HRM.backend.src.HRM.Application.DTOs.Events;
 using HRM.backend.src.HRM.Application.Interfaces;
 using HRM.backend.src.HRM.Application.Interfaces.EmployeeProfile.Usecases;
 using HRM.backend.src.HRM.Application.Interfaces.System.Services;
@@ -9,6 +10,7 @@ using HRM.backend.src.HRM.Core.Entities.RequestHandover;
 using HRM.backend.src.HRM.Core.Enums;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.EmployeeProfile;
+using MediatR;
 
 namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
 {
@@ -22,6 +24,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
         private readonly IUnitOfWork _unitOfWork;
         private readonly ILockService _lockService;
         private readonly IIdempotencyService _idempotencyService;
+        private readonly IMediator _mediator;
 
         public ContractAddendumUseCase(
             IContractRepository contractRepo,
@@ -31,7 +34,8 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
             IApprovalConflictGuard approvalConflictGuard,
             IUnitOfWork unitOfWork,
             ILockService lockService,
-            IIdempotencyService idempotencyService)
+            IIdempotencyService idempotencyService,
+            IMediator mediator)
         {
             _contractRepo = contractRepo;
             _addendumRepo = addendumRepo;
@@ -41,6 +45,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
             _unitOfWork = unitOfWork;
             _lockService = lockService;
             _idempotencyService = idempotencyService;
+            _mediator = mediator;
         }
 
         public async Task<ContractAddendumResponseDto> CreateDraftAsync(int contractId, CreateContractAddendumDto dto, CancellationToken ct, string? idempotencyKey = null)
@@ -145,6 +150,8 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
 
         public async Task ReviewByDeptAsync(int addendumId, int actorAccountId, string actorRoleName, ReviewContractAddendumDto dto, CancellationToken ct)
         {
+            int? contractId = null;
+
             await _lockService.GetWithLockAsync($"addendum_{addendumId}", async (innerCt) =>
             {
             await _unitOfWork.ExecuteTransactionAsync(async () =>
@@ -152,6 +159,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                 var addendum = await _addendumRepo.GetByIdWithContractAsync(addendumId, innerCt);
                 if (addendum == null)
                     throw new InvalidOperationException("Không tìm thấy phụ lục hợp đồng.");
+                contractId = addendum.ContractId;
                 if (addendum.Status != AddendumStatus.PendingDept)
                     throw new InvalidOperationException("Phụ lục không ở trạng thái chờ Trưởng phòng xác nhận.");
 
@@ -170,10 +178,15 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
             }, innerCt);
             return true;
             }, cancellationToken: ct);
+
+            if (!dto.IsApproved)
+                await PublishContractFlowRejectedAsync(contractId, addendumId, dto.RejectReason, ct);
         }
 
         public async Task ConfirmByHrAsync(int addendumId, int actorAccountId, string actorRoleName, ReviewContractAddendumDto dto, CancellationToken ct)
         {
+            int? contractId = null;
+
             await _lockService.GetWithLockAsync($"addendum_{addendumId}", async (innerCt) =>
             {
             await _unitOfWork.ExecuteTransactionAsync(async () =>
@@ -181,6 +194,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                 var addendum = await _addendumRepo.GetByIdWithContractAsync(addendumId, innerCt);
                 if (addendum == null)
                     throw new InvalidOperationException("Không tìm thấy phụ lục hợp đồng.");
+                contractId = addendum.ContractId;
                 if (addendum.Status != AddendumStatus.PendingHR)
                     throw new InvalidOperationException("Phụ lục không ở trạng thái chờ HR xác nhận chính sách.");
 
@@ -200,10 +214,15 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
             }, innerCt);
             return true;
             }, cancellationToken: ct);
+
+            if (!dto.IsApproved)
+                await PublishContractFlowRejectedAsync(contractId, addendumId, dto.RejectReason, ct);
         }
 
         public async Task EmployeeConfirmAsync(int addendumId, int actorAccountId, ReviewContractAddendumDto dto, CancellationToken ct)
         {
+            int? contractId = null;
+
             await _lockService.GetWithLockAsync($"addendum_{addendumId}", async (innerCt) =>
             {
             await _unitOfWork.ExecuteTransactionAsync(async () =>
@@ -211,6 +230,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                 var addendum = await _addendumRepo.GetByIdWithContractAsync(addendumId, innerCt);
                 if (addendum == null)
                     throw new InvalidOperationException("Không tìm thấy phụ lục hợp đồng.");
+                contractId = addendum.ContractId;
                 if (addendum.Status != AddendumStatus.PendingEmployee)
                     throw new InvalidOperationException("Phụ lục không ở trạng thái chờ người lao động xác nhận.");
 
@@ -228,10 +248,15 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
             }, innerCt);
             return true;
             }, cancellationToken: ct);
+
+            if (!dto.IsApproved)
+                await PublishContractFlowRejectedAsync(contractId, addendumId, dto.RejectReason, ct);
         }
 
         public async Task ApproveAsync(int addendumId, int actorAccountId, string actorRoleName, CancellationToken ct)
         {
+            int contractId = 0;
+
             await _lockService.GetWithLockAsync($"addendum_{addendumId}", async (innerCt) =>
             {
             await _unitOfWork.ExecuteTransactionAsync(async () =>
@@ -243,6 +268,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                     throw new InvalidOperationException("Phụ lục không ở trạng thái chờ Giám đốc phê duyệt.");
 
                 var contract = addendum.Contract ?? throw new InvalidOperationException("Phụ lục chưa liên kết hợp đồng gốc.");
+                contractId = contract.Id;
                 if (!contract.EmployeeId.HasValue)
                     throw new InvalidOperationException("Hợp đồng gốc chưa gắn nhân viên.");
 
@@ -265,10 +291,19 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
             }, innerCt);
             return true;
             }, cancellationToken: ct);
+
+            await _mediator.Publish(new ContractFlowCompletedEvent
+            {
+                ContractId = contractId == 0 ? null : contractId,
+                ContractAddendumId = addendumId,
+                Status = "Completed"
+            }, ct);
         }
 
         public async Task RejectAsync(int addendumId, int actorAccountId, string actorRoleName, string? reason, CancellationToken ct)
         {
+            int? contractId = null;
+
             await _lockService.GetWithLockAsync($"addendum_{addendumId}", async (innerCt) =>
             {
             await _unitOfWork.ExecuteTransactionAsync(async () =>
@@ -276,6 +311,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                 var addendum = await _addendumRepo.GetByIdWithContractAsync(addendumId, innerCt);
                 if (addendum == null)
                     throw new InvalidOperationException("Không tìm thấy phụ lục hợp đồng.");
+                contractId = addendum.ContractId;
                 if (addendum.Status != AddendumStatus.PendingDirector)
                     throw new InvalidOperationException("Chỉ phụ lục đang chờ duyệt mới có thể bị từ chối.");
 
@@ -292,6 +328,8 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
             }, innerCt);
             return true;
             }, cancellationToken: ct);
+
+            await PublishContractFlowRejectedAsync(contractId, addendumId, reason, ct);
         }
 
         public async Task<IEnumerable<ContractAddendumResponseDto>> GetByContractAsync(int contractId, CancellationToken ct)
@@ -347,6 +385,17 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
         {
             var addendums = await _addendumRepo.GetAllWithContractAsync(ct);
             return addendums.Select(Map);
+        }
+
+        private Task PublishContractFlowRejectedAsync(int? contractId, int addendumId, string? reason, CancellationToken ct)
+        {
+            return _mediator.Publish(new ContractFlowCompletedEvent
+            {
+                ContractId = contractId,
+                ContractAddendumId = addendumId,
+                Status = "Rejected",
+                Note = reason
+            }, ct);
         }
 
         private static void ValidateDraft(CreateContractAddendumDto dto)

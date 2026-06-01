@@ -8,7 +8,7 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.System
     public class AuditLogRepository : BaseRepository<AuditLog>, IAuditLogRepository
     {
         // BẢO MẬT: Whitelist - Chỉ cho phép truy vấn các module này, chặn đứng nguy cơ lộ CSDL
-        private readonly string[] ALLOWED_MODULES = { "accounts", "role_permissions", "configurations", "employees", "payrolls", "time_attendance" };
+        private readonly string[] ALLOWED_MODULES = { "accounts", "role_permissions", "configurations", "employees", "payrolls", "time_attendance", "personnel_change_requests" };
 
         public AuditLogRepository(MyDbContext context) : base(context) { }
 

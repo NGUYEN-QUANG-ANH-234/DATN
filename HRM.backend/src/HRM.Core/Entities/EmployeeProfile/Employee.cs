@@ -51,6 +51,8 @@ namespace HRM.backend.src.HRM.Core.Entities.EmployeeProfile
         [ForeignKey("PositionId")] public virtual Position? Position { get; set; }
         public int? JobLevelId { get; set; }
         [ForeignKey("JobLevelId")] public virtual JobLevel? JobLevel { get; set; }
+        public int? ManagerId { get; set; }
+        [ForeignKey("ManagerId")] public virtual Employee? Manager { get; set; }
 
         public EmployeeType Type { get; set; } = EmployeeType.Probation;
         public EmployeeStatus Status { get; set; } = EmployeeStatus.Probation;

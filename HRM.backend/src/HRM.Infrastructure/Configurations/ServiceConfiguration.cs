@@ -3,6 +3,8 @@ using HRM.backend.src.HRM.Application.Interfaces;
 using HRM.backend.src.HRM.Application.Interfaces.EmployeeProfile.Usecases;
 using HRM.backend.src.HRM.Application.Interfaces.PayrollAllowances.Services;
 using HRM.backend.src.HRM.Application.Interfaces.PayrollAllowances.Usecases;
+using HRM.backend.src.HRM.Application.Interfaces.PersonnelChanges.Services;
+using HRM.backend.src.HRM.Application.Interfaces.PersonnelChanges.UseCases;
 using HRM.backend.src.HRM.Application.Interfaces.Recruitment.Usecases;
 using HRM.backend.src.HRM.Application.Interfaces.Services;
 using HRM.backend.src.HRM.Application.Interfaces.System;
@@ -18,6 +20,7 @@ using HRM.backend.src.HRM.Application.Services.TasksTraining;
 using HRM.backend.src.HRM.Application.Services.TimeAttendance;
 using HRM.backend.src.HRM.Application.UseCases.EmployeeProfile;
 using HRM.backend.src.HRM.Application.UseCases.PayrollAllowances;
+using HRM.backend.src.HRM.Application.UseCases.PersonnelChanges;
 using HRM.backend.src.HRM.Application.UseCases.Recruitment;
 using HRM.backend.src.HRM.Application.UseCases.System;
 using HRM.backend.src.HRM.Application.UseCases.TasksTraining;
@@ -92,6 +95,16 @@ namespace HRM.backend.src.HRM.Infrastructure.Configurations
             services.AddScoped<IContractUseCase, ContractUseCase>();
             services.AddScoped<IContractAddendumUseCase, ContractAddendumUseCase>();
 
+            // Module: Personnel Changes
+            services.AddScoped<IPersonnelChangeUseCase, PersonnelChangeUseCase>();
+            services.AddScoped<IPromotionOfficialUseCase, PromotionOfficialUseCase>();
+            services.AddScoped<ISeniorAppointmentUseCase, SeniorAppointmentUseCase>();
+            services.AddScoped<IVoluntaryTerminationUseCase, VoluntaryTerminationUseCase>();
+            services.AddScoped<IDismissalDisciplinaryUseCase, DismissalDisciplinaryUseCase>();
+            services.AddScoped<IInternalTransferUseCase, InternalTransferUseCase>();
+            services.AddScoped<PersonnelChangeRiskSummaryBuilder>();
+            services.AddScoped<IPersonnelChangeContractFlowService, PersonnelChangeContractFlowService>();
+
             // Các service có trạng thái nội bộ liên quan đến request -> Scoped
             services.AddScoped<IJwtService, Infrastructure.ExternalServices.JwtService>(); // Đảm bảo mapping đúng namespace
 
@@ -113,6 +126,7 @@ namespace HRM.backend.src.HRM.Infrastructure.Configurations
             services.AddHostedService<CentralSlaWorker>();
             services.AddHostedService<TaskSlaWorker>();
             services.AddHostedService<TrainingSlaWorker>();
+            services.AddHostedService<PersonnelChangeSlaWorker>();
 
             // Đăng ký Event
             // Đăng ký MediatR (Tự động quét và đăng ký tất cả các Event Handler trong Assembly)            

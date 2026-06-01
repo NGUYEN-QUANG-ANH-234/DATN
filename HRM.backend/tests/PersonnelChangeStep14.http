@@ -1,0 +1,160 @@
+@baseUrl = https://localhost:7003/api/v1
+
+### Step 14 notes
+# Fill these tokens from /auth/login.
+# - actorToken: Admin/HR/Director token with Module 7 permissions.
+# - employeeToken: token of the employee selected in hr-select-employee.
+@actorToken = paste_actor_token_here
+@employeeToken = paste_selected_employee_token_here
+
+### Login sample employee from seed, if available
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "nv1@hicas.com",
+  "password": "123456"
+}
+
+### 1. Create request - internal transfer demand
+# Save data.id as requestId.
+POST {{baseUrl}}/personnel-changes/internal-transfers/demands
+Authorization: Bearer {{actorToken}}
+Content-Type: application/json
+
+{
+  "requestedDepartmentId": 1,
+  "requestedPositionId": 1,
+  "requestedManagerId": null,
+  "reason": "Step 14 smoke test - internal transfer without contract flow.",
+  "urgencyLevel": "Normal",
+  "expectedEffectiveDate": "2026-06-15",
+  "requiredSkills": "Smoke test"
+}
+
+@requestId = 1
+
+### 2. View detail
+GET {{baseUrl}}/personnel-changes/{{requestId}}
+Authorization: Bearer {{actorToken}}
+
+### 3. View risk summary
+GET {{baseUrl}}/personnel-changes/{{requestId}}/risk-summary
+Authorization: Bearer {{actorToken}}
+
+### 4. View timeline
+GET {{baseUrl}}/personnel-changes/{{requestId}}/timeline
+Authorization: Bearer {{actorToken}}
+
+### 5. Move status - HR selects employee, no contract flow
+PATCH {{baseUrl}}/personnel-changes/internal-transfers/{{requestId}}/hr-select-employee
+Authorization: Bearer {{actorToken}}
+Content-Type: application/json
+
+{
+  "employeeId": 1,
+  "newDepartmentId": 1,
+  "newPositionId": 1,
+  "newManagerId": null,
+  "newJobLevelId": null,
+  "requiresContractAddendum": false,
+  "note": "HR selected employee for Step 14 smoke test."
+}
+
+### 6. Move status - current manager opinion
+PATCH {{baseUrl}}/personnel-changes/internal-transfers/{{requestId}}/current-manager-opinion
+Authorization: Bearer {{actorToken}}
+Content-Type: application/json
+
+{
+  "isApproved": true,
+  "opinion": "Manager approved in Step 14 smoke test."
+}
+
+### 7. Move status - employee consent
+PATCH {{baseUrl}}/personnel-changes/internal-transfers/{{requestId}}/employee-consent
+Authorization: Bearer {{employeeToken}}
+Content-Type: application/json
+
+{
+  "isAccepted": true,
+  "note": "Employee accepted in Step 14 smoke test."
+}
+
+### 8. Move status - director approval
+PATCH {{baseUrl}}/personnel-changes/internal-transfers/{{requestId}}/director-approve-transfer
+Authorization: Bearer {{actorToken}}
+Content-Type: application/json
+
+{
+  "isApproved": true,
+  "note": "Director approved in Step 14 smoke test."
+}
+
+### 9. Issue decision
+PATCH {{baseUrl}}/personnel-changes/internal-transfers/{{requestId}}/issue-transfer-decision
+Authorization: Bearer {{actorToken}}
+Content-Type: application/json
+
+{
+  "decisionNumber": "IT-SMOKE-2026-001",
+  "decisionFilePath": null,
+  "decisionIssuedAt": "2026-06-15",
+  "note": "Decision issued in Step 14 smoke test."
+}
+
+### 10. Execute success
+PATCH {{baseUrl}}/personnel-changes/internal-transfers/{{requestId}}/execute
+Authorization: Bearer {{actorToken}}
+Content-Type: application/json
+
+{
+  "completedAt": "2026-06-15T02:00:00Z",
+  "note": "Executed in Step 14 smoke test."
+}
+
+### 11. History created - timeline should contain created/moved/decision/executed records
+GET {{baseUrl}}/personnel-changes/{{requestId}}/timeline
+Authorization: Bearer {{actorToken}}
+
+### Reject case - create a second demand and reject at manager opinion/director approval
+POST {{baseUrl}}/personnel-changes/internal-transfers/demands
+Authorization: Bearer {{actorToken}}
+Content-Type: application/json
+
+{
+  "requestedDepartmentId": 1,
+  "reason": "Step 14 reject smoke test.",
+  "expectedEffectiveDate": "2026-06-20"
+}
+
+@rejectRequestId = 2
+
+### Contract flow blocked case - select employee with addendum required
+PATCH {{baseUrl}}/personnel-changes/internal-transfers/{{rejectRequestId}}/hr-select-employee
+Authorization: Bearer {{actorToken}}
+Content-Type: application/json
+
+{
+  "employeeId": 1,
+  "newDepartmentId": 1,
+  "newPositionId": 1,
+  "newManagerId": null,
+  "newJobLevelId": null,
+  "requiresContractAddendum": true,
+  "note": "Requires contract addendum."
+}
+
+### Reject case - manager rejects
+PATCH {{baseUrl}}/personnel-changes/internal-transfers/{{rejectRequestId}}/current-manager-opinion
+Authorization: Bearer {{actorToken}}
+Content-Type: application/json
+
+{
+  "isApproved": false,
+  "opinion": "Rejected in Step 14 smoke test."
+}
+
+### Contract flow blocked case expected result
+# For a request with requiresContractFlow=true, execute/decision must fail until Module 3 completes
+# and Module 7 has ContractFlowStatus = Accepted or Signed.

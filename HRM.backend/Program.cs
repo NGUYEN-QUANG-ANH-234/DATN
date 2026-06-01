@@ -78,7 +78,7 @@ public class Program
             .AddCacheConfig(builder.Configuration)                       // Redis & Caching
             .AddSecurityConfig(builder.Configuration) // JWT & AuthService
             .AddCustomAuthorization()               // Phân quyền động (Dynamic RBAC)
-            .AddCustomCors()                        // CORS
+            .AddCustomCors(builder.Configuration)                        // CORS
             .AddCustomControllers()                 // Controllers & JSON
             .AddSwaggerConfig();                    // Swagger UI
     }

@@ -7,6 +7,7 @@ using HRM.backend.src.HRM.Core.Interfaces.Repositories;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.EmployeeProfile;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.Organization;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.PayrollAllowances;
+using HRM.backend.src.HRM.Core.Interfaces.Repositories.PersonnelChanges;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.Recruitment;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.System;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.TasksTraining;
@@ -16,6 +17,7 @@ using HRM.backend.src.HRM.Infrastructure.Persistence.Repositories;
 using HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.EmployeeProfile;
 using HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.Organization;
 using HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.PayrollAllowances;
+using HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.PersonnelChanges;
 using HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.Recruitment;
 using HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.System;
 using HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.TasksTraining;
@@ -92,6 +94,9 @@ namespace HRM.backend.src.HRM.Infrastructure.Configurations
 
             // Payroll
             services.AddScoped<IPayrollRepository, PayrollRepository>();
+
+            // Personnel Changes
+            services.AddScoped<IPersonnelChangeRepository, PersonnelChangeRepository>();
 
 
             return services;

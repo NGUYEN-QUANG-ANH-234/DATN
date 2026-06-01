@@ -1,4 +1,5 @@
 using HRM.backend.src.HRM.Application.DTOs.EmployeeProfile;
+using HRM.backend.src.HRM.Application.DTOs.Events;
 using HRM.backend.src.HRM.Application.Interfaces;
 using HRM.backend.src.HRM.Application.Interfaces.EmployeeProfile.Usecases;
 using HRM.backend.src.HRM.Application.Interfaces.System.Services;
@@ -22,6 +23,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
         private readonly IUnitOfWork _unitOfWork;
         private readonly ILockService _lockService;
         private readonly IIdempotencyService _idempotencyService;
+        private readonly IMediator _mediator;
 
         public ContractUseCase(
             IContractRepository contractRepo,
@@ -46,6 +48,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
             _unitOfWork = unitOfWork;
             _lockService = lockService;
             _idempotencyService = idempotencyService;
+            _mediator = mediator;
         }
 
         public async Task<int> CreateRequestAsync(int accountId, ContractRequestDto dto, CancellationToken ct, string? idempotencyKey = null)
@@ -171,6 +174,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                 }, innerCt);
                 return true;
             }, cancellationToken: ct);
+
         }
 
         public async Task HrRejectAsync(int contractId, int actorAccountId, string actorRoleName, string reason, CancellationToken ct)
@@ -200,6 +204,13 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                 }, innerCt);
                 return true;
             }, cancellationToken: ct);
+
+            await _mediator.Publish(new ContractFlowCompletedEvent
+            {
+                ContractId = contractId,
+                Status = "Rejected",
+                Note = reason
+            }, ct);
         }
 
         public async Task NegotiateAsync(int contractId, int actorAccountId, NegotiateDto dto, CancellationToken ct)
@@ -226,6 +237,13 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                 }, innerCt);
                 return true;
             }, cancellationToken: ct);
+
+            await _mediator.Publish(new ContractFlowCompletedEvent
+            {
+                ContractId = contractId,
+                Status = "Negotiating",
+                Note = dto.NegotiationNote.Trim()
+            }, ct);
         }
 
         public async Task EmployeeAcceptAsync(int contractId, int actorAccountId, CancellationToken ct)

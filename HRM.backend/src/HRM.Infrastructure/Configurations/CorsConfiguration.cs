@@ -2,11 +2,27 @@
 
 public static class CorsConfiguration
 {
-    public static IServiceCollection AddCustomCors(this IServiceCollection services)
+    public static IServiceCollection AddCustomCors(this IServiceCollection services, IConfiguration configuration)
     {
+        var allowedOrigins = configuration
+            .GetSection("Cors:AllowedOrigins")
+            .Get<string[]>()
+            ?.Where(origin => !string.IsNullOrWhiteSpace(origin))
+            .Select(origin => origin.Trim().TrimEnd('/'))
+            .ToArray();
+
+        if (allowedOrigins == null || allowedOrigins.Length == 0)
+        {
+            allowedOrigins = new[]
+            {
+                "http://localhost:5173",
+                "https://localhost:5173"
+            };
+        }
+
         services.AddCors(options => {
             options.AddPolicy("AllowFrontend", policy => {
-                policy.WithOrigins("http://localhost:5173", "https://localhost:5173")
+                policy.WithOrigins(allowedOrigins)
                       .AllowAnyHeader()
                       .AllowAnyMethod()
                       .AllowCredentials();

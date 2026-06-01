@@ -72,6 +72,21 @@ namespace HRM.backend.src.HRM.Application.Handlers
                     BasicSalary = contract.BasicSalary,
                     StartDate = contract.StartDate
                 }, ct);
+
+                await _mediator.Publish(new ContractFlowCompletedEvent
+                {
+                    ContractId = contract.Id,
+                    Status = "Completed"
+                }, ct);
+            }
+            else if (!approvedByDirector)
+            {
+                await _mediator.Publish(new ContractFlowCompletedEvent
+                {
+                    ContractId = contract.Id,
+                    Status = "Rejected",
+                    Note = notification.Note
+                }, ct);
             }
 
             await _slaTrackingService.ResolveTaskAsync(SlaModuleType.DirectorContractApproval, contract.Id, ct);

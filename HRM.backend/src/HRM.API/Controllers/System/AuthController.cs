@@ -12,11 +12,13 @@ namespace HRM.backend.src.HRM.API.Controllers.System
     public class AuthController : ControllerBase
     {
         private readonly IIdentityUseCase _identityUseCase;
+        private readonly IConfiguration _configuration;
 
-        public AuthController(IIdentityUseCase identityUseCase)
+        public AuthController(IIdentityUseCase identityUseCase, IConfiguration configuration)
         {
             //Console.WriteLine("DI ĐÃ KHỞI TẠO THÀNH CÔNG IDENTITY USE CASE!");
             _identityUseCase = identityUseCase;
+            _configuration = configuration;
         }
 
         [HttpPost("login")]
@@ -210,14 +212,30 @@ namespace HRM.backend.src.HRM.API.Controllers.System
 
         private void SetRefreshTokenCookie(string refreshToken)
         {
+            var sameSite = ParseSameSiteMode(
+                _configuration["Auth:RefreshCookie:SameSite"],
+                SameSiteMode.Strict);
+            var secure = _configuration.GetValue("Auth:RefreshCookie:Secure", true);
+            var expirationDays = _configuration.GetValue("Auth:RefreshCookie:ExpirationDays", 7);
+
             var cookieOptions = new CookieOptions
             {
                 HttpOnly = true, // Chặn JavaScript truy cập
-                Secure = true,   // Bắt buộc chạy trên HTTPS
-                SameSite = SameSiteMode.Strict, // Chống tấn công CSRF
-                Expires = DateTime.UtcNow.AddDays(7)
+                Secure = secure,
+                SameSite = sameSite,
+                Expires = DateTime.UtcNow.AddDays(expirationDays)
             };
             Response.Cookies.Append("refreshToken", refreshToken, cookieOptions);
+        }
+
+        private static SameSiteMode ParseSameSiteMode(string? value, SameSiteMode fallback)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return fallback;
+
+            return Enum.TryParse<SameSiteMode>(value, ignoreCase: true, out var mode)
+                ? mode
+                : fallback;
         }
     }
 }

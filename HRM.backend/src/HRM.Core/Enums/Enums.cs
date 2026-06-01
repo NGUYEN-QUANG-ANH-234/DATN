@@ -16,7 +16,7 @@ namespace HRM.backend.src.HRM.Core.Enums
     // MODULE 4: Employee & Contract
     // ==========================================
     public enum Gender { Male, Female, Other }
-    public enum EmployeeStatus { Probation, Official, OnMaternityLeave, Resigned, Terminated }
+    public enum EmployeeStatus { Probation, Official, OnMaternityLeave, Resigned, Terminated, Dismissed }
     public enum ContractType { Probation, Definite, Indefinite, PartTime }
     public enum ContractStatus { Draft, PendingDept, PendingHR, Negotiating, PendingDirector, Rejected, Active, Liquidating, Expired, Draft_Cancelled }
 
@@ -229,7 +229,77 @@ namespace HRM.backend.src.HRM.Core.Enums
     public enum ContractAddendumDetailValueType { Text, Money, Date, Number, Json, Boolean }
 
     // ==========================================
-    // MODULE 8: Requests & Handover
+    // MODULE 7: Personnel Changes
+    // ==========================================
+    public enum PersonnelChangeType
+    {
+        ConvertToOfficial,
+        Promotion,
+        SeniorAppointment,
+        VoluntaryTermination,
+        Dismissal,
+        InternalTransfer
+    }
+
+    public enum PersonnelChangeStatus
+    {
+        Draft,
+        PendingHRReview,
+        PendingEmployeeConsent,
+        EmployeeDeclined,
+        PendingDirectorApproval,
+        ApprovedByDirector,
+        PendingContractFlow,
+        ContractNegotiating,
+        ContractAccepted,
+        ContractRejected,
+        PendingDecisionIssuance,
+        ReadyToExecute,
+        Completed,
+        Rejected,
+        Cancelled,
+        Escalated,
+        PendingCurrentManagerOpinion,
+        PendingEmployeeNotification,
+        PendingEmployeeExplanation,
+        PendingManagerReview
+    }
+
+    public enum PersonnelChangeConsentStatus
+    {
+        NotRequired,
+        Pending,
+        Accepted,
+        Declined,
+        Acknowledged
+    }
+
+    public enum PersonnelChangeContractFlowType
+    {
+        None,
+        NewContract,
+        ContractRenewal,
+        ContractAddendum,
+        ContractTermination
+    }
+
+    public enum PersonnelChangePromotionType
+    {
+        ConvertToOfficial,
+        PositionPromotion,
+        JobLevelPromotion
+    }
+
+    public enum PersonnelChangeApprovalDecision
+    {
+        Pending,
+        Approved,
+        Rejected,
+        Escalated
+    }
+
+    // ==========================================
+    // MODULE 9: Requests & Handover
     // ==========================================
     public enum RequestStatus
     {

@@ -1,6 +1,7 @@
 ﻿using HRM.backend.src.HRM.Core.Entities.EmployeeProfile;
 using HRM.backend.src.HRM.Core.Entities.Organization;
 using HRM.backend.src.HRM.Core.Entities.PayrollAllowances;
+using HRM.backend.src.HRM.Core.Entities.PersonnelChanges;
 using HRM.backend.src.HRM.Core.Entities.Recruitment;
 using HRM.backend.src.HRM.Core.Entities.RequestHandover;
 using HRM.backend.src.HRM.Core.Entities.System;
@@ -124,7 +125,14 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
         public DbSet<ExternalTimesheetImport> ExternalTimesheetImports { get; set; }
         public DbSet<ExternalTimesheetLine> ExternalTimesheetLines { get; set; }
 
-        // 8. Requests & Handover
+        // 8. Personnel Changes
+        public DbSet<PersonnelChangeRequest> PersonnelChangeRequests { get; set; }
+        public DbSet<PersonnelChangeApproval> PersonnelChangeApprovals { get; set; }
+        public DbSet<PersonnelChangeHistory> PersonnelChangeHistories { get; set; }
+        public DbSet<PersonnelChangeContractLink> PersonnelChangeContractLinks { get; set; }
+        public DbSet<PersonnelChangeRiskSnapshot> PersonnelChangeRiskSnapshots { get; set; }
+
+        // 9. Requests & Handover
         public DbSet<Request> Requests { get; set; }
         public DbSet<EmploymentHistory> EmploymentHistories { get; set; }
 
@@ -225,6 +233,12 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
             modelBuilder.Entity<ExternalTimesheetImport>().HasIndex(e => new { e.SourceSystem, e.ImportMonth, e.ImportYear, e.Status }).HasDatabaseName("IX_external_timesheet_imports_Source_Period_Status");
             modelBuilder.Entity<ExternalTimesheetLine>().HasIndex(e => new { e.ImportId, e.CollaboratorEmployeeId, e.WorkDate }).HasDatabaseName("IX_external_timesheet_lines_Import_Employee_WorkDate");
             modelBuilder.Entity<ExternalTimesheetLine>().HasIndex(e => new { e.CollaboratorEmployeeId, e.WorkDate, e.IsPayrollImported }).HasDatabaseName("IX_external_timesheet_lines_Employee_WorkDate_Payroll");
+            modelBuilder.Entity<PersonnelChangeRequest>().HasIndex(p => new { p.ChangeType, p.Status, p.RequestedAt }).HasDatabaseName("IX_personnel_change_requests_Type_Status_RequestedAt");
+            modelBuilder.Entity<PersonnelChangeRequest>().HasIndex(p => new { p.EmployeeId, p.Status }).HasDatabaseName("IX_personnel_change_requests_Employee_Status");
+            modelBuilder.Entity<PersonnelChangeApproval>().HasIndex(p => new { p.RequestId, p.StepName }).HasDatabaseName("IX_personnel_change_approvals_Request_Step");
+            modelBuilder.Entity<PersonnelChangeHistory>().HasIndex(p => new { p.RequestId, p.CreatedAt }).HasDatabaseName("IX_personnel_change_histories_Request_CreatedAt");
+            modelBuilder.Entity<PersonnelChangeContractLink>().HasIndex(p => new { p.PersonnelChangeRequestId, p.ContractFlowType }).HasDatabaseName("IX_personnel_change_contract_links_Request_FlowType");
+            modelBuilder.Entity<PersonnelChangeRiskSnapshot>().HasIndex(p => new { p.RequestId, p.CreatedAt }).HasDatabaseName("IX_personnel_change_risk_snapshots_Request_CreatedAt");
 
             // ==========================================
             // 3. QUAN HỆ (RELATIONSHIPS) & CHỐNG LỖI CASCADE
@@ -267,6 +281,12 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
                 .WithMany(j => j.Employees)
                 .HasForeignKey(e => e.JobLevelId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<Employee>()
+                .HasOne(e => e.Manager)
+                .WithMany()
+                .HasForeignKey(e => e.ManagerId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<PositionJobLevelPolicy>()
                 .HasOne(p => p.Position)
@@ -447,6 +467,164 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
                 .HasOne(pr => pr.PerformanceReview)
                 .WithMany()
                 .HasForeignKey(pr => pr.PerformanceReviewId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // --- PERSONNEL CHANGES ---
+            modelBuilder.Entity<PersonnelChangeRequest>()
+                .HasOne(p => p.Employee)
+                .WithMany()
+                .HasForeignKey(p => p.EmployeeId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .IsRequired(false);
+
+            modelBuilder.Entity<PersonnelChangeRequest>()
+                .HasOne(p => p.RequestedByAccount)
+                .WithMany()
+                .HasForeignKey(p => p.RequestedByAccountId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<PersonnelChangeRequest>()
+                .HasOne(p => p.CurrentDepartment)
+                .WithMany()
+                .HasForeignKey(p => p.CurrentDepartmentId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<PersonnelChangeRequest>()
+                .HasOne(p => p.NewDepartment)
+                .WithMany()
+                .HasForeignKey(p => p.NewDepartmentId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<PersonnelChangeRequest>()
+                .HasOne(p => p.CurrentPosition)
+                .WithMany()
+                .HasForeignKey(p => p.CurrentPositionId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<PersonnelChangeRequest>()
+                .HasOne(p => p.NewPosition)
+                .WithMany()
+                .HasForeignKey(p => p.NewPositionId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<PersonnelChangeRequest>()
+                .HasOne(p => p.CurrentManager)
+                .WithMany()
+                .HasForeignKey(p => p.CurrentManagerId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<PersonnelChangeRequest>()
+                .HasOne(p => p.NewManager)
+                .WithMany()
+                .HasForeignKey(p => p.NewManagerId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<PersonnelChangeRequest>()
+                .HasOne(p => p.CurrentJobLevel)
+                .WithMany()
+                .HasForeignKey(p => p.CurrentJobLevelId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<PersonnelChangeRequest>()
+                .HasOne(p => p.NewJobLevel)
+                .WithMany()
+                .HasForeignKey(p => p.NewJobLevelId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<PersonnelChangeRequest>()
+                .HasOne(p => p.DirectorApprovedByAccount)
+                .WithMany()
+                .HasForeignKey(p => p.DirectorApprovedByAccountId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<PersonnelChangeRequest>()
+                .HasOne(p => p.HRAssignedAccount)
+                .WithMany()
+                .HasForeignKey(p => p.HRAssignedAccountId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<PersonnelChangeRequest>()
+                .HasOne(p => p.RelatedContract)
+                .WithMany()
+                .HasForeignKey(p => p.RelatedContractId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<PersonnelChangeRequest>()
+                .HasOne(p => p.RelatedContractAddendum)
+                .WithMany()
+                .HasForeignKey(p => p.RelatedContractAddendumId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<PersonnelChangeRequest>()
+                .HasOne(p => p.RelatedFinalSettlement)
+                .WithMany()
+                .HasForeignKey(p => p.RelatedFinalSettlementId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<PersonnelChangeRequest>()
+                .HasOne(p => p.SourcePenaltyRecord)
+                .WithMany()
+                .HasForeignKey(p => p.SourcePenaltyRecordId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<PersonnelChangeRequest>()
+                .HasOne(p => p.SourcePerformanceReview)
+                .WithMany()
+                .HasForeignKey(p => p.SourcePerformanceReviewId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<PersonnelChangeRequest>()
+                .HasMany(p => p.Approvals)
+                .WithOne(p => p.Request)
+                .HasForeignKey(p => p.RequestId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<PersonnelChangeRequest>()
+                .HasMany(p => p.Histories)
+                .WithOne(p => p.Request)
+                .HasForeignKey(p => p.RequestId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<PersonnelChangeRequest>()
+                .HasMany(p => p.ContractLinks)
+                .WithOne(p => p.PersonnelChangeRequest)
+                .HasForeignKey(p => p.PersonnelChangeRequestId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<PersonnelChangeRequest>()
+                .HasMany(p => p.RiskSnapshots)
+                .WithOne(p => p.Request)
+                .HasForeignKey(p => p.RequestId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<PersonnelChangeApproval>()
+                .HasOne(p => p.ApproverAccount)
+                .WithMany()
+                .HasForeignKey(p => p.ApproverAccountId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<PersonnelChangeHistory>()
+                .HasOne(p => p.ActorAccount)
+                .WithMany()
+                .HasForeignKey(p => p.ActorAccountId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<PersonnelChangeContractLink>()
+                .HasOne(p => p.Contract)
+                .WithMany()
+                .HasForeignKey(p => p.ContractId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<PersonnelChangeContractLink>()
+                .HasOne(p => p.ContractAddendum)
+                .WithMany()
+                .HasForeignKey(p => p.ContractAddendumId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<PersonnelChangeRiskSnapshot>()
+                .HasOne(p => p.CreatedByAccount)
+                .WithMany()
+                .HasForeignKey(p => p.CreatedByAccountId)
                 .OnDelete(DeleteBehavior.SetNull);
 
             modelBuilder.Entity<WorkTask>()

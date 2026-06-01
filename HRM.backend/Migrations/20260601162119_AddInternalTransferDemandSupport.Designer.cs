@@ -4,6 +4,7 @@ using HRM.backend.src.HRM.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace HRM.backend.Migrations
 {
     [DbContext(typeof(MyDbContext))]
-    partial class MyDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260601162119_AddInternalTransferDemandSupport")]
+    partial class AddInternalTransferDemandSupport
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -120,7 +123,7 @@ namespace HRM.backend.Migrations
                     b.HasIndex("EmployeeId", "Status", "StartDate")
                         .HasDatabaseName("IX_contracts_Employee_Status_StartDate");
 
-                    b.ToTable("contracts", (string)null);
+                    b.ToTable("contracts");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.ContractAddendum", b =>
@@ -176,7 +179,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("ContractId", "Status");
 
-                    b.ToTable("contract_addendums", (string)null);
+                    b.ToTable("contract_addendums");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.ContractAddendumDetail", b =>
@@ -217,7 +220,7 @@ namespace HRM.backend.Migrations
                     b.HasIndex("ContractAddendumId", "FieldName")
                         .HasDatabaseName("IX_contract_addendum_details_Addendum_Field");
 
-                    b.ToTable("contract_addendum_details", (string)null);
+                    b.ToTable("contract_addendum_details");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.Dependent", b =>
@@ -276,7 +279,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("EmployeeId", "TaxDependentCode");
 
-                    b.ToTable("dependents", (string)null);
+                    b.ToTable("dependents");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.DependentUpdateRequest", b =>
@@ -327,7 +330,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("EmployeeId", "Status");
 
-                    b.ToTable("dependent_update_requests", (string)null);
+                    b.ToTable("dependent_update_requests");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.Employee", b =>
@@ -417,9 +420,6 @@ namespace HRM.backend.Migrations
                     b.Property<DateTime?>("JoinedDate")
                         .HasColumnType("datetime(6)");
 
-                    b.Property<int?>("ManagerId")
-                        .HasColumnType("int");
-
                     b.Property<string>("PermanentAddress")
                         .HasMaxLength(255)
                         .HasColumnType("varchar(255)");
@@ -484,8 +484,6 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("JobLevelId");
 
-                    b.HasIndex("ManagerId");
-
                     b.HasIndex("PositionId");
 
                     b.HasIndex("SocialInsCode")
@@ -494,7 +492,7 @@ namespace HRM.backend.Migrations
                     b.HasIndex("TaxCode")
                         .IsUnique();
 
-                    b.ToTable("employees", (string)null);
+                    b.ToTable("employees");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.EmploymentServicePeriod", b =>
@@ -555,7 +553,7 @@ namespace HRM.backend.Migrations
                     b.HasIndex("EmployeeId", "PeriodStart", "PeriodEnd")
                         .HasDatabaseName("IX_employment_service_periods_Employee_Range");
 
-                    b.ToTable("employment_service_periods", (string)null);
+                    b.ToTable("employment_service_periods");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.FinalSettlement", b =>
@@ -660,7 +658,7 @@ namespace HRM.backend.Migrations
                     b.HasIndex("EmployeeId", "Status")
                         .HasDatabaseName("IX_final_settlements_Employee_Status");
 
-                    b.ToTable("final_settlements", (string)null);
+                    b.ToTable("final_settlements");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.MaternityLeave", b =>
@@ -715,7 +713,7 @@ namespace HRM.backend.Migrations
                     b.HasIndex("EmployeeId", "Status", "StartDate")
                         .HasDatabaseName("IX_maternity_leaves_Employee_Status_Start");
 
-                    b.ToTable("maternity_leaves", (string)null);
+                    b.ToTable("maternity_leaves");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.OnboardingRequest", b =>
@@ -747,7 +745,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("CandidateId");
 
-                    b.ToTable("onboarding_requests", (string)null);
+                    b.ToTable("onboarding_requests");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.ProfileUpdateRequest", b =>
@@ -783,7 +781,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("EmployeeId");
 
-                    b.ToTable("profile_update_requests", (string)null);
+                    b.ToTable("profile_update_requests");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.TerminationRequest", b =>
@@ -858,7 +856,7 @@ namespace HRM.backend.Migrations
                     b.HasIndex("EmployeeId", "Status", "ExpectedLastWorkingDate")
                         .HasDatabaseName("IX_termination_requests_Employee_Status_LastDate");
 
-                    b.ToTable("termination_requests", (string)null);
+                    b.ToTable("termination_requests");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.Organization.Department", b =>
@@ -898,7 +896,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("ParentDeptId");
 
-                    b.ToTable("departments", (string)null);
+                    b.ToTable("departments");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.Organization.JobLevel", b =>
@@ -940,7 +938,7 @@ namespace HRM.backend.Migrations
                     b.HasIndex("IsActive", "RankOrder")
                         .HasDatabaseName("IX_job_levels_Active_Rank");
 
-                    b.ToTable("job_levels", (string)null);
+                    b.ToTable("job_levels");
 
                     b.HasData(
                         new
@@ -1039,7 +1037,7 @@ namespace HRM.backend.Migrations
                     b.HasIndex("Title")
                         .IsUnique();
 
-                    b.ToTable("positions", (string)null);
+                    b.ToTable("positions");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.Organization.PositionJobLevelPolicy", b =>
@@ -1100,7 +1098,7 @@ namespace HRM.backend.Migrations
                     b.HasIndex("PositionId", "JobLevelId", "IsActive", "EffectiveFrom")
                         .HasDatabaseName("IX_position_job_level_policies_Lookup");
 
-                    b.ToTable("position_job_level_policies", (string)null);
+                    b.ToTable("position_job_level_policies");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.AllowanceType", b =>
@@ -1123,7 +1121,7 @@ namespace HRM.backend.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("allowance_types", (string)null);
+                    b.ToTable("allowance_types");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.EmployeeAllowance", b =>
@@ -1149,7 +1147,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("EmployeeId");
 
-                    b.ToTable("employee_allowances", (string)null);
+                    b.ToTable("employee_allowances");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.EmployeeSalaryComponent", b =>
@@ -1196,7 +1194,7 @@ namespace HRM.backend.Migrations
                     b.HasIndex("EmployeeId", "SalaryComponentTypeId", "EffectiveFrom")
                         .HasDatabaseName("IX_employee_salary_components_Employee_Type_EffectiveFrom");
 
-                    b.ToTable("employee_salary_components", (string)null);
+                    b.ToTable("employee_salary_components");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.ExternalTimesheetImport", b =>
@@ -1248,7 +1246,7 @@ namespace HRM.backend.Migrations
                     b.HasIndex("SourceSystem", "ImportMonth", "ImportYear", "Status")
                         .HasDatabaseName("IX_external_timesheet_imports_Source_Period_Status");
 
-                    b.ToTable("external_timesheet_imports", (string)null);
+                    b.ToTable("external_timesheet_imports");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.ExternalTimesheetLine", b =>
@@ -1309,7 +1307,7 @@ namespace HRM.backend.Migrations
                     b.HasIndex("ImportId", "CollaboratorEmployeeId", "WorkDate")
                         .HasDatabaseName("IX_external_timesheet_lines_Import_Employee_WorkDate");
 
-                    b.ToTable("external_timesheet_lines", (string)null);
+                    b.ToTable("external_timesheet_lines");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.InsuranceConfig", b =>
@@ -1388,7 +1386,7 @@ namespace HRM.backend.Migrations
                         .IsUnique()
                         .HasDatabaseName("UX_insurance_configs_Code_EffectiveFrom");
 
-                    b.ToTable("insurance_configs", (string)null);
+                    b.ToTable("insurance_configs");
 
                     b.HasData(
                         new
@@ -1490,7 +1488,7 @@ namespace HRM.backend.Migrations
                         .IsUnique()
                         .HasDatabaseName("UX_monthly_insurance_statuses_Employee_Period");
 
-                    b.ToTable("monthly_insurance_statuses", (string)null);
+                    b.ToTable("monthly_insurance_statuses");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.OvertimeRateConfig", b =>
@@ -1547,7 +1545,7 @@ namespace HRM.backend.Migrations
                     b.HasIndex("OvertimeType", "IsActive", "EffectiveFrom")
                         .HasDatabaseName("IX_overtime_rate_configs_Type_Active_EffectiveFrom");
 
-                    b.ToTable("overtime_rate_configs", (string)null);
+                    b.ToTable("overtime_rate_configs");
 
                     b.HasData(
                         new
@@ -1689,7 +1687,7 @@ namespace HRM.backend.Migrations
                         .IsUnique()
                         .HasDatabaseName("UX_pit_tax_brackets_Code_Level_EffectiveFrom");
 
-                    b.ToTable("pit_tax_brackets", (string)null);
+                    b.ToTable("pit_tax_brackets");
 
                     b.HasData(
                         new
@@ -1915,7 +1913,7 @@ namespace HRM.backend.Migrations
                     b.HasIndex("Month", "Year", "Status")
                         .HasDatabaseName("IX_payrolls_Period_Status");
 
-                    b.ToTable("payrolls", (string)null);
+                    b.ToTable("payrolls");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.PayrollAdjustment", b =>
@@ -2003,7 +2001,7 @@ namespace HRM.backend.Migrations
                     b.HasIndex("EmployeeId", "RecognizedMonth", "RecognizedYear", "Status")
                         .HasDatabaseName("IX_payroll_adjustments_Employee_Recognized_Status");
 
-                    b.ToTable("payroll_adjustments", (string)null);
+                    b.ToTable("payroll_adjustments");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.PayrollContractSegment", b =>
@@ -2085,7 +2083,7 @@ namespace HRM.backend.Migrations
                     b.HasIndex("EmployeeId", "StartDate", "EndDate")
                         .HasDatabaseName("IX_payroll_contract_segments_Employee_Range");
 
-                    b.ToTable("payroll_contract_segments", (string)null);
+                    b.ToTable("payroll_contract_segments");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.PayrollDetail", b =>
@@ -2153,7 +2151,7 @@ namespace HRM.backend.Migrations
                     b.HasIndex("PayrollId", "ComponentCode")
                         .HasDatabaseName("IX_payroll_details_Payroll_Component");
 
-                    b.ToTable("payroll_details", (string)null);
+                    b.ToTable("payroll_details");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.PayrollFormula", b =>
@@ -2243,7 +2241,7 @@ namespace HRM.backend.Migrations
                     b.HasIndex("Status", "ContractType", "PayBasis", "EmployeeType", "DeptId", "PositionId", "JobLevelId", "EffectiveFrom")
                         .HasDatabaseName("IX_payroll_formulas_Scope_Lookup");
 
-                    b.ToTable("payroll_formulas", (string)null);
+                    b.ToTable("payroll_formulas");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.PayrollFormulaLine", b =>
@@ -2305,7 +2303,7 @@ namespace HRM.backend.Migrations
                         .IsUnique()
                         .HasDatabaseName("UX_payroll_formula_lines_Formula_Component");
 
-                    b.ToTable("payroll_formula_lines", (string)null);
+                    b.ToTable("payroll_formula_lines");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.SalaryComponentType", b =>
@@ -2393,7 +2391,7 @@ namespace HRM.backend.Migrations
                     b.HasIndex("ComponentGroup", "IsActive", "EffectiveFrom")
                         .HasDatabaseName("IX_salary_component_types_Group_Active_EffectiveFrom");
 
-                    b.ToTable("salary_component_types", (string)null);
+                    b.ToTable("salary_component_types");
 
                     b.HasData(
                         new
@@ -2755,7 +2753,7 @@ namespace HRM.backend.Migrations
                         .IsUnique()
                         .HasDatabaseName("UX_tax_configs_Code_EffectiveFrom");
 
-                    b.ToTable("tax_configs", (string)null);
+                    b.ToTable("tax_configs");
 
                     b.HasData(
                         new
@@ -2821,7 +2819,7 @@ namespace HRM.backend.Migrations
                     b.HasIndex("RequestId", "StepName")
                         .HasDatabaseName("IX_personnel_change_approvals_Request_Step");
 
-                    b.ToTable("personnel_change_approvals", (string)null);
+                    b.ToTable("personnel_change_approvals");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PersonnelChanges.PersonnelChangeContractLink", b =>
@@ -2867,7 +2865,7 @@ namespace HRM.backend.Migrations
                     b.HasIndex("PersonnelChangeRequestId", "ContractFlowType")
                         .HasDatabaseName("IX_personnel_change_contract_links_Request_FlowType");
 
-                    b.ToTable("personnel_change_contract_links", (string)null);
+                    b.ToTable("personnel_change_contract_links");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PersonnelChanges.PersonnelChangeHistory", b =>
@@ -2909,7 +2907,7 @@ namespace HRM.backend.Migrations
                     b.HasIndex("RequestId", "CreatedAt")
                         .HasDatabaseName("IX_personnel_change_histories_Request_CreatedAt");
 
-                    b.ToTable("personnel_change_histories", (string)null);
+                    b.ToTable("personnel_change_histories");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PersonnelChanges.PersonnelChangeRequest", b =>
@@ -2919,9 +2917,6 @@ namespace HRM.backend.Migrations
                         .HasColumnType("int");
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime?>("AccountLockedAt")
-                        .HasColumnType("datetime(6)");
 
                     b.Property<string>("ChangeType")
                         .IsRequired()
@@ -2991,22 +2986,8 @@ namespace HRM.backend.Migrations
                         .IsRequired()
                         .HasColumnType("VARCHAR(50)");
 
-                    b.Property<string>("EmployeeExplanation")
-                        .HasMaxLength(2000)
-                        .HasColumnType("varchar(2000)");
-
-                    b.Property<DateTime?>("EmployeeExplanationAt")
-                        .HasColumnType("datetime(6)");
-
                     b.Property<int?>("EmployeeId")
                         .HasColumnType("int");
-
-                    b.Property<DateTime?>("EmployeeNotifiedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<string>("EvidenceFilePath")
-                        .HasMaxLength(500)
-                        .HasColumnType("varchar(500)");
 
                     b.Property<int?>("HRAssignedAccountId")
                         .HasColumnType("int");
@@ -3017,13 +2998,6 @@ namespace HRM.backend.Migrations
 
                     b.Property<DateTime?>("HRProcessedAt")
                         .HasColumnType("datetime(6)");
-
-                    b.Property<bool>("LockAccountOnExecution")
-                        .HasColumnType("tinyint(1)");
-
-                    b.Property<string>("ManagerNote")
-                        .HasMaxLength(2000)
-                        .HasColumnType("varchar(2000)");
 
                     b.Property<int?>("NewDepartmentId")
                         .HasColumnType("int");
@@ -3039,9 +3013,6 @@ namespace HRM.backend.Migrations
 
                     b.Property<int?>("NewPositionId")
                         .HasColumnType("int");
-
-                    b.Property<string>("PromotionType")
-                        .HasColumnType("VARCHAR(50)");
 
                     b.Property<string>("Reason")
                         .HasMaxLength(2000)
@@ -3060,9 +3031,6 @@ namespace HRM.backend.Migrations
                     b.Property<int?>("RelatedContractRequestId")
                         .HasColumnType("int");
 
-                    b.Property<int?>("RelatedFinalSettlementId")
-                        .HasColumnType("int");
-
                     b.Property<DateTime>("RequestedAt")
                         .HasColumnType("datetime(6)");
 
@@ -3078,14 +3046,8 @@ namespace HRM.backend.Migrations
                     b.Property<bool>("RequiresEmployeeConsent")
                         .HasColumnType("tinyint(1)");
 
-                    b.Property<bool>("RequiresFinalSettlement")
-                        .HasColumnType("tinyint(1)");
-
                     b.Property<bool>("RequiresHRProcessing")
                         .HasColumnType("tinyint(1)");
-
-                    b.Property<DateTime?>("ResponseDeadlineAt")
-                        .HasColumnType("datetime(6)");
 
                     b.Property<int?>("SourcePenaltyRecordId")
                         .HasColumnType("int");
@@ -3126,8 +3088,6 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("RelatedContractId");
 
-                    b.HasIndex("RelatedFinalSettlementId");
-
                     b.HasIndex("RequestedByAccountId");
 
                     b.HasIndex("SourcePenaltyRecordId");
@@ -3140,7 +3100,7 @@ namespace HRM.backend.Migrations
                     b.HasIndex("ChangeType", "Status", "RequestedAt")
                         .HasDatabaseName("IX_personnel_change_requests_Type_Status_RequestedAt");
 
-                    b.ToTable("personnel_change_requests", (string)null);
+                    b.ToTable("personnel_change_requests");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PersonnelChanges.PersonnelChangeRiskSnapshot", b =>
@@ -3171,7 +3131,7 @@ namespace HRM.backend.Migrations
                     b.HasIndex("RequestId", "CreatedAt")
                         .HasDatabaseName("IX_personnel_change_risk_snapshots_Request_CreatedAt");
 
-                    b.ToTable("personnel_change_risk_snapshots", (string)null);
+                    b.ToTable("personnel_change_risk_snapshots");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.Recruitment.Candidate", b =>
@@ -3218,7 +3178,7 @@ namespace HRM.backend.Migrations
                         .IsUnique()
                         .HasDatabaseName("UX_candidates_RecruitmentRequestId_Email");
 
-                    b.ToTable("candidates", (string)null);
+                    b.ToTable("candidates");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.Recruitment.RecruitmentRequest", b =>
@@ -3260,7 +3220,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("PositionId");
 
-                    b.ToTable("recruitment_requests", (string)null);
+                    b.ToTable("recruitment_requests");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.RequestHandover.EmploymentHistory", b =>
@@ -3299,7 +3259,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("EmployeeId");
 
-                    b.ToTable("employment_history", (string)null);
+                    b.ToTable("employment_history");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.RequestHandover.Request", b =>
@@ -3344,7 +3304,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("TargetPositionId");
 
-                    b.ToTable("requests", (string)null);
+                    b.ToTable("requests");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.System.Account", b =>
@@ -3401,7 +3361,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("RoleId");
 
-                    b.ToTable("accounts", (string)null);
+                    b.ToTable("accounts");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.System.ApprovalRequest", b =>
@@ -3431,7 +3391,7 @@ namespace HRM.backend.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("approval_requests", (string)null);
+                    b.ToTable("approval_requests");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.System.ApprovalStep", b =>
@@ -3470,7 +3430,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("ApprovalRequestId");
 
-                    b.ToTable("approval_steps", (string)null);
+                    b.ToTable("approval_steps");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.System.AuditLog", b =>
@@ -3508,7 +3468,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("AccountId");
 
-                    b.ToTable("audit_logs", (string)null);
+                    b.ToTable("audit_logs");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.System.Configuration", b =>
@@ -3541,7 +3501,7 @@ namespace HRM.backend.Migrations
                     b.HasIndex("ConfigGroup", "ParamKey")
                         .IsUnique();
 
-                    b.ToTable("configurations", (string)null);
+                    b.ToTable("configurations");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.System.IdempotencyRecord", b =>
@@ -3584,7 +3544,7 @@ namespace HRM.backend.Migrations
                     b.HasIndex("Scope", "IdempotencyKey")
                         .IsUnique();
 
-                    b.ToTable("idempotency_records", (string)null);
+                    b.ToTable("idempotency_records");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.System.MfaRecoveryCode", b =>
@@ -3609,7 +3569,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("AccountId");
 
-                    b.ToTable("MfaRecoveryCodes", (string)null);
+                    b.ToTable("MfaRecoveryCodes");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.System.OutboxMessage", b =>
@@ -3660,7 +3620,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("Status", "CreatedAt");
 
-                    b.ToTable("outbox_messages", (string)null);
+                    b.ToTable("outbox_messages");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.System.PayrollPolicy", b =>
@@ -3744,7 +3704,7 @@ namespace HRM.backend.Migrations
                     b.HasIndex("PolicyType", "IsActive", "EffectiveFrom")
                         .HasDatabaseName("IX_payroll_policies_Type_Active_EffectiveFrom");
 
-                    b.ToTable("payroll_policies", (string)null);
+                    b.ToTable("payroll_policies");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.System.Permission", b =>
@@ -3773,7 +3733,7 @@ namespace HRM.backend.Migrations
                     b.HasIndex("PermissionCode")
                         .IsUnique();
 
-                    b.ToTable("permissions", (string)null);
+                    b.ToTable("permissions");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.System.Role", b =>
@@ -3797,7 +3757,7 @@ namespace HRM.backend.Migrations
                     b.HasIndex("RoleName")
                         .IsUnique();
 
-                    b.ToTable("roles", (string)null);
+                    b.ToTable("roles");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.System.RolePermission", b =>
@@ -3812,7 +3772,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("PermissionId");
 
-                    b.ToTable("role_permissions", (string)null);
+                    b.ToTable("role_permissions");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.System.SlaTrackingTask", b =>
@@ -3845,7 +3805,7 @@ namespace HRM.backend.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("sla_tracking_tasks", (string)null);
+                    b.ToTable("sla_tracking_tasks");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.System.SourceCatalog", b =>
@@ -3890,7 +3850,7 @@ namespace HRM.backend.Migrations
                     b.HasIndex("SourcePath")
                         .IsUnique();
 
-                    b.ToTable("source_catalogs", (string)null);
+                    b.ToTable("source_catalogs");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TasksTraining.KpiImportBatch", b =>
@@ -3938,7 +3898,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("ImportedByAccountId");
 
-                    b.ToTable("kpi_import_batches", (string)null);
+                    b.ToTable("kpi_import_batches");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TasksTraining.PenaltyRecord", b =>
@@ -4070,7 +4030,7 @@ namespace HRM.backend.Migrations
                     b.HasIndex("EmployeeId", "Period", "AffectsPerformance", "Status")
                         .HasDatabaseName("IX_penalty_records_Employee_Performance_Status");
 
-                    b.ToTable("penalty_records", (string)null);
+                    b.ToTable("penalty_records");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TasksTraining.PenaltyRule", b =>
@@ -4153,7 +4113,7 @@ namespace HRM.backend.Migrations
                         .IsUnique()
                         .HasDatabaseName("UX_penalty_rules_SourceType_RuleCode");
 
-                    b.ToTable("penalty_rules", (string)null);
+                    b.ToTable("penalty_rules");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TasksTraining.PerformanceDetail", b =>
@@ -4245,7 +4205,7 @@ namespace HRM.backend.Migrations
                         .IsUnique()
                         .HasDatabaseName("UX_performance_details_ReviewId_KpiCode");
 
-                    b.ToTable("performance_details", (string)null);
+                    b.ToTable("performance_details");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TasksTraining.PerformanceReview", b =>
@@ -4323,7 +4283,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("DeptId", "Period", "Status");
 
-                    b.ToTable("performance_reviews", (string)null);
+                    b.ToTable("performance_reviews");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TasksTraining.TaskFeedback", b =>
@@ -4361,7 +4321,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("TaskId");
 
-                    b.ToTable("task_feedbacks", (string)null);
+                    b.ToTable("task_feedbacks");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TasksTraining.TaskProgress", b =>
@@ -4398,7 +4358,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("TaskId", "SubmittedAt");
 
-                    b.ToTable("task_progresses", (string)null);
+                    b.ToTable("task_progresses");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TasksTraining.Training", b =>
@@ -4469,7 +4429,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("ManagerId", "EvaluationDeadline", "Status");
 
-                    b.ToTable("trainings", (string)null);
+                    b.ToTable("trainings");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TasksTraining.WorkTask", b =>
@@ -4547,7 +4507,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("AssignedTo", "Status", "Deadline");
 
-                    b.ToTable("tasks", (string)null);
+                    b.ToTable("tasks");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TimeAttendance.AttendanceAdjustmentLog", b =>
@@ -4585,7 +4545,7 @@ namespace HRM.backend.Migrations
                     b.HasIndex("AttendanceDailySummaryId", "AdjustedAt")
                         .HasDatabaseName("IX_attendance_adjustment_logs_Summary_AdjustedAt");
 
-                    b.ToTable("attendance_adjustment_logs", (string)null);
+                    b.ToTable("attendance_adjustment_logs");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TimeAttendance.AttendanceDailySummary", b =>
@@ -4670,7 +4630,7 @@ namespace HRM.backend.Migrations
                         .IsUnique()
                         .HasDatabaseName("UX_attendance_daily_summaries_Employee_WorkDate");
 
-                    b.ToTable("attendance_daily_summaries", (string)null);
+                    b.ToTable("attendance_daily_summaries");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TimeAttendance.AttendanceLog", b =>
@@ -4716,7 +4676,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("ShiftId");
 
-                    b.ToTable("attendance_logs", (string)null);
+                    b.ToTable("attendance_logs");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TimeAttendance.AttendanceSummary", b =>
@@ -4765,7 +4725,7 @@ namespace HRM.backend.Migrations
                     b.HasIndex("EmployeeId", "Month", "Year")
                         .IsUnique();
 
-                    b.ToTable("attendance_summaries", (string)null);
+                    b.ToTable("attendance_summaries");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TimeAttendance.LeaveBalance", b =>
@@ -4789,7 +4749,7 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("LeaveTypeId");
 
-                    b.ToTable("leave_balances", (string)null);
+                    b.ToTable("leave_balances");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TimeAttendance.LeaveRequest", b =>
@@ -4830,7 +4790,7 @@ namespace HRM.backend.Migrations
                         .IsUnique()
                         .HasDatabaseName("UX_leave_requests_EmployeeId_LeaveTypeId_StartDate_EndDate");
 
-                    b.ToTable("leave_requests", (string)null);
+                    b.ToTable("leave_requests");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TimeAttendance.LeaveType", b =>
@@ -4866,7 +4826,7 @@ namespace HRM.backend.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("leave_types", (string)null);
+                    b.ToTable("leave_types");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TimeAttendance.OvertimeRequest", b =>
@@ -4972,7 +4932,7 @@ namespace HRM.backend.Migrations
                         .IsUnique()
                         .HasDatabaseName("UX_overtime_requests_EmployeeId_WorkDate_StartTime_EndTime");
 
-                    b.ToTable("overtime_requests", (string)null);
+                    b.ToTable("overtime_requests");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TimeAttendance.OvertimeSegment", b =>
@@ -5023,7 +4983,7 @@ namespace HRM.backend.Migrations
                     b.HasIndex("OvertimeRequestId", "SegmentStartAt")
                         .HasDatabaseName("IX_overtime_segments_Request_Start");
 
-                    b.ToTable("overtime_segments", (string)null);
+                    b.ToTable("overtime_segments");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TimeAttendance.WorkCalendarConfig", b =>
@@ -5081,7 +5041,7 @@ namespace HRM.backend.Migrations
                         .IsUnique()
                         .HasDatabaseName("UX_work_calendar_configs_DeptId_Month_Year");
 
-                    b.ToTable("work_calendar_configs", (string)null);
+                    b.ToTable("work_calendar_configs");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TimeAttendance.WorkShift", b =>
@@ -5127,7 +5087,7 @@ namespace HRM.backend.Migrations
                         .IsUnique()
                         .HasDatabaseName("UX_work_shifts_DeptId");
 
-                    b.ToTable("work_shifts", (string)null);
+                    b.ToTable("work_shifts");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.Contract", b =>
@@ -5215,11 +5175,6 @@ namespace HRM.backend.Migrations
                         .HasForeignKey("JobLevelId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.HasOne("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.Employee", "Manager")
-                        .WithMany()
-                        .HasForeignKey("ManagerId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.HasOne("HRM.backend.src.HRM.Core.Entities.Organization.Position", "Position")
                         .WithMany("Employees")
                         .HasForeignKey("PositionId")
@@ -5232,8 +5187,6 @@ namespace HRM.backend.Migrations
                     b.Navigation("Department");
 
                     b.Navigation("JobLevel");
-
-                    b.Navigation("Manager");
 
                     b.Navigation("Position");
                 });
@@ -5699,11 +5652,6 @@ namespace HRM.backend.Migrations
                         .HasForeignKey("RelatedContractId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.HasOne("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.FinalSettlement", "RelatedFinalSettlement")
-                        .WithMany()
-                        .HasForeignKey("RelatedFinalSettlementId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
                     b.HasOne("HRM.backend.src.HRM.Core.Entities.System.Account", "RequestedByAccount")
                         .WithMany()
                         .HasForeignKey("RequestedByAccountId")
@@ -5745,8 +5693,6 @@ namespace HRM.backend.Migrations
                     b.Navigation("RelatedContract");
 
                     b.Navigation("RelatedContractAddendum");
-
-                    b.Navigation("RelatedFinalSettlement");
 
                     b.Navigation("RequestedByAccount");
 
