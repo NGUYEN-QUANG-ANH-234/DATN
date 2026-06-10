@@ -232,7 +232,7 @@ export const PenaltyRecordPage = () => {
               checked={form.affectsPersonnelDecision}
               onChange={(event) => setForm((current) => ({ ...current, affectsPersonnelDecision: event.target.checked }))}
             />
-            Lưu hồ sơ Module 7
+            Ghi nhận vào hồ sơ nhân sự
           </label>
         </div>
         <label className="block">
@@ -288,7 +288,7 @@ export const PenaltyRecordPage = () => {
   return (
     <FeaturePage
       title="Quản lý vi phạm, điểm trừ và điều chỉnh công"
-      description="Theo dõi lỗi hiện diện, biên bản vi phạm và điểm trừ dùng cho F5.4, bảng công và Module 7. Payroll chỉ đọc kết quả bảng công đã chốt."
+      description="Theo dõi vi phạm, điểm trừ và điều chỉnh công để phục vụ đánh giá, bảng công và quyết định nhân sự."
       actions={
         <Button variant="secondary" onClick={() => loadRecords()}>
           Tải lại
