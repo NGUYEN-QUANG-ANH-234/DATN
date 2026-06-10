@@ -5,6 +5,7 @@ import { usePayrollPeriod } from "../hooks/usePayrollPeriod";
 import { formatMoney, sumSalarySlips } from "../utils";
 import { PayrollMetricCard } from "./PayrollMetricCard";
 import { PayrollPeriodFilter } from "./PayrollPeriodFilter";
+import { PayrollPreflightPanel } from "./PayrollPreflightPanel";
 import { SalarySlipDetailPanel } from "./SalarySlipDetailPanel";
 import { SalarySlipTable } from "./SalarySlipTable";
 
@@ -20,7 +21,7 @@ export const PayrollAggregationPage = () => {
   return (
     <FeaturePage
       title="Tổng hợp lương thưởng"
-      description="Tổng hợp bảng lương nháp từ hợp đồng, bảng công đã chốt, OT, KPI, phụ cấp thâm niên, truy lĩnh/truy thu và snapshot chính sách lương."
+      description="Tổng hợp bảng lương nháp từ bảng công, KPI và chính sách lương."
       width="wide"
     >
       <Card title="Kỳ lương">
@@ -29,7 +30,7 @@ export const PayrollAggregationPage = () => {
           year={year}
           loading={payroll.loading}
           calculating={payroll.calculating}
-          canCalculate={payroll.canManagePayroll}
+          canCalculate={payroll.canCalculatePayroll}
           canExport={payroll.selectedIds.length > 0}
           showCalculate={payroll.canManagePayroll}
           onMonthChange={setMonth}
@@ -40,11 +41,15 @@ export const PayrollAggregationPage = () => {
         />
       </Card>
 
+      {payroll.canManagePayroll && (
+        <PayrollPreflightPanel preflight={payroll.preflight} loading={payroll.preflightLoading} />
+      )}
+
       <div className="grid gap-4 md:grid-cols-4">
         <PayrollMetricCard label="Số phiếu" value={String(payroll.slips.length)} />
-        <PayrollMetricCard label="Tổng Gross" value={formatMoney(sumSalarySlips(payroll.slips, "grossIncome"))} />
+        <PayrollMetricCard label="Tổng thu nhập" value={formatMoney(sumSalarySlips(payroll.slips, "grossIncome"))} />
         <PayrollMetricCard label="BH, thuế và điều chỉnh hợp lệ" value={formatMoney(totalDeductions)} />
-        <PayrollMetricCard label="Tổng Net" value={formatMoney(sumSalarySlips(payroll.slips, "netSalary"))} strong />
+        <PayrollMetricCard label="Tổng thực nhận" value={formatMoney(sumSalarySlips(payroll.slips, "netSalary"))} strong />
       </div>
 
       {payroll.calculationResult && (

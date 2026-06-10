@@ -23,6 +23,24 @@ export interface SalarySlipDetail {
   isTaxable: boolean;
   isInsuranceBased: boolean;
   note?: string | null;
+  projectBonusSources?: ProjectBonusSource[];
+}
+
+export interface ProjectBonusSource {
+  id: number;
+  batchId: number;
+  fileName?: string | null;
+  payrollPeriod?: string | null;
+  approvedAt?: string | null;
+  employeeCode: string;
+  employeeName?: string | null;
+  projectCode: string;
+  projectName: string;
+  bonusAmount: number;
+  taxable: boolean;
+  insuranceContributable: boolean;
+  reason?: string | null;
+  note?: string | null;
 }
 
 export interface SalarySlip {
@@ -76,6 +94,47 @@ export interface PayrollCalculationResult {
   payrolls: SalarySlip[];
 }
 
+export interface PayrollFeatureToggles {
+  enableInsurance: boolean;
+  enableOvertime: boolean;
+  enableMealAllowance: boolean;
+  enableExternalTimesheetPay: boolean;
+}
+
+export interface PayrollPreflightPolicy {
+  area: string;
+  code: string;
+  name: string;
+  version: number;
+  versionCode?: string | null;
+  effectiveFrom: string;
+  effectiveTo?: string | null;
+  status: string;
+  isApplied: boolean;
+  note?: string | null;
+}
+
+export interface PayrollDependencyImpact {
+  key: string;
+  name: string;
+  enabled: boolean;
+  impacts: string[];
+}
+
+export interface PayrollPreflight {
+  month: number;
+  year: number;
+  period: string;
+  periodStart: string;
+  periodEnd: string;
+  canCalculate: boolean;
+  featureToggles: PayrollFeatureToggles;
+  policies: PayrollPreflightPolicy[];
+  dependencyImpacts: PayrollDependencyImpact[];
+  errors: string[];
+  warnings: string[];
+}
+
 export type PayrollAdjustmentType =
   | "RetroactiveSalaryIncrease"
   | "RetroactiveAllowance"
@@ -101,6 +160,77 @@ export interface PayrollAdjustment {
   reason: string;
   status: string;
   createdAt?: string | null;
+}
+
+export type ProjectBonusImportStatus =
+  | "Draft"
+  | "PendingReview"
+  | "Approved"
+  | "Rejected"
+  | "Cancelled";
+
+export interface ProjectBonusImportLine {
+  id: number;
+  rowNumber: number;
+  employeeId?: number | null;
+  employeeCode: string;
+  employeeName?: string | null;
+  projectCode: string;
+  projectName: string;
+  bonusAmount: number;
+  taxable: boolean;
+  insuranceContributable: boolean;
+  reason?: string | null;
+  note?: string | null;
+  validationStatus: string;
+  isValid: boolean;
+  errorMessage?: string | null;
+}
+
+export interface ProjectBonusImportBatch {
+  id: number;
+  periodMonth: number;
+  periodYear: number;
+  payrollPeriod: string;
+  fileName: string;
+  status: ProjectBonusImportStatus | string;
+  statusText: string;
+  totalRows: number;
+  validRows: number;
+  errorRows: number;
+  totalAmount: number;
+  uploadedByAccountId: number;
+  uploadedByName?: string | null;
+  createdAt: string;
+  approvedByAccountId?: number | null;
+  approvedByName?: string | null;
+  approvedAt?: string | null;
+  note?: string | null;
+  lines: ProjectBonusImportLine[];
+}
+
+export interface ProjectBonusImportPreview {
+  periodMonth: number;
+  periodYear: number;
+  payrollPeriod: string;
+  fileName: string;
+  overwrite: boolean;
+  canSave: boolean;
+  totalRows: number;
+  validRows: number;
+  errorRows: number;
+  totalAmount: number;
+  globalErrors: string[];
+  lines: ProjectBonusImportLine[];
+}
+
+export interface ReviewProjectBonusImportRequest {
+  isApproved: boolean;
+  note?: string | null;
+}
+
+export interface CancelProjectBonusImportRequest {
+  note?: string | null;
 }
 
 export interface CreatePayrollAdjustmentRequest {

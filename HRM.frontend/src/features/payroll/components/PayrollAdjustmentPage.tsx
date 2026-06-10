@@ -47,7 +47,7 @@ export const PayrollAdjustmentPage = () => {
   return (
     <FeaturePage
       title="Điều chỉnh nghiệp vụ lương"
-      description="Ghi nhận truy lĩnh, truy thu, điều chỉnh thuế, bảo hiểm, bồi hoàn hoặc sai sót kỳ trước. Lỗi hiện diện đi qua bảng công và biên bản vi phạm, không tạo khoản tiền trực tiếp tại payroll."
+      description="Ghi nhận truy lĩnh, truy thu và các điều chỉnh kỳ lương."
       width="wide"
     >
       <Card title="Kỳ ghi nhận">

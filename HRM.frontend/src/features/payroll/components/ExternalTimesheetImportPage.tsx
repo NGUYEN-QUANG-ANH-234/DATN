@@ -14,12 +14,12 @@ export const ExternalTimesheetImportPage = () => {
 
   return (
     <FeaturePage
-      title="Import giờ công CTV"
-      description="Xem trước dữ liệu giờ công cộng tác viên/freelancer trước khi đưa vào payroll. Backend hiện đã có entity, phần API import/duyệt sẽ được nối ở bước tiếp theo."
+      title="Giờ công cộng tác viên"
+      description="Xem trước và kiểm tra dữ liệu giờ công cộng tác viên trước khi đưa vào kỳ lương."
       width="wide"
     >
       <Card
-        title="Thông tin import"
+        title="Thông tin nhập dữ liệu"
         actions={
           <Button type="button" variant="secondary" onClick={reset}>
             <RotateCcw size={16} />
@@ -71,7 +71,7 @@ export const ExternalTimesheetImportPage = () => {
             <FileSpreadsheet size={28} className="text-[var(--hicas-orange)]" />
             <span className="font-semibold text-[var(--hicas-text-main)]">Chọn file CSV giờ công CTV</span>
             <span>
-              Định dạng cột: collaboratorCode, collaboratorName, workDate, projectCode, taskCode,
+              Cột dữ liệu: collaboratorCode, collaboratorName, workDate, projectCode, taskCode,
               approvedHours, hourlyRate, note
             </span>
             <input
@@ -88,7 +88,7 @@ export const ExternalTimesheetImportPage = () => {
       </Card>
 
       <div className="grid gap-4 md:grid-cols-4">
-        <PayrollMetricCard label="Kỳ import" value={period} />
+        <PayrollMetricCard label="Kỳ lương" value={period} />
         <PayrollMetricCard label="File" value={importState.fileName || "Chưa chọn"} />
         <PayrollMetricCard label="Tổng giờ" value={formatNumber(importState.totalHours)} />
         <PayrollMetricCard label="Tổng tiền" value={formatMoney(importState.totalAmount)} strong />
@@ -96,7 +96,7 @@ export const ExternalTimesheetImportPage = () => {
 
       <Card title="Dữ liệu xem trước">
         <div className="mb-4 rounded-[var(--radius-lg)] border border-[var(--hicas-warning-soft)] bg-[var(--hicas-warning-soft)] px-4 py-3 text-sm text-amber-800">
-          Đây là trang frontend đã tách hook/type để chuẩn bị cho luồng CTV. Nút lưu chính thức sẽ được bật khi backend mở API import và phê duyệt ExternalTimesheetImport.
+          Dữ liệu đang ở chế độ xem trước. Hãy kiểm tra tổng giờ, tổng tiền và các dòng chi tiết trước khi lưu.
         </div>
         <ExternalTimesheetPreviewTable lines={importState.lines} />
       </Card>

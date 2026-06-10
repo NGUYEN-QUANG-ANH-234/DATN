@@ -19,7 +19,7 @@ export const useSalarySlips = (period: string) => {
       setActiveSlip(null);
     } catch (error) {
       console.error(error);
-      triggerAlert("error", "Không tải được phiếu lương", "Vui lòng kiểm tra backend hoặc thử lại sau.");
+      triggerAlert("error", "Không tải được phiếu lương", "Vui lòng thử lại sau hoặc liên hệ quản trị hệ thống.");
     } finally {
       setLoading(false);
     }

@@ -43,12 +43,12 @@ export const SalarySlipTable = ({
     { key: "payableHours", header: "Giờ tính lương", render: (slip) => formatNumber(slip.payableWorkHours) },
     { key: "late", header: "Đi muộn", render: (slip) => formatMinutes(slip.lateMinutes) },
     { key: "early", header: "Về sớm", render: (slip) => formatMinutes(slip.earlyLeaveMinutes) },
-    { key: "gross", header: "Gross", render: (slip) => formatMoney(slip.grossIncome) },
-    { key: "insurance", header: "BH NLĐ", render: (slip) => formatMoney(slip.employeeInsuranceAmount) },
-    { key: "pit", header: "PIT", render: (slip) => formatMoney(slip.pitAmount) },
+    { key: "gross", header: "Tổng thu nhập", render: (slip) => formatMoney(slip.grossIncome) },
+    { key: "insurance", header: "Bảo hiểm", render: (slip) => formatMoney(slip.employeeInsuranceAmount) },
+    { key: "pit", header: "Thuế TNCN", render: (slip) => formatMoney(slip.pitAmount) },
     {
       key: "net",
-      header: "Net",
+      header: "Thực nhận",
       render: (slip) => (
         <span className="font-bold text-[var(--hicas-text-main)]">{formatMoney(slip.netSalary)}</span>
       ),

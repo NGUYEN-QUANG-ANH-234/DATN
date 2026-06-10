@@ -45,8 +45,8 @@ export const formulaPreviewLines: PayrollFormulaPreviewLine[] = [
   },
   {
     componentCode: "KPI_BONUS",
-    componentName: "Thưởng KPI",
-    expression: "kpi_bonus_amount",
+    componentName: "Thưởng KPI thực nhận",
+    expression: "kpi_bonus_amount * kpi_score / 100",
     calculationOrder: 80,
     isGrossComponent: true,
     isTaxable: true,
@@ -55,7 +55,7 @@ export const formulaPreviewLines: PayrollFormulaPreviewLine[] = [
   },
   {
     componentCode: "OT_BASE",
-    componentName: "OT phần gốc 100%",
+    componentName: "Làm thêm phần gốc 100%",
     expression: "overtime_base_amount",
     calculationOrder: 90,
     isGrossComponent: true,
@@ -65,7 +65,7 @@ export const formulaPreviewLines: PayrollFormulaPreviewLine[] = [
   },
   {
     componentCode: "OT_PREMIUM",
-    componentName: "OT phần trả cao hơn",
+    componentName: "Làm thêm phần trả cao hơn",
     expression: "overtime_premium_amount",
     calculationOrder: 100,
     isGrossComponent: true,

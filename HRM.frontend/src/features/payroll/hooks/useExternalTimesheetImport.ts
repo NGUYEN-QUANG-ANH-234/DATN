@@ -78,7 +78,7 @@ export const useExternalTimesheetImport = (month: number, year: number) => {
     triggerAlert(
       "success",
       "Đã đọc file giờ công CTV",
-      "Dữ liệu đang ở trạng thái xem trước phía frontend.",
+      "Dữ liệu đang ở trạng thái xem trước.",
     );
   };
 

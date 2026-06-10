@@ -7,12 +7,11 @@ import { PayrollMetricCard } from "./PayrollMetricCard";
 const formatMinutes = (value?: number) => `${value ?? 0} phút`;
 
 export const SalarySlipDetailPanel = ({ slip }: SalarySlipDetailPanelProps) => {
+  const projectBonusSources = slip.details.flatMap((detail) =>
+    detail.componentCode === "PROJECT_BONUS" ? detail.projectBonusSources ?? [] : [],
+  );
+
   const columns: Array<DataTableColumn<SalarySlipDetail>> = [
-    {
-      key: "code",
-      header: "Mã khoản",
-      render: (detail) => <span className="font-mono text-xs">{detail.componentCode}</span>,
-    },
     { key: "name", header: "Tên khoản", render: (detail) => detail.componentName },
     { key: "amount", header: "Số tiền", render: (detail) => formatMoney(detail.amount) },
     {
@@ -31,13 +30,13 @@ export const SalarySlipDetailPanel = ({ slip }: SalarySlipDetailPanelProps) => {
   return (
     <Card
       title={`Chi tiết phiếu lương - ${slip.employeeName}`}
-      description={`Kỳ ${slip.period}. Payroll chỉ đọc bảng công đã chốt; lỗi hiện diện được phản ánh qua giờ/công tính lương, không tạo khoản tiền trực tiếp.`}
+      description={`Kỳ ${slip.period}. Dữ liệu được tổng hợp từ bảng công và chính sách lương đã áp dụng.`}
     >
       <div className="mb-5 grid gap-3 text-sm md:grid-cols-4">
         <PayrollMetricCard label="Lương hợp đồng" value={formatMoney(slip.baseSalary)} />
-        <PayrollMetricCard label="Gross" value={formatMoney(slip.grossIncome)} />
+        <PayrollMetricCard label="Tổng thu nhập" value={formatMoney(slip.grossIncome)} />
         <PayrollMetricCard label="Thu nhập tính thuế" value={formatMoney(slip.taxableIncome)} />
-        <PayrollMetricCard label="Net" value={formatMoney(slip.netSalary)} strong />
+        <PayrollMetricCard label="Thực nhận" value={formatMoney(slip.netSalary)} strong />
       </div>
 
       <div className="mb-5 grid gap-3 text-sm md:grid-cols-4">
@@ -65,6 +64,57 @@ export const SalarySlipDetailPanel = ({ slip }: SalarySlipDetailPanelProps) => {
         className="border-0 shadow-none"
         emptyTitle="Phiếu lương chưa có dòng chi tiết"
       />
+
+      {projectBonusSources.length > 0 ? (
+        <section className="mt-6 rounded-[var(--radius-lg)] border border-[var(--hicas-border)] bg-[var(--hicas-bg-soft)] p-4">
+          <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h3 className="text-base font-semibold text-[var(--hicas-text-main)]">Nguồn thưởng dự án</h3>
+              <p className="text-sm text-[var(--hicas-text-secondary)]">
+                Các dòng thưởng đã được duyệt và được snapshot vào phiếu lương này.
+              </p>
+            </div>
+            <div className="rounded-[var(--radius-md)] bg-white px-3 py-2 text-sm font-semibold text-[var(--hicas-orange)]">
+              {formatMoney(projectBonusSources.reduce((sum, source) => sum + source.bonusAmount, 0))}
+            </div>
+          </div>
+
+          <div className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--hicas-border)] bg-white">
+            <table className="min-w-full text-left text-sm">
+              <thead className="border-b border-[var(--hicas-border)] text-xs uppercase text-[var(--hicas-text-secondary)]">
+                <tr>
+                  <th className="px-3 py-3">Batch</th>
+                  <th className="px-3 py-3">Dự án</th>
+                  <th className="px-3 py-3">Số tiền</th>
+                  <th className="px-3 py-3">Thuế</th>
+                  <th className="px-3 py-3">Bảo hiểm</th>
+                  <th className="px-3 py-3">Ghi chú</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--hicas-border)]">
+                {projectBonusSources.map((source) => (
+                  <tr key={`${source.batchId}-${source.id}`}>
+                    <td className="px-3 py-3">
+                      <p className="font-semibold">#{source.batchId}</p>
+                      <p className="text-xs text-[var(--hicas-text-secondary)]">{source.fileName || "Không có tên file"}</p>
+                    </td>
+                    <td className="px-3 py-3">
+                      <p className="font-semibold">{source.projectName}</p>
+                      <p className="text-xs text-[var(--hicas-text-secondary)]">{source.projectCode}</p>
+                    </td>
+                    <td className="px-3 py-3 font-semibold">{formatMoney(source.bonusAmount)}</td>
+                    <td className="px-3 py-3">{source.taxable ? "Có" : "Không"}</td>
+                    <td className="px-3 py-3">{source.insuranceContributable ? "Có" : "Không"}</td>
+                    <td className="px-3 py-3 text-[var(--hicas-text-secondary)]">
+                      {source.reason || source.note || ""}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
     </Card>
   );
 };

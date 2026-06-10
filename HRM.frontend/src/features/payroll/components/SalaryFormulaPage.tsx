@@ -6,28 +6,28 @@ import { SalaryFormulaPreviewTable } from "./SalaryFormulaPreviewTable";
 
 export const SalaryFormulaPage = () => (
   <FeaturePage
-    title="Định nghĩa công thức lương"
-    description="Màn hình chuẩn bị cho PayrollFormula và PayrollFormulaLine: HR cấu hình công thức theo component code, scope áp dụng, ngày hiệu lực và trạng thái phê duyệt."
+    title="Công thức lương"
+    description="Thiết lập cách tính các khoản lương, phụ cấp và khấu trừ theo từng nhóm nhân sự."
     width="wide"
   >
     <div className="grid gap-4 md:grid-cols-3">
-      <Card title="Scope công thức">
+      <Card title="Phạm vi áp dụng">
         <div className="space-y-2 text-sm leading-6 text-[var(--hicas-text-secondary)]">
-          <p>Hỗ trợ lọc theo loại hợp đồng, pay basis, loại nhân sự, phòng ban, vị trí và job level.</p>
-          <p>Backend đã có entity công thức và engine tính toán; API CRUD/phê duyệt công thức sẽ nối ở bước tiếp theo.</p>
+          <p>Lọc theo loại hợp đồng, hình thức trả lương, loại nhân sự, phòng ban, vị trí và cấp bậc.</p>
+          <p>Mỗi công thức có thời gian hiệu lực và trạng thái phê duyệt riêng.</p>
         </div>
       </Card>
 
       <Card title="Biến đầu vào">
         <div className="space-y-2 text-sm leading-6 text-[var(--hicas-text-secondary)]">
-          <p>Biến lương lấy từ cấu hình F0.1, bảng công, KPI, OT, thuế, bảo hiểm và chính sách thâm niên.</p>
-          <p>Ví dụ: base_salary, actual_workdays, payable_work_hours, service_months, seniority_allowance, kpi_bonus_amount.</p>
+          <p>Biến lương lấy từ bảng công, KPI, làm thêm giờ, thuế, bảo hiểm và chính sách thâm niên.</p>
+          <p>HR chỉ chọn nguồn dữ liệu đã được hệ thống cho phép khi thiết lập công thức.</p>
         </div>
       </Card>
 
-      <Card title="Snapshot">
+      <Card title="Lưu lịch sử">
         <div className="space-y-2 text-sm leading-6 text-[var(--hicas-text-secondary)]">
-          <p>Mỗi dòng tính lương được lưu vào PayrollDetail để khóa lịch sử khi chốt lương.</p>
+          <p>Mỗi kỳ lương được lưu lại theo dữ liệu tại thời điểm chốt.</p>
           <p>Không tính động lại phiếu lương đã khóa.</p>
         </div>
       </Card>
@@ -38,19 +38,19 @@ export const SalaryFormulaPage = () => (
       actions={
         <Button variant="secondary" disabled>
           <GitBranch size={16} />
-          API quản lý công thức chưa mở
+          Chưa cho phép chỉnh sửa
         </Button>
       }
     >
       <SalaryFormulaPreviewTable lines={formulaPreviewLines} />
     </Card>
 
-    <Card title="Ý nghĩa ComponentCode">
+    <Card title="Ý nghĩa khoản lương">
       <div className="flex gap-3 rounded-[var(--radius-lg)] border border-[var(--hicas-info-soft)] bg-[var(--hicas-info-soft)] p-4 text-sm leading-6 text-[var(--hicas-info)]">
         <ShieldCheck className="mt-0.5 shrink-0" size={20} />
         <p>
-          ComponentCode là mã khoản lương hoặc khoản giảm hợp lệ được engine dùng để tính, lưu snapshot và xuất phiếu lương.
-          Các lỗi hiện diện không đi vào đây như khoản tiền trực tiếp, mà được phản ánh qua bảng công đã chốt.
+          Mỗi khoản lương hoặc khoản giảm được xác định rõ để tính toán, lưu lịch sử và xuất phiếu lương.
+          Các lỗi hiện diện được phản ánh qua bảng công đã chốt trước khi tính lương.
         </p>
       </div>
     </Card>
