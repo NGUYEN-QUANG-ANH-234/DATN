@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   EmptyState,
   FeatureCard,
@@ -20,7 +21,7 @@ const typeOptions: { value: HistoryEventType; label: string }[] = [
   { value: "PROFILE", label: "Hồ sơ" },
   { value: "CONTRACT", label: "Hợp đồng" },
   { value: "ADDENDUM", label: "Phụ lục" },
-  { value: "EMPLOYMENT", label: "Biến động" },
+  { value: "EMPLOYMENT", label: "Biến động nhân sự" },
 ];
 
 const typeStyles: Record<string, { label: string; className: string; dot: string }> = {
@@ -54,9 +55,19 @@ const defaultPage: PaginatedHistoryResponse = {
   totalPages: 0,
 };
 
+const parseHistoryType = (value: string | null): HistoryEventType => {
+  const normalized = (value || "").toUpperCase();
+  return typeOptions.some((item) => item.value === normalized)
+    ? (normalized as HistoryEventType)
+    : "ALL";
+};
+
 export const EmployeeHistoryTimeline = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [year, setYear] = useState<number | "">("");
-  const [type, setType] = useState<HistoryEventType>("ALL");
+  const [type, setType] = useState<HistoryEventType>(() =>
+    parseHistoryType(new URLSearchParams(window.location.search).get("type")),
+  );
   const [page, setPage] = useState(1);
   const [history, setHistory] = useState<PaginatedHistoryResponse>(defaultPage);
   const [loading, setLoading] = useState(false);
@@ -66,6 +77,12 @@ export const EmployeeHistoryTimeline = () => {
     const current = new Date().getFullYear();
     return Array.from({ length: 6 }, (_, index) => current - index);
   }, []);
+
+  useEffect(() => {
+    const nextType = parseHistoryType(searchParams.get("type"));
+    setType((current) => (current === nextType ? current : nextType));
+    setPage(1);
+  }, [searchParams]);
 
   useEffect(() => {
     let cancelled = false;
@@ -82,8 +99,8 @@ export const EmployeeHistoryTimeline = () => {
         if (!cancelled) setHistory(res.data || defaultPage);
       } catch (error) {
         if (!cancelled) {
-          console.error("Không thể tải lịch sử biến động:", error);
-          triggerAlert("error", "Lỗi", "Không thể tải lịch sử biến động.");
+          console.error("Không thể tải lịch sử hồ sơ & hợp đồng:", error);
+          triggerAlert("error", "Không thể tải lịch sử", "Vui lòng thử lại.");
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -96,15 +113,23 @@ export const EmployeeHistoryTimeline = () => {
     };
   }, [year, type, page, triggerAlert]);
 
+  const updateQueryType = (nextType: HistoryEventType) => {
+    const next = new URLSearchParams(searchParams);
+    if (nextType === "ALL") next.delete("type");
+    else next.set("type", nextType);
+    setSearchParams(next);
+  };
+
   const resetFilter = () => {
     setYear("");
-    setType("ALL");
     setPage(1);
+    updateQueryType("ALL");
   };
 
   const handleTypeChange = (nextType: HistoryEventType) => {
     setType(nextType);
     setPage(1);
+    updateQueryType(nextType);
   };
 
   const handleYearChange = (nextYear: string) => {
@@ -114,8 +139,8 @@ export const EmployeeHistoryTimeline = () => {
 
   return (
     <FeaturePage
-      title="Lịch sử biến động"
-      description="Theo dõi các mốc thay đổi hồ sơ cá nhân, hợp đồng, phụ lục và biến động nhân sự đã được ghi nhận."
+      title="Lịch sử hồ sơ & hợp đồng"
+      description="Theo dõi các thay đổi đã ghi nhận về hồ sơ, hợp đồng, phụ lục và biến động nhân sự."
       width="wide"
     >
       <FeatureCard>

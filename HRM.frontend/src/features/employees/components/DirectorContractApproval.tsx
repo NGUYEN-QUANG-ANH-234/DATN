@@ -48,7 +48,7 @@ export const DirectorContractApproval = () => {
       setContracts(raw.data || raw.Data || []);
     } catch (err: unknown) {
       const e = err as { message?: string };
-      alertRef.current("error", "Lỗi tải dữ liệu", e?.message || "Không thể tải danh sách chờ phê duyệt.");
+      alertRef.current("error", "Không thể tải dữ liệu", e?.message || "Vui lòng thử lại.");
     } finally {
       setLoading(false);
     }
@@ -79,22 +79,21 @@ export const DirectorContractApproval = () => {
   const handleReject = async () => {
     if (!rejectTarget) return;
     if (!rejectReason.trim()) {
-      alertRef.current("warning", "Thiếu lý do", "Vui lòng nhập lý do từ chối.");
+      alertRef.current("warning", "Thiếu lý do", "Vui lòng nhập lý do yêu cầu chỉnh sửa.");
       return;
     }
 
     try {
-      await contractApi.directorApprove(rejectTarget.id, {
-        isApproved: false,
-        rejectReason: rejectReason.trim(),
+      await contractApi.requestRevision(rejectTarget.id, {
+        reason: rejectReason.trim(),
       });
-      alertRef.current("success", "Đã từ chối", "Hợp đồng đã được cập nhật trạng thái từ chối.");
+      alertRef.current("success", "Đã gửi yêu cầu chỉnh sửa", "Hợp đồng đã được chuyển về HR chỉnh sửa.");
       setRejectTarget(null);
       setRejectReason("");
       fetchContracts();
     } catch (err: unknown) {
       const e = err as { message?: string };
-      alertRef.current("error", "Lỗi", e?.message || "Thao tác thất bại.");
+      alertRef.current("error", "Không thể xử lý", e?.message || "Vui lòng thử lại.");
     }
   };
 
@@ -112,11 +111,11 @@ export const DirectorContractApproval = () => {
     >
       {loading ? (
         <FeatureCard>
-          <div className="py-10 text-center text-sm text-gray-500">Đang tải danh sách hợp đồng...</div>
+          <div className="py-10 text-center text-sm text-gray-500">Đang tải dữ liệu...</div>
         </FeatureCard>
       ) : contracts.length === 0 ? (
         <FeatureCard>
-          <EmptyState title="Không có hợp đồng chờ phê duyệt" description="Các hợp đồng mới sẽ xuất hiện sau khi nhân viên đồng ý bản nháp." />
+          <EmptyState title="Chưa có hợp đồng chờ phê duyệt" description="Các hợp đồng mới sẽ xuất hiện sau khi nhân viên đồng ý bản nháp." />
         </FeatureCard>
       ) : (
         <div className="space-y-3">
@@ -144,7 +143,7 @@ export const DirectorContractApproval = () => {
                     }}
                   >
                     <X size={16} />
-                    Từ chối
+                    Yêu cầu chỉnh sửa
                   </button>
                   <button className={primaryButtonClass} onClick={() => handleApprove(contract.id)}>
                     <Check size={16} />
@@ -186,15 +185,15 @@ export const DirectorContractApproval = () => {
       {rejectTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-2xl">
-            <h2 className="text-lg font-semibold text-gray-900">Từ chối phê duyệt</h2>
-            <p className="mt-1 text-sm text-gray-500">Lý do từ chối sẽ được lưu để HR và nhân viên theo dõi.</p>
+            <h2 className="text-lg font-semibold text-gray-900">Yêu cầu chỉnh sửa hợp đồng</h2>
+            <p className="mt-1 text-sm text-gray-500">Nội dung này sẽ được chuyển về HR để cập nhật bản nháp.</p>
             <label className="mt-4 block">
-              <span className="mb-1 block text-sm font-medium text-gray-700">Lý do từ chối</span>
+              <span className="mb-1 block text-sm font-medium text-gray-700">Lý do yêu cầu chỉnh sửa</span>
               <textarea
                 className={textareaClass}
                 value={rejectReason}
                 onChange={e => setRejectReason(e.target.value)}
-                placeholder="Nhập lý do từ chối..."
+                placeholder="Nhập nội dung cần HR chỉnh sửa..."
               />
             </label>
 
@@ -204,7 +203,7 @@ export const DirectorContractApproval = () => {
               </button>
               <button className={dangerButtonClass} onClick={handleReject}>
                 <X size={16} />
-                Xác nhận từ chối
+                Gửi yêu cầu chỉnh sửa
               </button>
             </div>
           </div>

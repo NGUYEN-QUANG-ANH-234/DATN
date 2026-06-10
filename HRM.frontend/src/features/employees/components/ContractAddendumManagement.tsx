@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Check, FilePenLine, FilePlus2, RefreshCw, Send, X } from "lucide-react";
+import { Check, Download, Eye, FilePenLine, FilePlus2, RefreshCw, Send, X } from "lucide-react";
 import { contractApi } from "../api/contractApi";
 import type { ContractDto } from "../api/contractApi";
 import { contractAddendumApi } from "../api/contractAddendumApi";
-import type { ContractAddendumDto, CreateContractAddendumPayload } from "../api/contractAddendumApi";
+import type { ContractAddendumDto, ContractDocumentPreviewDto, CreateContractAddendumPayload } from "../api/contractAddendumApi";
 import { departmentApi } from "../../organization/api/departmentApi";
 import type { DepartmentTree } from "../../organization/types/department";
 import { recruitmentApi } from "../../recruitment/api/recruitmentApi";
@@ -24,6 +24,7 @@ type DepartmentOption = { id: number; deptName: string };
 
 type AddendumForm = {
   contractId: string;
+  addendumType: string;
   newBasicSalary: string;
   newInsuranceSalary: string;
   newEndDate: string;
@@ -31,11 +32,14 @@ type AddendumForm = {
   positionId: string;
   otherChangesJson: string;
   content: string;
+  changedContentSummary: string;
+  unchangedTerms: string;
   effectiveDate: string;
 };
 
 const defaultForm: AddendumForm = {
   contractId: "",
+  addendumType: "Other",
   newBasicSalary: "",
   newInsuranceSalary: "",
   newEndDate: "",
@@ -43,6 +47,8 @@ const defaultForm: AddendumForm = {
   positionId: "",
   otherChangesJson: "",
   content: "",
+  changedContentSummary: "",
+  unchangedTerms: "Các điều khoản khác của hợp đồng lao động gốc không thay đổi và tiếp tục có hiệu lực.",
   effectiveDate: "",
 };
 
@@ -52,15 +58,40 @@ const STATUS_MAP: Record<string, { label: string; cls: string }> = {
   PendingHR: { label: "Chờ HR xác nhận chính sách", cls: "bg-indigo-50 text-indigo-700 border-indigo-200" },
   PendingEmployee: { label: "Chờ người lao động xác nhận", cls: "bg-amber-50 text-amber-700 border-amber-200" },
   PendingDirector: { label: "Chờ Giám đốc duyệt", cls: "bg-purple-50 text-purple-700 border-purple-200" },
+  PendingHRRevision: { label: "Chờ HR chỉnh sửa", cls: "bg-amber-50 text-amber-700 border-amber-200" },
+  ApprovedByDirector: { label: "Đã duyệt, chờ phát hành", cls: "bg-teal-50 text-teal-700 border-teal-200" },
   Active: { label: "Có hiệu lực", cls: "bg-green-50 text-green-700 border-green-200" },
   Rejected: { label: "Bị từ chối", cls: "bg-red-50 text-red-700 border-red-200" },
 };
+
+const ADDENDUM_TYPE_OPTIONS = [
+  { value: "SalaryAdjustment", label: "Điều chỉnh lương" },
+  { value: "InternalTransfer", label: "Điều chuyển nội bộ" },
+  { value: "SeniorAppointment", label: "Bổ nhiệm/chức danh" },
+  { value: "Other", label: "Nội dung khác" },
+];
+
+const ADDENDUM_TYPE_LABELS = new Map([
+  ...ADDENDUM_TYPE_OPTIONS,
+  { value: "Extension", label: "Gia hạn hợp đồng (cần tạo hợp đồng mới/tái ký)" },
+].map(item => [item.value, item.label]));
 
 const fmt = (value?: number | null) =>
   value == null ? "-" : new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(value);
 
 const dateText = (value?: string | null) =>
   value ? new Date(value).toLocaleDateString("vi-VN") : "-";
+
+const saveBlob = (blob: Blob, fileName: string) => {
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+};
 
 const unwrap = <T,>(res: unknown): T[] => {
   const raw = res as { data?: T[]; Data?: T[] };
@@ -94,6 +125,9 @@ export const ContractAddendumManagement = () => {
   const [form, setForm] = useState<AddendumForm>(defaultForm);
   const [rejectTarget, setRejectTarget] = useState<ContractAddendumDto | null>(null);
   const [rejectReason, setRejectReason] = useState("");
+  const [documentPreview, setDocumentPreview] = useState<ContractDocumentPreviewDto | null>(null);
+  const [documentTarget, setDocumentTarget] = useState<ContractAddendumDto | null>(null);
+  const [documentLoading, setDocumentLoading] = useState(false);
 
   const { triggerAlert } = useNotification();
   const alertRef = useRef(triggerAlert);
@@ -132,7 +166,7 @@ export const ContractAddendumManagement = () => {
       setPositions(unwrap<PositionOption>(posRes));
     } catch (err: unknown) {
       const e = err as { message?: string };
-      alertRef.current("error", "Lỗi tải dữ liệu", e?.message || "Không thể tải dữ liệu phụ lục.");
+      alertRef.current("error", "Không thể tải dữ liệu", e?.message || "Vui lòng thử lại.");
     } finally {
       setLoading(false);
     }
@@ -166,6 +200,15 @@ export const ContractAddendumManagement = () => {
       return null;
     }
 
+    if (form.addendumType === "Extension" || form.newEndDate) {
+      alertRef.current(
+        "warning",
+        "Cần tạo hợp đồng mới/tái ký",
+        "Phụ lục không dùng để thay đổi thời hạn hợp đồng. Vui lòng tạo hợp đồng mới hoặc luồng tái ký.",
+      );
+      return null;
+    }
+
     if (form.otherChangesJson.trim()) {
       try {
         JSON.parse(form.otherChangesJson);
@@ -176,17 +219,19 @@ export const ContractAddendumManagement = () => {
     }
 
     const otherChangesJson = buildOtherChangesJson();
-    if (!form.newBasicSalary && !form.newInsuranceSalary && !form.newEndDate && !otherChangesJson) {
+    if (!form.newBasicSalary && !form.newInsuranceSalary && !otherChangesJson) {
       alertRef.current("warning", "Thiếu nội dung", "Phụ lục cần có ít nhất một thông tin điều chỉnh.");
       return null;
     }
 
     return {
+      addendumType: form.addendumType || "Other",
       newBasicSalary: form.newBasicSalary ? Number(form.newBasicSalary) : undefined,
       newInsuranceSalary: form.newInsuranceSalary ? Number(form.newInsuranceSalary) : undefined,
-      newEndDate: form.newEndDate || undefined,
       otherChangesJson,
       content: form.content.trim() || undefined,
+      changedContentSummary: form.changedContentSummary.trim() || undefined,
+      unchangedTerms: form.unchangedTerms.trim() || undefined,
       effectiveDate: form.effectiveDate,
     };
   };
@@ -213,6 +258,7 @@ export const ContractAddendumManagement = () => {
     setEditingTarget(addendum);
     setForm({
       contractId: String(addendum.contractId),
+      addendumType: addendum.addendumType || "Other",
       newBasicSalary: addendum.newBasicSalary == null ? "" : String(addendum.newBasicSalary),
       newInsuranceSalary: addendum.newInsuranceSalary == null ? "" : String(addendum.newInsuranceSalary),
       newEndDate: addendum.newEndDate ? addendum.newEndDate.slice(0, 10) : "",
@@ -220,6 +266,8 @@ export const ContractAddendumManagement = () => {
       positionId,
       otherChangesJson: Object.keys(parsed).length ? JSON.stringify(parsed, null, 2) : "",
       content: addendum.content || "",
+      changedContentSummary: addendum.changedContentSummary || "",
+      unchangedTerms: addendum.unchangedTerms || defaultForm.unchangedTerms,
       effectiveDate: addendum.effectiveDate ? addendum.effectiveDate.slice(0, 10) : "",
     });
     setShowForm(true);
@@ -280,20 +328,69 @@ export const ContractAddendumManagement = () => {
   const handleReject = async () => {
     if (!rejectTarget) return;
     if (!rejectReason.trim()) {
-      alertRef.current("warning", "Thiếu lý do", "Vui lòng nhập lý do từ chối.");
+      alertRef.current("warning", "Thiếu lý do", "Vui lòng nhập lý do yêu cầu chỉnh sửa.");
       return;
     }
 
     try {
-      await contractAddendumApi.reject(rejectTarget.id, rejectReason.trim());
-      alertRef.current("success", "Đã từ chối", "Phụ lục hợp đồng đã bị từ chối.");
+      await contractAddendumApi.requestRevision(rejectTarget.id, { reason: rejectReason.trim() });
+      alertRef.current("success", "Đã gửi yêu cầu chỉnh sửa", "Phụ lục hợp đồng đã được chuyển về HR chỉnh sửa.");
       setRejectTarget(null);
       setRejectReason("");
       fetchData();
     } catch (err: unknown) {
       const e = err as { message?: string };
-      alertRef.current("error", "Lỗi", e?.message || "Không thể từ chối phụ lục.");
+      alertRef.current("error", "Lỗi", e?.message || "Không thể gửi yêu cầu chỉnh sửa phụ lục.");
     }
+  };
+
+  const openDocumentPreview = async (addendum: ContractAddendumDto) => {
+    setDocumentTarget(addendum);
+    setDocumentLoading(true);
+    try {
+      const res = await contractAddendumApi.previewDocument(addendum.id);
+      const raw = res as unknown as { data?: ContractDocumentPreviewDto; Data?: ContractDocumentPreviewDto };
+      setDocumentPreview(raw.data || raw.Data || null);
+    } catch (err: unknown) {
+      const e = err as { message?: string };
+      alertRef.current("error", "Không thể xem trước", e?.message || "Phụ lục chưa có đủ dữ liệu văn bản.");
+      setDocumentTarget(null);
+    } finally {
+      setDocumentLoading(false);
+    }
+  };
+
+  const downloadDocument = async (addendum: ContractAddendumDto, type: "doc" | "pdf") => {
+    try {
+      const blob = type === "doc"
+        ? await contractAddendumApi.downloadDocumentDoc(addendum.id)
+        : await contractAddendumApi.downloadDocumentPdf(addendum.id);
+      saveBlob(blob, `${addendum.legalDocumentNumber || addendum.addendumNumber || `addendum-${addendum.id}`}.${type}`);
+    } catch (err: unknown) {
+      const e = err as { message?: string };
+      alertRef.current("error", "Không thể tải văn bản", e?.message || "Vui lòng thử lại.");
+    }
+  };
+
+  const issueDocument = async (addendum: ContractAddendumDto) => {
+    alertRef.current("confirm", "Phát hành phụ lục", "Văn bản phụ lục sẽ được đánh dấu đã phát hành và sẵn sàng tải DOC.", async () => {
+      try {
+        const res = await contractAddendumApi.issueDocument(addendum.id, {
+          legalDocumentNumber: addendum.legalDocumentNumber || addendum.addendumNumber,
+          documentTemplateCode: addendum.documentTemplateCode || "CONTRACT_ADDENDUM",
+          issuedAt: new Date().toISOString(),
+          employerSignedAt: new Date().toISOString(),
+        });
+        const raw = res as unknown as { data?: ContractDocumentPreviewDto; Data?: ContractDocumentPreviewDto };
+        setDocumentTarget(addendum);
+        setDocumentPreview(raw.data || raw.Data || null);
+        alertRef.current("success", "Đã phát hành", "Văn bản phụ lục đã sẵn sàng để tải.");
+        fetchData();
+      } catch (err: unknown) {
+        const e = err as { message?: string };
+        alertRef.current("error", "Không thể phát hành", e?.message || "Vui lòng thử lại.");
+      }
+    });
   };
 
   const describeOtherChanges = (json?: string | null) => {
@@ -314,9 +411,9 @@ export const ContractAddendumManagement = () => {
   };
 
   return (
-    <FeaturePage
-      title="Phụ lục hợp đồng"
-      description="Tạo phụ lục điều chỉnh lương, thời hạn hoặc thông tin điều chuyển gắn với hợp đồng gốc."
+      <FeaturePage
+        title="Phụ lục hợp đồng"
+      description="Tạo phụ lục điều chỉnh lương, chức danh, phòng ban hoặc điều khoản bổ sung của hợp đồng."
       actions={
         <div className="flex flex-wrap gap-2">
           <button className={secondaryButtonClass} onClick={fetchData} disabled={loading}>
@@ -332,7 +429,7 @@ export const ContractAddendumManagement = () => {
     >
       {loading ? (
         <FeatureCard>
-          <div className="py-10 text-center text-sm text-gray-500">Đang tải danh sách phụ lục...</div>
+          <div className="py-10 text-center text-sm text-gray-500">Đang tải dữ liệu...</div>
         </FeatureCard>
       ) : addendums.length === 0 ? (
         <FeatureCard>
@@ -352,13 +449,16 @@ export const ContractAddendumManagement = () => {
                       {status.label}
                     </span>
                     <h2 className="mt-2 text-base font-semibold text-gray-900">{addendum.addendumNumber}</h2>
+                    <p className="mt-1 text-xs font-medium text-gray-500">
+                      {ADDENDUM_TYPE_LABELS.get(addendum.addendumType) || addendum.addendumType || "Nội dung khác"}
+                    </p>
                     <p className="mt-1 text-sm text-gray-500">
                       HĐ gốc: {addendum.contractNumber || `#${addendum.contractId}`} · {addendum.employeeName || "Chưa có tên nhân viên"}
                     </p>
                   </div>
 
                   <div className="flex flex-wrap gap-2">
-                    {addendum.status === "Draft" && (
+                    {(addendum.status === "Draft" || addendum.status === "PendingHRRevision") && (
                       <>
                         <button className={secondaryButtonClass} onClick={() => openEdit(addendum)}>
                           <FilePenLine size={16} />
@@ -374,13 +474,33 @@ export const ContractAddendumManagement = () => {
                       <>
                         <button className={dangerButtonClass} onClick={() => { setRejectTarget(addendum); setRejectReason(""); }}>
                           <X size={16} />
-                          Từ chối
+                          Yêu cầu chỉnh sửa
                         </button>
                         <button className={primaryButtonClass} onClick={() => handleApprove(addendum.id)}>
                           <Check size={16} />
                           Phê duyệt
                         </button>
                       </>
+                    )}
+                    <button className={secondaryButtonClass} onClick={() => openDocumentPreview(addendum)}>
+                      <Eye size={16} />
+                      Xem trước
+                    </button>
+                    <button className={secondaryButtonClass} onClick={() => downloadDocument(addendum, "doc")}>
+                      <Download size={16} />
+                      Tải DOC
+                    </button>
+                    {addendum.documentPdfFilePath && (
+                      <button className={secondaryButtonClass} onClick={() => downloadDocument(addendum, "pdf")}>
+                        <Download size={16} />
+                        PDF
+                      </button>
+                    )}
+                    {!addendum.issuedAt && (addendum.status === "ApprovedByDirector" || addendum.status === "Active") && (
+                      <button className={primaryButtonClass} onClick={() => issueDocument(addendum)}>
+                        <Send size={16} />
+                        Phát hành
+                      </button>
                     )}
                   </div>
                 </div>
@@ -393,10 +513,6 @@ export const ContractAddendumManagement = () => {
                   <div>
                     <p className="text-xs font-medium text-gray-500">BHXH mới</p>
                     <p className="mt-1 font-semibold text-gray-900">{fmt(addendum.newInsuranceSalary)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-gray-500">Ngày kết thúc mới</p>
-                    <p className="mt-1 font-semibold text-gray-900">{dateText(addendum.newEndDate)}</p>
                   </div>
                   <div>
                     <p className="text-xs font-medium text-gray-500">Ngày hiệu lực</p>
@@ -415,8 +531,8 @@ export const ContractAddendumManagement = () => {
                   </div>
                 )}
                 {addendum.rejectReason && (
-                  <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                    {addendum.rejectReason}
+                  <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                    <span className="font-semibold">Yêu cầu chỉnh sửa: </span>{addendum.rejectReason}
                   </p>
                 )}
               </FeatureCard>
@@ -451,6 +567,19 @@ export const ContractAddendumManagement = () => {
                 </select>
               </label>
 
+              <label className="sm:col-span-2">
+                <span className="mb-1 block text-sm font-medium text-gray-700">Loại phụ lục</span>
+                <select
+                  className={fieldClass}
+                  value={form.addendumType}
+                  onChange={e => setForm(prev => ({ ...prev, addendumType: e.target.value }))}
+                >
+                  {ADDENDUM_TYPE_OPTIONS.map(option => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </label>
+
               <label>
                 <span className="mb-1 block text-sm font-medium text-gray-700">Lương cơ bản mới</span>
                 <input className={fieldClass} type="number" min={0} value={form.newBasicSalary} onChange={e => setForm(prev => ({ ...prev, newBasicSalary: e.target.value }))} />
@@ -461,10 +590,9 @@ export const ContractAddendumManagement = () => {
                 <input className={fieldClass} type="number" min={0} value={form.newInsuranceSalary} onChange={e => setForm(prev => ({ ...prev, newInsuranceSalary: e.target.value }))} />
               </label>
 
-              <label>
-                <span className="mb-1 block text-sm font-medium text-gray-700">Ngày kết thúc mới</span>
-                <input className={fieldClass} type="date" value={form.newEndDate} onChange={e => setForm(prev => ({ ...prev, newEndDate: e.target.value }))} />
-              </label>
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                Thay đổi thời hạn hoặc loại hợp đồng cần tạo hợp đồng mới/tái ký, không xử lý bằng phụ lục.
+              </div>
 
               <label>
                 <span className="mb-1 block text-sm font-medium text-gray-700">Ngày hiệu lực</span>
@@ -493,6 +621,16 @@ export const ContractAddendumManagement = () => {
               </label>
 
               <label className="sm:col-span-2">
+                <span className="mb-1 block text-sm font-medium text-gray-700">Nội dung thay đổi trên phụ lục</span>
+                <textarea className={textareaClass} value={form.changedContentSummary} onChange={e => setForm(prev => ({ ...prev, changedContentSummary: e.target.value }))} placeholder="Để trống nếu muốn hệ thống tự tóm tắt từ các trường thay đổi." />
+              </label>
+
+              <label className="sm:col-span-2">
+                <span className="mb-1 block text-sm font-medium text-gray-700">Điều khoản giữ nguyên</span>
+                <textarea className={textareaClass} value={form.unchangedTerms} onChange={e => setForm(prev => ({ ...prev, unchangedTerms: e.target.value }))} />
+              </label>
+
+              <label className="sm:col-span-2">
                 <span className="mb-1 block text-sm font-medium text-gray-700">Điều chỉnh nâng cao dạng JSON</span>
                 <textarea className={textareaClass} value={form.otherChangesJson} onChange={e => setForm(prev => ({ ...prev, otherChangesJson: e.target.value }))} placeholder='Ví dụ: {"workShiftId": 2}' />
               </label>
@@ -511,13 +649,64 @@ export const ContractAddendumManagement = () => {
         </div>
       )}
 
+      {documentTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="flex max-h-[92vh] w-full max-w-5xl flex-col rounded-lg bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-gray-100 p-5">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Xem trước phụ lục hợp đồng</h2>
+                <p className="mt-1 text-sm text-gray-500">
+                  {documentPreview?.documentNumber || documentTarget.addendumNumber} · {documentPreview?.templateCode || "CONTRACT_ADDENDUM"}
+                </p>
+              </div>
+              <button className={secondaryButtonClass} onClick={() => { setDocumentTarget(null); setDocumentPreview(null); }}>
+                Đóng
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto bg-gray-100 p-4">
+              {documentLoading ? (
+                <div className="rounded-lg bg-white p-8 text-center text-sm text-gray-500">Đang tải bản xem trước...</div>
+              ) : documentPreview?.html ? (
+                <div className="rounded-lg bg-white shadow-sm" dangerouslySetInnerHTML={{ __html: documentPreview.html }} />
+              ) : (
+                <div className="rounded-lg bg-white p-8 text-center text-sm text-gray-500">Chưa có nội dung xem trước.</div>
+              )}
+            </div>
+            <div className="flex flex-col-reverse gap-2 border-t border-gray-100 p-4 sm:flex-row sm:justify-end">
+              <button className={secondaryButtonClass} onClick={() => downloadDocument(documentTarget, "doc")}>
+                <Download size={16} />
+                Tải DOC
+              </button>
+              {documentPreview?.canDownloadPdf && (
+                <button className={secondaryButtonClass} onClick={() => downloadDocument(documentTarget, "pdf")}>
+                  <Download size={16} />
+                  Tải PDF
+                </button>
+              )}
+              {!documentTarget.issuedAt && (documentTarget.status === "ApprovedByDirector" || documentTarget.status === "Active") && (
+                <button className={primaryButtonClass} onClick={() => issueDocument(documentTarget)}>
+                  <Send size={16} />
+                  Phát hành
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {rejectTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-2xl">
-            <h2 className="text-lg font-semibold text-gray-900">Từ chối phụ lục</h2>
+            <h2 className="text-lg font-semibold text-gray-900">Yêu cầu chỉnh sửa phụ lục</h2>
+            <p className="mt-1 text-sm text-gray-500">Nội dung này sẽ được chuyển về HR để cập nhật bản nháp phụ lục.</p>
             <label className="mt-4 block">
-              <span className="mb-1 block text-sm font-medium text-gray-700">Lý do từ chối</span>
-              <textarea className={textareaClass} value={rejectReason} onChange={e => setRejectReason(e.target.value)} />
+              <span className="mb-1 block text-sm font-medium text-gray-700">Lý do yêu cầu chỉnh sửa</span>
+              <textarea
+                className={textareaClass}
+                value={rejectReason}
+                onChange={e => setRejectReason(e.target.value)}
+                placeholder="Nhập nội dung cần HR chỉnh sửa..."
+              />
             </label>
             <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
               <button className={secondaryButtonClass} onClick={() => setRejectTarget(null)}>
@@ -525,7 +714,7 @@ export const ContractAddendumManagement = () => {
               </button>
               <button className={dangerButtonClass} onClick={handleReject}>
                 <X size={16} />
-                Xác nhận từ chối
+                Gửi yêu cầu chỉnh sửa
               </button>
             </div>
           </div>

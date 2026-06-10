@@ -131,7 +131,7 @@ export const OnboardingForm: React.FC<{ candidateId?: number }> = ({
 
   return (
     <FeaturePage
-      title="Onboarding nhân sự mới"
+      title="Tiếp nhận nhân sự mới"
       description="Hoàn thiện hồ sơ điện tử để HR khởi tạo tài khoản nội bộ."
       width="normal"
     >

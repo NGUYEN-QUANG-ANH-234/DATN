@@ -7,13 +7,88 @@ export interface ContractDto {
   basicSalary: number;
   salaryPercentage: number;
   insuranceSalary: number;
-  startDate: string;
+  startDate: string | null;
   endDate: string | null;
   status: string;
   version: number;
   negotiationNote: string | null;
   employeeId?: number;
   employeeName?: string;
+  legalDocumentType?: string | null;
+  employerLegalName?: string | null;
+  employerTaxCode?: string | null;
+  employerAddress?: string | null;
+  employerRepresentativeName?: string | null;
+  employerRepresentativeTitle?: string | null;
+  employerRepresentativeAuthorization?: string | null;
+  signingLocation?: string | null;
+  employeeFullNameSnapshot?: string | null;
+  employeeBirthDateSnapshot?: string | null;
+  employeeGenderSnapshot?: string | null;
+  employeeIdentityNumberSnapshot?: string | null;
+  employeeIdentityIssueDate?: string | null;
+  employeeIdentityIssuePlace?: string | null;
+  employeeResidenceAddressSnapshot?: string | null;
+  employeeDepartmentSnapshot?: string | null;
+  employeePositionSnapshot?: string | null;
+  employeeJobLevelSnapshot?: string | null;
+  jobTitle?: string | null;
+  jobDescription?: string | null;
+  workLocation?: string | null;
+  workingMode?: string | null;
+  workingHours?: string | null;
+  restTime?: string | null;
+  directManagerSnapshot?: string | null;
+  salaryPaymentMethod?: string | null;
+  salaryPaymentDate?: string | null;
+  allowanceDescription?: string | null;
+  additionalBenefits?: string | null;
+  salaryReviewPolicy?: string | null;
+  bonusPolicy?: string | null;
+  kpiBonusTargetAmount?: number | null;
+  kpiBonusPolicyCode?: string | null;
+  kpiBonusPolicyVersionCode?: string | null;
+  kpiScoreFormula?: string | null;
+  kpiPayoutFormula?: string | null;
+  kpiBonusEligibilityRule?: string | null;
+  kpiBonusPaymentPeriod?: string | null;
+  kpiBonusApproverRole?: string | null;
+  insurancePolicy?: string | null;
+  laborProtectionPolicy?: string | null;
+  trainingPolicy?: string | null;
+  employeeObligations?: string | null;
+  employerObligations?: string | null;
+  confidentialityClause?: string | null;
+  intellectualPropertyClause?: string | null;
+  terminationClause?: string | null;
+  disputeResolutionClause?: string | null;
+  legalDocumentNumber?: string | null;
+  documentTemplateCode?: string | null;
+  documentDocFilePath?: string | null;
+  documentPdfFilePath?: string | null;
+  issuedAt?: string | null;
+  employeeSignedAt?: string | null;
+  employerSignedAt?: string | null;
+}
+
+export interface ContractDocumentPreviewDto {
+  referenceId: number;
+  referenceType: string;
+  templateCode: string;
+  documentNumber: string;
+  fileName: string;
+  html: string;
+  docFilePath?: string | null;
+  pdfFilePath?: string | null;
+  canDownloadPdf: boolean;
+}
+
+export interface IssueContractDocumentPayload {
+  legalDocumentNumber?: string;
+  documentTemplateCode?: string;
+  issuedAt?: string;
+  employeeSignedAt?: string;
+  employerSignedAt?: string;
 }
 
 export interface ContractRequestPayload {
@@ -32,10 +107,68 @@ export interface CreateDraftPayload {
   insuranceSalary: number;
   startDate: string;
   endDate?: string;
+  employer?: {
+    legalName?: string;
+    taxCode?: string;
+    address?: string;
+    representativeName?: string;
+    representativeTitle?: string;
+    representativeAuthorization?: string;
+    signingLocation?: string;
+  };
+  employee?: {
+    fullName?: string;
+    birthDate?: string;
+    gender?: string;
+    identityNumber?: string;
+    identityIssueDate?: string;
+    identityIssuePlace?: string;
+    residenceAddress?: string;
+    department?: string;
+    position?: string;
+    jobLevel?: string;
+  };
+  work?: {
+    jobTitle?: string;
+    jobDescription?: string;
+    workLocation?: string;
+    workingMode?: string;
+    workingHours?: string;
+    restTime?: string;
+    directManager?: string;
+  };
+  compensation?: {
+    salaryPaymentMethod?: string;
+    salaryPaymentDate?: string;
+    allowanceDescription?: string;
+    additionalBenefits?: string;
+    salaryReviewPolicy?: string;
+    bonusPolicy?: string;
+    insurancePolicy?: string;
+    laborProtectionPolicy?: string;
+    trainingPolicy?: string;
+  };
+  clauses?: {
+    employeeObligations?: string;
+    employerObligations?: string;
+    confidentialityClause?: string;
+    intellectualPropertyClause?: string;
+    terminationClause?: string;
+    disputeResolutionClause?: string;
+  };
+  issuance?: {
+    legalDocumentNumber?: string;
+    documentTemplateCode?: string;
+    issuedAt?: string;
+  };
 }
 
 export interface NegotiatePayload {
   negotiationNote: string;
+}
+
+export interface RequestRevisionPayload {
+  reason: string;
 }
 
 export const contractApi = {
@@ -74,9 +207,33 @@ export const contractApi = {
     return await axiosClient.patch(`/contracts/${id}/director-approve`, payload);
   },
 
+  requestRevision: async (id: number, payload: RequestRevisionPayload) => {
+    return await axiosClient.patch(`/contracts/${id}/request-revision`, payload);
+  },
+
   // Lấy danh sách hợp đồng (HR/Manager/Director)
   getAllContracts: async (): Promise<{ success: boolean; data: ContractDto[] }> => {
     return await axiosClient.get("/contracts");
+  },
+
+  getDraftDefaults: async (id: number): Promise<{ success: boolean; data: ContractDto }> => {
+    return await axiosClient.get(`/contracts/${id}/draft-defaults`);
+  },
+
+  previewDocument: async (id: number): Promise<{ success: boolean; data: ContractDocumentPreviewDto }> => {
+    return await axiosClient.get(`/contracts/${id}/document-preview`);
+  },
+
+  downloadDocumentDoc: async (id: number): Promise<Blob> => {
+    return await axiosClient.get(`/contracts/${id}/document-doc`, { responseType: "blob" });
+  },
+
+  downloadDocumentPdf: async (id: number): Promise<Blob> => {
+    return await axiosClient.get(`/contracts/${id}/document-pdf`, { responseType: "blob" });
+  },
+
+  issueDocument: async (id: number, payload: IssueContractDocumentPayload): Promise<{ success: boolean; data: ContractDocumentPreviewDto }> => {
+    return await axiosClient.patch(`/contracts/${id}/issue-document`, payload);
   },
 
   // Lấy hợp đồng của nhân viên hiện tại

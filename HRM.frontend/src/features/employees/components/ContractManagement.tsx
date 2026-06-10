@@ -17,9 +17,13 @@ import {
 const STATUS_MAP: Record<string, { label: string; cls: string }> = {
   PendingDept: { label: "Chờ Trưởng phòng", cls: "bg-blue-50 text-blue-700 border-blue-200" },
   PendingHR: { label: "Chờ HR soạn thảo", cls: "bg-indigo-50 text-indigo-700 border-indigo-200" },
+  PendingManagerContentReview: { label: "Chờ Trưởng phòng duyệt nội dung", cls: "bg-blue-50 text-blue-700 border-blue-200" },
+  PendingEmployee: { label: "Chờ người lao động xác nhận", cls: "bg-amber-50 text-amber-700 border-amber-200" },
+  PendingHRRevision: { label: "Chờ HR chỉnh sửa", cls: "bg-amber-50 text-amber-700 border-amber-200" },
   Draft: { label: "Chờ nhân viên xác nhận", cls: "bg-amber-50 text-amber-700 border-amber-200" },
   Negotiating: { label: "Đang thương lượng", cls: "bg-orange-50 text-orange-700 border-orange-200" },
   PendingDirector: { label: "Chờ Giám đốc duyệt", cls: "bg-purple-50 text-purple-700 border-purple-200" },
+  ApprovedByDirector: { label: "Đã duyệt, chờ phát hành", cls: "bg-teal-50 text-teal-700 border-teal-200" },
   Active: { label: "Có hiệu lực", cls: "bg-green-50 text-green-700 border-green-200" },
   Rejected: { label: "Bị từ chối", cls: "bg-red-50 text-red-700 border-red-200" },
   Draft_Cancelled: { label: "Hết hạn xác nhận", cls: "bg-gray-100 text-gray-600 border-gray-200" },
@@ -69,7 +73,7 @@ export const ContractManagement = () => {
       setPendingAddendums(addendumRaw.data || addendumRaw.Data || []);
     } catch (err: unknown) {
       const e = err as { message?: string };
-      alertRef.current("error", "Lỗi tải dữ liệu", e?.message || "Không thể tải danh sách hợp đồng.");
+      alertRef.current("error", "Không thể tải dữ liệu", e?.message || "Vui lòng thử lại.");
     } finally {
       setLoading(false);
     }
@@ -98,22 +102,25 @@ export const ContractManagement = () => {
   const handleAddendumConfirm = (addendum: ContractAddendumDto, isApproved: boolean) => {
     alertRef.current(
       "confirm",
-      isApproved ? "Xác nhận phụ lục" : "Từ chối phụ lục",
+      isApproved ? "Xác nhận phụ lục" : "Yêu cầu chỉnh sửa phụ lục",
       isApproved
         ? "Bạn đồng ý với toàn bộ điều khoản của phụ lục hợp đồng này?"
-        : "Bạn muốn từ chối điều khoản phụ lục hợp đồng này?",
+        : "Bạn muốn gửi yêu cầu chỉnh sửa phụ lục này về HR?",
       async () => {
         try {
-          await contractAddendumApi.employeeConfirm(addendum.id, {
-            isApproved,
-            rejectReason: isApproved ? undefined : "Người lao động từ chối điều khoản phụ lục.",
-          });
+          if (isApproved) {
+            await contractAddendumApi.employeeConfirm(addendum.id, { isApproved: true });
+          } else {
+            await contractAddendumApi.requestRevision(addendum.id, {
+              reason: "Người lao động yêu cầu HR chỉnh sửa điều khoản phụ lục.",
+            });
+          }
           alertRef.current(
             "success",
-            isApproved ? "Đã xác nhận phụ lục" : "Đã từ chối phụ lục",
+            isApproved ? "Đã xác nhận phụ lục" : "Đã gửi yêu cầu chỉnh sửa",
             isApproved
               ? "Phụ lục đã được chuyển sang Giám đốc phê duyệt cuối."
-              : "Phụ lục đã được ghi nhận là bị từ chối.",
+              : "Phụ lục đã được chuyển về HR chỉnh sửa.",
           );
           fetchContracts();
         } catch (err: unknown) {
@@ -200,7 +207,7 @@ export const ContractManagement = () => {
                 <div className="flex flex-wrap gap-2">
                   <button className={secondaryButtonClass} onClick={() => handleAddendumConfirm(addendum, false)}>
                     <X size={16} />
-                    Từ chối
+                    Yêu cầu chỉnh sửa
                   </button>
                   <button className={primaryButtonClass} onClick={() => handleAddendumConfirm(addendum, true)}>
                     <Check size={16} />
@@ -215,7 +222,7 @@ export const ContractManagement = () => {
 
       {loading ? (
         <FeatureCard>
-          <div className="py-10 text-center text-sm text-gray-500">Đang tải danh sách hợp đồng...</div>
+          <div className="py-10 text-center text-sm text-gray-500">Đang tải dữ liệu...</div>
         </FeatureCard>
       ) : contracts.length === 0 ? (
         <FeatureCard>

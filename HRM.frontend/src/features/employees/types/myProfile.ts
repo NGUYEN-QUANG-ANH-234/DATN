@@ -1,7 +1,7 @@
 export interface MyProfileDto {
   employeeCode: string;
   fullName: string;
-  gender: number | null;
+  gender: string | null;
   birthDate: string | null;
 
   // --- MỚI THÊM ---

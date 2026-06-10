@@ -1,21 +1,152 @@
-import React, { useState, useEffect } from "react";
-import { hrProfileApi } from "../api/hrProfileApi";
-import { dependentApi } from "../api/dependentApi";
-import type { PendingProfileRequest } from "../types/profileRequest";
-import type { PendingDependentRequest } from "../types/dependent";
+import React, { useEffect, useState } from "react";
+import { CheckCircle2, Clock, FileText, UserCheck, XCircle } from "lucide-react";
+import { PageHeader } from "../../../components/layout";
+import { Badge, Button, Card, EmptyState } from "../../../components/ui";
 import { BACKEND_URL } from "../../../core/api/config";
 import { useNotification } from "../../../core/context/NotificationContext";
+import { dependentApi } from "../api/dependentApi";
+import { hrProfileApi } from "../api/hrProfileApi";
+import type { PendingDependentRequest } from "../types/dependent";
+import type { PendingProfileRequest } from "../types/profileRequest";
+
+const formatDateTime = (value?: string | null) =>
+  value ? new Date(value).toLocaleString("vi-VN") : "-";
+
+const profileFieldLabels: Record<string, string> = {
+  FullName: "Họ tên mới",
+  IdentityNumber: "CCCD mới",
+  TaxCode: "Mã số thuế",
+  SocialInsCode: "Mã số BHXH",
+  SocialInsJoinDate: "Ngày tham gia BHXH",
+  InsuranceHospital: "Nơi khám chữa bệnh",
+  BankAccount: "Số tài khoản",
+  BankName: "Ngân hàng",
+  PhoneNumber: "Số điện thoại",
+  PersonalEmail: "Email cá nhân",
+  CurrentAddress: "Chỗ ở hiện tại",
+  PermanentAddress: "Địa chỉ thường trú",
+  EmergencyContactName: "Người liên hệ khẩn cấp",
+  EmergencyPhone: "Số điện thoại khẩn cấp",
+  EmergencyRelation: "Quan hệ khẩn cấp",
+};
+
+const dependentFieldLabels: Record<string, string> = {
+  FullName: "Họ tên",
+  Relationship: "Quan hệ",
+  IdNumber: "CCCD",
+  TaxDependentCode: "MST phụ thuộc",
+  BirthDate: "Ngày sinh",
+  ValidFrom: "Hiệu lực từ",
+  ValidTo: "Hiệu lực đến",
+  Note: "Ghi chú",
+};
+
+const relationLabel = (value: unknown) =>
+  ["Con", "Cha/Mẹ", "Vợ/Chồng", "Khác"][Number(value)] ?? String(value ?? "-");
+
+const safeParse = (jsonString: string): Record<string, unknown> | null => {
+  try {
+    const parsed = JSON.parse(jsonString);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
+type ChangeListProps = {
+  jsonString: string;
+  labels: Record<string, string>;
+  evidenceUrl?: string | null;
+  dependentMode?: boolean;
+};
+
+const ChangeList = ({ jsonString, labels, evidenceUrl, dependentMode = false }: ChangeListProps) => {
+  const data = safeParse(jsonString);
+
+  if (!data) {
+    return <span className="text-sm text-[var(--hicas-danger)]">Không đọc được dữ liệu yêu cầu.</span>;
+  }
+
+  const hiddenKeys = new Set(["IdentityFrontUrl", "IdentityBackUrl", "CertificateUrl"]);
+  const items = Object.entries(data).filter(
+    ([key, value]) => !hiddenKeys.has(key) && value !== null && value !== undefined && value !== "",
+  );
+
+  return (
+    <div className="space-y-2">
+      {items.length === 0 ? (
+        <p className="text-sm text-[var(--hicas-text-secondary)]">Không có trường thay đổi.</p>
+      ) : (
+        items.map(([key, value]) => (
+          <div
+            key={key}
+            className="rounded-[var(--radius-md)] border border-[var(--hicas-border-soft)] bg-[var(--hicas-bg)] px-3 py-2 text-sm"
+          >
+            <span className="block text-xs font-medium text-[var(--hicas-text-secondary)]">
+              {labels[key] || key}
+            </span>
+            <span className="mt-1 block font-semibold text-[var(--hicas-text-main)]">
+              {dependentMode && key === "Relationship" ? relationLabel(value) : String(value)}
+            </span>
+          </div>
+        ))
+      )}
+
+      {(data.IdentityFrontUrl || data.IdentityBackUrl || data.CertificateUrl || evidenceUrl) && (
+        <div className="flex flex-wrap gap-2 pt-1">
+          {Boolean(data.IdentityFrontUrl) && (
+            <a
+              href={`${BACKEND_URL}${String(data.IdentityFrontUrl)}`}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs font-semibold text-[var(--hicas-orange-dark)] hover:underline"
+            >
+              CCCD mặt trước
+            </a>
+          )}
+          {Boolean(data.IdentityBackUrl) && (
+            <a
+              href={`${BACKEND_URL}${String(data.IdentityBackUrl)}`}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs font-semibold text-[var(--hicas-orange-dark)] hover:underline"
+            >
+              CCCD mặt sau
+            </a>
+          )}
+          {Boolean(data.CertificateUrl) && (
+            <a
+              href={`${BACKEND_URL}${String(data.CertificateUrl)}`}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs font-semibold text-[var(--hicas-orange-dark)] hover:underline"
+            >
+              Chứng chỉ / bằng cấp
+            </a>
+          )}
+          {evidenceUrl && (
+            <a
+              href={`${BACKEND_URL}${evidenceUrl}`}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs font-semibold text-[var(--hicas-orange-dark)] hover:underline"
+            >
+              Minh chứng
+            </a>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const HRProfileReviewList: React.FC = () => {
   const [requests, setRequests] = useState<PendingProfileRequest[]>([]);
-  const [dependentRequests, setDependentRequests] = useState<
-    PendingDependentRequest[]
-  >([]);
+  const [dependentRequests, setDependentRequests] = useState<PendingDependentRequest[]>([]);
   const [loading, setLoading] = useState(false);
   const [processingId, setProcessingId] = useState<number | null>(null);
   const { triggerAlert } = useNotification();
 
-  // States quản lý Input Từ chối ngay trên UI (Thay cho window.prompt)
   const [rejectingId, setRejectingId] = useState<number | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [dependentRejectingId, setDependentRejectingId] = useState<number | null>(null);
@@ -40,12 +171,7 @@ export const HRProfileReviewList: React.FC = () => {
     fetchRequests();
   }, []);
 
-  // Hàm xử lý API chung
-  const executeReview = async (
-    id: number,
-    isApproved: boolean,
-    reason?: string,
-  ) => {
+  const executeReview = async (id: number, isApproved: boolean, reason?: string) => {
     setProcessingId(id);
     try {
       const response: unknown = await hrProfileApi.reviewRequest(id, {
@@ -53,34 +179,28 @@ export const HRProfileReviewList: React.FC = () => {
         rejectReason: reason,
       });
 
-      // Bọc thép: Chỉ cần không văng lỗi Axios (HTTP 4xx, 5xx) thì coi như thành công
       const msg =
         (response as { message?: string })?.message ||
         (response as { Message?: string })?.Message ||
-        "Thao tác thành công!";
+        "Thao tác thành công.";
       triggerAlert("success", "Thành công", msg);
 
-      // Xóa item khỏi UI và reset trạng thái
-      setRequests((prev) => prev.filter((r) => r.id !== id));
+      setRequests((prev) => prev.filter((item) => item.id !== id));
       setRejectingId(null);
       setRejectReason("");
     } catch (error: unknown) {
-      console.error(error); // In ra console để biết Axios phàn nàn gì
+      console.error(error);
       triggerAlert(
         "error",
         "Lỗi xử lý",
-        "Giao diện gặp lỗi, nhưng backend có thể đã xử lý. Vui lòng tải lại trang để kiểm tra dữ liệu.",
+        "Không thể xử lý yêu cầu hồ sơ. Vui lòng tải lại trang để kiểm tra trạng thái mới nhất.",
       );
     } finally {
       setProcessingId(null);
     }
   };
 
-  const executeDependentReview = async (
-    id: number,
-    isApproved: boolean,
-    reason?: string,
-  ) => {
+  const executeDependentReview = async (id: number, isApproved: boolean, reason?: string) => {
     setProcessingId(id);
     try {
       const response = await dependentApi.reviewRequest(id, {
@@ -92,21 +212,18 @@ export const HRProfileReviewList: React.FC = () => {
         "Thành công",
         response.message || "Đã xử lý yêu cầu người phụ thuộc.",
       );
-      setDependentRequests((prev) => prev.filter((r) => r.id !== id));
+      setDependentRequests((prev) => prev.filter((item) => item.id !== id));
       setDependentRejectingId(null);
       setDependentRejectReason("");
     } catch (error: unknown) {
       const msg =
-        error instanceof Error
-          ? error.message
-          : "Không thể xử lý yêu cầu người phụ thuộc.";
+        error instanceof Error ? error.message : "Không thể xử lý yêu cầu người phụ thuộc.";
       triggerAlert("error", "Lỗi xử lý", msg);
     } finally {
       setProcessingId(null);
     }
   };
 
-  // Hành động bấm "Phê duyệt"
   const handleApprove = (id: number) => {
     triggerAlert(
       "confirm",
@@ -116,7 +233,6 @@ export const HRProfileReviewList: React.FC = () => {
     );
   };
 
-  // Hành động Submit nút "Từ chối"
   const handleConfirmReject = (id: number) => {
     if (!rejectReason.trim()) {
       triggerAlert("warning", "Thiếu lý do", "Bạn phải nhập lý do từ chối.");
@@ -125,361 +241,250 @@ export const HRProfileReviewList: React.FC = () => {
     executeReview(id, false, rejectReason.trim());
   };
 
-  const renderRequestedChanges = (jsonString: string) => {
-    try {
-      const data = JSON.parse(jsonString);
-      const items = [];
-
-      if (data.FullName)
-        items.push(
-          <li key="name">
-            Tên mới: <b className="text-blue-700">{data.FullName}</b>
-          </li>,
-        );
-      if (data.IdentityNumber)
-        items.push(
-          <li key="id">
-            CCCD mới: <b className="text-blue-700">{data.IdentityNumber}</b>
-          </li>,
-        );
-      if (data.BankAccount)
-        items.push(
-          <li key="bank">
-            TK Ngân hàng:{" "}
-            <b className="text-blue-700">
-              {data.BankAccount} ({data.BankName})
-            </b>
-          </li>,
-        );
-
-      if (data.IdentityFrontUrl) {
-        items.push(
-          <li key="f_front">
-            <a
-              href={`${BACKEND_URL}${data.IdentityFrontUrl}`}
-              target="_blank"
-              rel="noreferrer"
-              className="text-blue-500 hover:underline"
-            >
-              📎 Xem CCCD Mặt trước
-            </a>
-          </li>,
-        );
-      }
-      if (data.IdentityBackUrl) {
-        items.push(
-          <li key="f_back">
-            <a
-              href={`${BACKEND_URL}${data.IdentityBackUrl}`}
-              target="_blank"
-              rel="noreferrer"
-              className="text-blue-500 hover:underline"
-            >
-              📎 Xem CCCD Mặt sau
-            </a>
-          </li>,
-        );
-      }
-      if (data.CertificateUrl) {
-        items.push(
-          <li key="f_cert">
-            <a
-              href={`${BACKEND_URL}${data.CertificateUrl}`}
-              target="_blank"
-              rel="noreferrer"
-              className="text-blue-500 hover:underline"
-            >
-              📎 Xem Bằng cấp/Chứng chỉ
-            </a>
-          </li>,
-        );
-      }
-
-      return (
-        <ul className="list-disc pl-5 text-sm text-gray-700 space-y-1">
-          {items}
-        </ul>
-      );
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    } catch (e) {
-      return <span className="text-red-500 text-sm">Lỗi giải mã dữ liệu</span>;
+  const handleConfirmDependentReject = (id: number) => {
+    if (!dependentRejectReason.trim()) {
+      triggerAlert("warning", "Thiếu lý do", "Bạn phải nhập lý do từ chối.");
+      return;
     }
+    executeDependentReview(id, false, dependentRejectReason.trim());
   };
-
-  const renderDependentChanges = (jsonString: string, evidenceUrl?: string | null) => {
-    try {
-      const data = JSON.parse(jsonString);
-      return (
-        <ul className="list-disc pl-5 text-sm text-gray-700 space-y-1">
-          <li>
-            Họ tên: <b className="text-blue-700">{data.FullName}</b>
-          </li>
-          <li>Quan hệ: {["Con", "Cha/Mẹ", "Vợ/Chồng", "Khác"][data.Relationship] ?? "Khác"}</li>
-          {data.IdNumber && <li>CCCD: {data.IdNumber}</li>}
-          {data.TaxDependentCode && <li>MST phụ thuộc: {data.TaxDependentCode}</li>}
-          {data.ValidFrom && (
-            <li>
-              Hiệu lực từ: {new Date(data.ValidFrom).toLocaleDateString("vi-VN")}
-            </li>
-          )}
-          {data.ValidTo && (
-            <li>Hiệu lực đến: {new Date(data.ValidTo).toLocaleDateString("vi-VN")}</li>
-          )}
-          {data.Note && <li>Ghi chú: {data.Note}</li>}
-          {evidenceUrl && (
-            <li>
-              <a
-                href={`${BACKEND_URL}${evidenceUrl}`}
-                target="_blank"
-                rel="noreferrer"
-                className="text-blue-500 hover:underline"
-              >
-                Xem minh chứng
-              </a>
-            </li>
-          )}
-        </ul>
-      );
-    } catch {
-      return <span className="text-red-500 text-sm">Lỗi giải mã dữ liệu</span>;
-    }
-  };
-
-  if (loading)
-    return (
-      <div className="p-8 text-center text-gray-500">
-        Đang tải danh sách chờ duyệt...
-      </div>
-    );
 
   return (
-    <div className="min-h-full bg-gray-50 px-4 py-6 sm:px-6">
-      <div className="mx-auto max-w-6xl rounded-lg border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
-        <h2 className="text-2xl font-bold text-gray-800 mb-6 border-b pb-3">
-          Phê duyệt cập nhật hồ sơ (Dành cho HR)
-        </h2>
-
-        {requests.length === 0 ? (
-          <div className="text-center py-10 bg-gray-50 rounded border border-dashed">
-            <p className="text-gray-500">
-              Tuyệt vời! Hiện không có hồ sơ nào bị tồn đọng cần duyệt.
-            </p>
+    <div className="space-y-6">
+      <PageHeader
+        title="Phê duyệt cập nhật hồ sơ"
+        description="Kiểm tra yêu cầu thay đổi hồ sơ trước khi cập nhật."
+        breadcrumb={[
+          { label: "Hồ sơ & hợp đồng" },
+          { label: "Phê duyệt hồ sơ" },
+        ]}
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <Badge variant="warning">{requests.length} hồ sơ</Badge>
+            <Badge variant="info">{dependentRequests.length} người phụ thuộc</Badge>
           </div>
-        ) : (
-          <div className="space-y-4">
-            {requests.map((req) => (
-              <div
-                key={req.id}
-                className="border border-gray-200 rounded-lg p-5 flex flex-col md:flex-row justify-between gap-4 hover:shadow-md transition bg-white"
-              >
-                {/* Thông tin */}
-                <div className="md:w-1/3 border-b md:border-b-0 md:border-r border-gray-100 pr-4 pb-4 md:pb-0">
-                  <h3 className="font-bold text-gray-800">
-                    {req.employeeName}
-                  </h3>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Mã NV: {req.employeeCode}
-                  </p>
-                  <div className="mt-2 inline-block px-2 py-1 bg-yellow-50 text-yellow-700 border border-yellow-200 text-xs rounded font-medium">
-                    Hạn xử lý SLA:{" "}
-                    {new Date(req.deadlineSLA).toLocaleString("vi-VN")}
-                  </div>
-                </div>
+        }
+      />
 
-                {/* Nội dung thay đổi */}
-                <div className="md:w-1/2">
-                  <h4 className="text-sm font-semibold text-gray-700 mb-2 uppercase">
-                    Nội dung đề xuất:
-                  </h4>
-                  <div className="bg-gray-50 p-3 rounded border border-gray-100">
-                    {renderRequestedChanges(req.requestedDataJson)}
-                  </div>
-                </div>
-
-                {/* Các nút Action - Bố cục thông minh chống Spam */}
-                <div className="md:w-1/6 flex flex-col justify-center gap-2">
-                  {rejectingId === req.id ? (
-                    /* CHẾ ĐỘ NHẬP LÝ DO TỪ CHỐI (Inline) */
-                    <div className="flex flex-col gap-2 animate-fade-in">
-                      <input
-                        type="text"
-                        autoFocus
-                        placeholder="Lý do từ chối..."
-                        value={rejectReason}
-                        onChange={(e) => setRejectReason(e.target.value)}
-                        className="w-full border border-red-300 p-2 rounded text-sm outline-none focus:ring-1 focus:ring-red-400"
-                      />
-                      <div className="flex gap-1">
-                        <button
-                          onClick={() => handleConfirmReject(req.id)}
-                          disabled={processingId === req.id}
-                          className="flex-1 bg-red-600 text-white py-1.5 rounded text-sm font-medium hover:bg-red-700 disabled:opacity-50"
-                        >
-                          Chốt
-                        </button>
-                        <button
-                          onClick={() => {
-                            setRejectingId(null);
-                            setRejectReason("");
-                          }}
-                          disabled={processingId === req.id}
-                          className="flex-1 bg-gray-200 text-gray-700 py-1.5 rounded text-sm font-medium hover:bg-gray-300 disabled:opacity-50"
-                        >
-                          Hủy
-                        </button>
+      {loading ? (
+        <Card>
+          <div className="py-12 text-center text-sm text-[var(--hicas-text-secondary)]">
+            Đang tải dữ liệu...
+          </div>
+        </Card>
+      ) : (
+        <div className="space-y-6">
+          <Card
+            title="Yêu cầu cập nhật hồ sơ"
+            description="Các thay đổi thông tin cá nhân và tài liệu minh chứng."
+            actions={<UserCheck size={20} className="text-[var(--hicas-orange)]" />}
+          >
+            {requests.length === 0 ? (
+              <EmptyState
+                title="Chưa có hồ sơ chờ duyệt"
+                description="Hiện không có yêu cầu cập nhật hồ sơ đang tồn đọng."
+              />
+            ) : (
+              <div className="space-y-4">
+                {requests.map((req) => (
+                  <article
+                    key={req.id}
+                    className="grid gap-4 rounded-[var(--radius-lg)] border border-[var(--hicas-border)] bg-white p-4 xl:grid-cols-[260px_minmax(0,1fr)_220px]"
+                  >
+                    <div className="space-y-3">
+                      <div>
+                        <h3 className="font-semibold text-[var(--hicas-text-main)]">
+                          {req.employeeName}
+                        </h3>
+                        <p className="mt-1 text-sm text-[var(--hicas-text-secondary)]">
+                          Mã NV: {req.employeeCode}
+                        </p>
                       </div>
+                      <Badge variant="warning">
+                        <span className="inline-flex items-center gap-1">
+                          <Clock size={13} />
+                          SLA: {formatDateTime(req.deadlineSLA)}
+                        </span>
+                      </Badge>
                     </div>
-                  ) : (
-                    /* CHẾ ĐỘ NÚT BẤM BÌNH THƯỜNG */
-                    <>
-                      <button
-                        onClick={() => handleApprove(req.id)}
-                        disabled={
-                          processingId === req.id || rejectingId !== null
-                        }
-                        className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded text-sm transition-colors shadow-sm disabled:opacity-50"
-                      >
-                        {processingId === req.id
-                          ? "Đang xử lý..."
-                          : "✓ Phê duyệt"}
-                      </button>
-                      <button
-                        onClick={() => setRejectingId(req.id)}
-                        disabled={
-                          processingId === req.id || rejectingId !== null
-                        }
-                        className="w-full bg-red-50 hover:bg-red-100 text-red-600 font-medium py-2 px-4 rounded text-sm transition-colors border border-red-200 disabled:opacity-50"
-                      >
-                        ✕ Từ chối
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
 
-        <div className="mt-8 border-t pt-6">
-          <h3 className="mb-4 text-lg font-bold text-gray-800">
-            Yêu cầu người phụ thuộc
-          </h3>
-          {dependentRequests.length === 0 ? (
-            <div className="rounded border border-dashed bg-gray-50 py-6 text-center text-gray-500">
-              Không có yêu cầu người phụ thuộc đang chờ duyệt.
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {dependentRequests.map((req) => (
-                <div
-                  key={req.id}
-                  className="flex flex-col gap-4 rounded-lg border border-gray-200 bg-white p-5 transition hover:shadow-md md:flex-row md:justify-between"
-                >
-                  <div className="border-b border-gray-100 pb-4 md:w-1/3 md:border-b-0 md:border-r md:pb-0 md:pr-4">
-                    <h4 className="font-bold text-gray-800">
-                      {req.employeeName}
-                    </h4>
-                    <p className="mt-1 text-sm text-gray-500">
-                      Mã NV: {req.employeeCode}
-                    </p>
-                    <span className="mt-2 inline-block rounded border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">
-                      {req.actionType === "CREATE"
-                        ? "Thêm mới"
-                        : req.actionType === "UPDATE"
-                          ? "Cập nhật"
-                          : "Ngừng hiệu lực"}
-                    </span>
-                  </div>
+                    <ChangeList jsonString={req.requestedDataJson} labels={profileFieldLabels} />
 
-                  <div className="md:w-1/2">
-                    <h4 className="mb-2 text-sm font-semibold uppercase text-gray-700">
-                      Nội dung đề xuất:
-                    </h4>
-                    <div className="rounded border border-gray-100 bg-gray-50 p-3">
-                      {renderDependentChanges(
-                        req.requestedDataJson,
-                        req.evidenceUrl,
+                    <div className="flex flex-col justify-center gap-2">
+                      {rejectingId === req.id ? (
+                        <>
+                          <input
+                            type="text"
+                            autoFocus
+                            placeholder="Lý do từ chối"
+                            value={rejectReason}
+                            onChange={(event) => setRejectReason(event.target.value)}
+                            className="hicas-input w-full"
+                          />
+                          <div className="grid grid-cols-2 gap-2">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="danger"
+                              onClick={() => handleConfirmReject(req.id)}
+                              disabled={processingId === req.id}
+                            >
+                              Chốt
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => {
+                                setRejectingId(null);
+                                setRejectReason("");
+                              }}
+                              disabled={processingId === req.id}
+                            >
+                              Hủy
+                            </Button>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <Button
+                            type="button"
+                            size="sm"
+                            iconLeft={<CheckCircle2 size={15} />}
+                            onClick={() => handleApprove(req.id)}
+                            disabled={processingId === req.id || rejectingId !== null}
+                            isLoading={processingId === req.id}
+                          >
+                            Phê duyệt
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="danger"
+                            iconLeft={<XCircle size={15} />}
+                            onClick={() => setRejectingId(req.id)}
+                            disabled={processingId === req.id || rejectingId !== null}
+                          >
+                            Từ chối
+                          </Button>
+                        </>
                       )}
                     </div>
-                  </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </Card>
 
-                  <div className="flex flex-col justify-center gap-2 md:w-1/6">
-                    {dependentRejectingId === req.id ? (
-                      <div className="flex flex-col gap-2">
-                        <input
-                          type="text"
-                          autoFocus
-                          placeholder="Lý do từ chối..."
-                          value={dependentRejectReason}
-                          onChange={(e) =>
-                            setDependentRejectReason(e.target.value)
-                          }
-                          className="w-full rounded border border-red-300 p-2 text-sm outline-none focus:ring-1 focus:ring-red-400"
-                        />
-                        <div className="flex gap-1">
-                          <button
-                            onClick={() =>
-                              executeDependentReview(
-                                req.id,
-                                false,
-                                dependentRejectReason.trim(),
-                              )
-                            }
-                            disabled={
-                              processingId === req.id ||
-                              !dependentRejectReason.trim()
-                            }
-                            className="flex-1 rounded bg-red-600 py-1.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
-                          >
-                            Chốt
-                          </button>
-                          <button
-                            onClick={() => {
-                              setDependentRejectingId(null);
-                              setDependentRejectReason("");
-                            }}
-                            disabled={processingId === req.id}
-                            className="flex-1 rounded bg-gray-200 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300 disabled:opacity-50"
-                          >
-                            Hủy
-                          </button>
-                        </div>
+          <Card
+            title="Yêu cầu người phụ thuộc"
+            description="Các yêu cầu thêm, sửa hoặc ngừng hiệu lực người phụ thuộc của nhân viên."
+            actions={<FileText size={20} className="text-[var(--hicas-orange)]" />}
+          >
+            {dependentRequests.length === 0 ? (
+              <EmptyState
+                title="Chưa có yêu cầu người phụ thuộc"
+                description="Hiện không có yêu cầu người phụ thuộc đang chờ duyệt."
+              />
+            ) : (
+              <div className="space-y-4">
+                {dependentRequests.map((req) => (
+                  <article
+                    key={req.id}
+                    className="grid gap-4 rounded-[var(--radius-lg)] border border-[var(--hicas-border)] bg-white p-4 xl:grid-cols-[260px_minmax(0,1fr)_220px]"
+                  >
+                    <div className="space-y-3">
+                      <div>
+                        <h3 className="font-semibold text-[var(--hicas-text-main)]">
+                          {req.employeeName}
+                        </h3>
+                        <p className="mt-1 text-sm text-[var(--hicas-text-secondary)]">
+                          Mã NV: {req.employeeCode}
+                        </p>
                       </div>
-                    ) : (
-                      <>
-                        <button
-                          onClick={() =>
-                            executeDependentReview(req.id, true)
-                          }
-                          disabled={
-                            processingId === req.id ||
-                            dependentRejectingId !== null
-                          }
-                          className="w-full rounded bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-green-700 disabled:opacity-50"
-                        >
-                          {processingId === req.id
-                            ? "Đang xử lý..."
-                            : "Phê duyệt"}
-                        </button>
-                        <button
-                          onClick={() => setDependentRejectingId(req.id)}
-                          disabled={
-                            processingId === req.id ||
-                            dependentRejectingId !== null
-                          }
-                          className="w-full rounded border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-100 disabled:opacity-50"
-                        >
-                          Từ chối
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+                      <Badge variant="info">
+                        {req.actionType === "CREATE"
+                          ? "Thêm mới"
+                          : req.actionType === "UPDATE"
+                            ? "Cập nhật"
+                            : "Ngừng hiệu lực"}
+                      </Badge>
+                    </div>
+
+                    <ChangeList
+                      jsonString={req.requestedDataJson}
+                      labels={dependentFieldLabels}
+                      evidenceUrl={req.evidenceUrl}
+                      dependentMode
+                    />
+
+                    <div className="flex flex-col justify-center gap-2">
+                      {dependentRejectingId === req.id ? (
+                        <>
+                          <input
+                            type="text"
+                            autoFocus
+                            placeholder="Lý do từ chối"
+                            value={dependentRejectReason}
+                            onChange={(event) => setDependentRejectReason(event.target.value)}
+                            className="hicas-input w-full"
+                          />
+                          <div className="grid grid-cols-2 gap-2">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="danger"
+                              onClick={() => handleConfirmDependentReject(req.id)}
+                              disabled={processingId === req.id}
+                            >
+                              Chốt
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => {
+                                setDependentRejectingId(null);
+                                setDependentRejectReason("");
+                              }}
+                              disabled={processingId === req.id}
+                            >
+                              Hủy
+                            </Button>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <Button
+                            type="button"
+                            size="sm"
+                            iconLeft={<CheckCircle2 size={15} />}
+                            onClick={() => executeDependentReview(req.id, true)}
+                            disabled={processingId === req.id || dependentRejectingId !== null}
+                            isLoading={processingId === req.id}
+                          >
+                            Phê duyệt
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="danger"
+                            iconLeft={<XCircle size={15} />}
+                            onClick={() => setDependentRejectingId(req.id)}
+                            disabled={processingId === req.id || dependentRejectingId !== null}
+                          >
+                            Từ chối
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </Card>
         </div>
-      </div>
+      )}
     </div>
   );
 };

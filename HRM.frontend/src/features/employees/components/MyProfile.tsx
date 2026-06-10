@@ -1,268 +1,261 @@
 import React from "react";
-import { useMyProfileData } from "../hooks/useMyProfileData";
+import {
+  Building2,
+  FileText,
+  History,
+  HeartPulse,
+  IdCard,
+  Landmark,
+  Mail,
+  Phone,
+  UserRound,
+} from "lucide-react";
+import { PageHeader } from "../../../components/layout";
+import { Badge, Button, Card, EmptyState, LoadingState } from "../../../components/ui";
 import { BACKEND_URL } from "../../../core/api/config";
+import { useMyProfileData } from "../hooks/useMyProfileData";
+
+const formatDate = (value?: string | null) =>
+  value ? new Date(value).toLocaleDateString("vi-VN") : "Chưa cập nhật";
+
+const fallback = (value?: string | null) => value || "Chưa cập nhật";
+
+const getGenderText = (value?: string | null) => {
+  if (!value) return "Chưa cập nhật";
+
+  const normalized = value.trim().toLowerCase();
+  if (["0", "male", "nam"].includes(normalized)) return "Nam";
+  if (["1", "female", "nu", "nữ"].includes(normalized)) return "Nữ";
+  if (["2", "other", "khac", "khác"].includes(normalized)) return "Khác";
+
+  return value;
+};
+
+const getDependentRelationText = (value: number) =>
+  ["Con", "Cha/Mẹ", "Vợ/Chồng", "Khác"][value] ?? "Khác";
+
+const getStatusLabel = (status?: string | null) => {
+  switch ((status || "").toLowerCase()) {
+    case "active":
+      return "Đang làm việc";
+    case "inactive":
+      return "Tạm ngưng";
+    case "resigned":
+      return "Đã nghỉ việc";
+    case "dismissed":
+      return "Đã chấm dứt";
+    default:
+      return status || "Chưa cập nhật";
+  }
+};
+
+const getInitials = (fullName?: string) => {
+  const parts = (fullName || "HICAS").trim().split(/\s+/);
+  return parts
+    .slice(-2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+};
+
+type InfoItemProps = {
+  label: string;
+  value: React.ReactNode;
+};
+
+const InfoItem = ({ label, value }: InfoItemProps) => (
+  <div className="rounded-[var(--radius-md)] border border-[var(--hicas-border-soft)] bg-[var(--hicas-bg)] px-4 py-3">
+    <p className="text-xs font-medium text-[var(--hicas-text-secondary)]">{label}</p>
+    <p className="mt-1 break-words text-sm font-semibold text-[var(--hicas-text-main)]">
+      {value}
+    </p>
+  </div>
+);
+
+type InfoSectionProps = {
+  title: string;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+};
+
+const InfoSection = ({ title, icon, children }: InfoSectionProps) => (
+  <Card title={title} actions={<span className="text-[var(--hicas-orange)]">{icon}</span>}>
+    <div className="grid gap-3 sm:grid-cols-2">{children}</div>
+  </Card>
+);
 
 export const MyProfile: React.FC = () => {
   const { profile, dependents, loadingDependents, loadingProfile } = useMyProfileData({
     includeContracts: false,
   });
 
-  if (loadingProfile)
-    return (
-      <div className="p-8 text-center text-gray-500 animate-pulse">
-        Đang tải hồ sơ...
-      </div>
-    );
-  if (!profile)
-    return (
-      <div className="p-8 text-center text-gray-400">
-        Không tìm thấy thông tin hồ sơ của bạn.
-      </div>
-    );
+  if (loadingProfile) {
+    return <LoadingState title="Đang tải hồ sơ cá nhân..." />;
+  }
 
-  const getGenderText = (g: number | null) =>
-    g === 0 ? "Nam" : g === 1 ? "Nữ" : "Khác";
+  if (!profile) {
+    return (
+      <Card>
+        <EmptyState
+          title="Không tìm thấy hồ sơ"
+          description="Tài khoản hiện tại chưa được liên kết với hồ sơ nhân sự."
+        />
+      </Card>
+    );
+  }
 
-  const getDependentRelationText = (value: number) =>
-    ["Con", "Cha/Mẹ", "Vợ/Chồng", "Khác"][value] ?? "Khác";
+  const avatarSrc = profile.avatarUrl ? `${BACKEND_URL}${profile.avatarUrl}` : "";
+  const documentLinks = [
+    { label: "CCCD mặt trước", url: profile.identityFrontUrl },
+    { label: "CCCD mặt sau", url: profile.identityBackUrl },
+    { label: "Bằng cấp hoặc chứng chỉ", url: profile.certificateUrl },
+  ].filter((item) => item.url);
+
+  const isActive = profile.status?.toLowerCase().includes("active");
 
   return (
-    <div className="min-h-full bg-gray-50 px-4 py-6 sm:px-6">
-      <div className="mx-auto w-full max-w-6xl space-y-6 rounded-lg border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
-        {/* Header Profile */}
-        <div className="flex items-center gap-5 pb-6 border-b">
-          <img
-            src={
-              profile.avatarUrl
-                ? `${BACKEND_URL}${profile.avatarUrl}`
-                : "https://via.placeholder.com/150"
-            }
-            alt="Avatar"
-            className="w-24 h-24 rounded-full object-cover border-2 border-blue-500 shadow-sm"
-          />
-          <div>
-            <h2 className="text-2xl font-bold text-gray-800">
-              {profile.fullName}
-            </h2>
-            <p className="text-sm font-semibold text-blue-600 mt-1">
-              Mã NV: {profile.employeeCode}
-            </p>
-            <span className="inline-block bg-green-50 text-green-700 text-xs px-2.5 py-1 rounded-full font-medium mt-2">
-              Trạng thái: {profile.status}
-            </span>
+    <div className="space-y-6">
+      <PageHeader
+        title="Hồ sơ cá nhân"
+        description="Xem thông tin cá nhân, giấy tờ, bảo hiểm và người phụ thuộc."
+        breadcrumb={[
+          { label: "Hồ sơ & hợp đồng" },
+          { label: "Hồ sơ cá nhân" },
+        ]}
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="secondary"
+              iconLeft={<History size={16} />}
+              onClick={() => window.location.assign("/employee-contract/history?type=PROFILE")}
+            >
+              Lịch sử hồ sơ
+            </Button>
+            <Badge variant={isActive ? "success" : "neutral"}>
+              {getStatusLabel(profile.status)}
+            </Badge>
           </div>
-        </div>
+        }
+      />
 
-        {/* Nội dung chi tiết - Dùng Grid 3 cột cho gọn */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Cột 1: Cơ bản & Liên hệ */}
-          <div className="space-y-4">
-            <div>
-              <h3 className="font-bold text-gray-700 text-sm border-l-4 border-blue-500 pl-2 uppercase mb-2">
-                Cá nhân & Liên hệ
-              </h3>
-              <p className="text-sm text-gray-600 mb-1">
-                Giới tính:{" "}
-                <span className="font-semibold text-gray-800">
-                  {getGenderText(profile.gender)}
-                </span>
-              </p>
-              <p className="text-sm text-gray-600 mb-1">
-                Ngày sinh:{" "}
-                <span className="font-semibold text-gray-800">
-                  {profile.birthDate
-                    ? new Date(profile.birthDate).toLocaleDateString("vi-VN")
-                    : "Chưa cập nhật"}
-                </span>
-              </p>
-              <p className="text-sm text-gray-600 mb-1">
-                SĐT:{" "}
-                <span className="font-semibold text-gray-800">
-                  {profile.phoneNumber || "Chưa cập nhật"}
-                </span>
-              </p>
-              <p className="text-sm text-gray-600 mb-1">
-                Email cá nhân:{" "}
-                <span className="font-semibold text-gray-800">
-                  {profile.personalEmail || "Chưa cập nhật"}
-                </span>
-              </p>
-              <p className="text-sm text-gray-600 mb-1">
-                Chỗ ở hiện tại:{" "}
-                <span className="font-semibold text-gray-800">
-                  {profile.currentAddress || "Chưa cập nhật"}
-                </span>
-              </p>
-              <p className="text-sm text-gray-600 mb-1">
-                Thường trú:{" "}
-                <span className="font-semibold text-gray-800">
-                  {profile.permanentAddress || "Chưa cập nhật"}
-                </span>
-              </p>
+      <Card className="overflow-hidden" padded={false}>
+        <div className="border-b border-[var(--hicas-border-soft)] bg-[var(--hicas-bg)] px-6 py-5">
+          <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-center gap-5">
+              {avatarSrc ? (
+                <img
+                  src={avatarSrc}
+                  alt={profile.fullName}
+                  className="h-20 w-20 rounded-[var(--radius-xl)] border border-[var(--hicas-border)] object-cover shadow-sm"
+                />
+              ) : (
+                <div className="flex h-20 w-20 items-center justify-center rounded-[var(--radius-xl)] border border-[var(--hicas-border)] bg-white text-xl font-bold text-[var(--hicas-orange-dark)] shadow-sm">
+                  {getInitials(profile.fullName)}
+                </div>
+              )}
+              <div>
+                <h2 className="text-2xl font-bold text-[var(--hicas-text-main)]">
+                  {profile.fullName}
+                </h2>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <Badge variant="orange">Mã NV: {profile.employeeCode}</Badge>
+                  <Badge variant="info">Ngày vào: {formatDate(profile.joinedDate)}</Badge>
+                </div>
+              </div>
             </div>
-
-            <div>
-              <h3 className="font-bold text-gray-700 text-sm border-l-4 border-red-500 pl-2 uppercase mb-2">
-                Liên hệ khẩn cấp
-              </h3>
-              <p className="text-sm text-gray-600 mb-1">
-                Người liên hệ:{" "}
-                <span className="font-semibold text-gray-800">
-                  {profile.emergencyContactName || "Chưa cập nhật"}
-                </span>
-              </p>
-              <p className="text-sm text-gray-600 mb-1">
-                SĐT khẩn cấp:{" "}
-                <span className="font-semibold text-gray-800">
-                  {profile.emergencyPhone || "Chưa cập nhật"}
-                </span>
-              </p>
-              <p className="text-sm text-gray-600 mb-1">
-                Quan hệ:{" "}
-                <span className="font-semibold text-gray-800">
-                  {profile.emergencyRelation || "Chưa cập nhật"}
-                </span>
-              </p>
-            </div>
-          </div>
-
-          {/* Cột 2: Định danh & Thuế & BHXH */}
-          <div className="space-y-4">
-            <div>
-              <h3 className="font-bold text-gray-700 text-sm border-l-4 border-indigo-500 pl-2 uppercase mb-2">
-                Hồ sơ pháp lý
-              </h3>
-              <p className="text-sm text-gray-600 mb-1">
-                Số CCCD:{" "}
-                <span className="font-semibold text-gray-800">
-                  {profile.identityNumber || "Chưa cập nhật"}
-                </span>
-              </p>
-              <p className="text-sm text-gray-600 mb-1">
-                Mã số thuế:{" "}
-                <span className="font-semibold text-gray-800">
-                  {profile.taxCode || "Chưa có"}
-                </span>
-              </p>
-            </div>
-
-            <div>
-              <h3 className="font-bold text-gray-700 text-sm border-l-4 border-green-500 pl-2 uppercase mb-2">
-                Bảo hiểm Y tế / Xã hội
-              </h3>
-              <p className="text-sm text-gray-600 mb-1">
-                Số BHXH:{" "}
-                <span className="font-semibold text-gray-800">
-                  {profile.socialInsCode || "Chưa có"}
-                </span>
-              </p>
-              <p className="text-sm text-gray-600 mb-1">
-                Ngày tham gia:{" "}
-                <span className="font-semibold text-gray-800">
-                  {profile.socialInsJoinDate
-                    ? new Date(profile.socialInsJoinDate).toLocaleDateString(
-                        "vi-VN",
-                      )
-                    : "Chưa cập nhật"}
-                </span>
-              </p>
-              <p className="text-sm text-gray-600 mb-1">
-                Nơi khám chữa bệnh:{" "}
-                <span className="font-semibold text-gray-800">
-                  {profile.insuranceHospital || "Chưa cập nhật"}
-                </span>
-              </p>
-            </div>
-          </div>
-
-          {/* Cột 3: Công việc & Ngân hàng */}
-          <div className="space-y-4">
-            <div>
-              <h3 className="font-bold text-gray-700 text-sm border-l-4 border-yellow-500 pl-2 uppercase mb-2">
-                Thanh toán lương
-              </h3>
-              <p className="text-sm text-gray-600 mb-1">
-                Ngân hàng:{" "}
-                <span className="font-semibold text-gray-800">
-                  {profile.bankName || "Chưa có"}
-                </span>
-              </p>
-              <p className="text-sm text-gray-600 mb-1">
-                Số tài khoản:{" "}
-                <span className="font-semibold text-gray-800">
-                  {profile.bankAccount || "Chưa có"}
-                </span>
-              </p>
-            </div>
-            <div>
-              <h3 className="font-bold text-gray-700 text-sm border-l-4 border-purple-500 pl-2 uppercase mb-2">
-                Công ty
-              </h3>
-              <p className="text-sm text-gray-600 mb-1">
-                Ngày gia nhập:{" "}
-                <span className="font-semibold text-gray-800">
-                  {profile.joinedDate
-                    ? new Date(profile.joinedDate).toLocaleDateString("vi-VN")
-                    : "-"}
-                </span>
-              </p>
+            <div className="grid gap-2 text-sm text-[var(--hicas-text-secondary)] sm:grid-cols-2 md:min-w-[360px]">
+              <span className="flex items-center gap-2">
+                <Mail size={16} />
+                {fallback(profile.personalEmail)}
+              </span>
+              <span className="flex items-center gap-2">
+                <Phone size={16} />
+                {fallback(profile.phoneNumber)}
+              </span>
             </div>
           </div>
         </div>
+      </Card>
 
-        {/* Khối tài liệu minh chứng đính kèm */}
-        <div className="pt-6 border-t">
-          <h3 className="font-bold text-gray-700 text-sm mb-3 uppercase">
-            Tài liệu minh chứng
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {profile.identityFrontUrl && (
-              <a
-                href={`${BACKEND_URL}${profile.identityFrontUrl}`}
-                target="_blank"
-                rel="noreferrer"
-                className="p-3 border rounded text-center text-sm font-medium text-blue-600 hover:bg-blue-50 bg-gray-50/50"
-              >
-                📄 CCCD Mặt trước
-              </a>
-            )}
-            {profile.identityBackUrl && (
-              <a
-                href={`${BACKEND_URL}${profile.identityBackUrl}`}
-                target="_blank"
-                rel="noreferrer"
-                className="p-3 border rounded text-center text-sm font-medium text-blue-600 hover:bg-blue-50 bg-gray-50/50"
-              >
-                📄 CCCD Mặt sau
-              </a>
-            )}
-            {profile.certificateUrl && (
-              <a
-                href={`${BACKEND_URL}${profile.certificateUrl}`}
-                target="_blank"
-                rel="noreferrer"
-                className="p-3 border rounded text-center text-sm font-medium text-blue-600 hover:bg-blue-50 bg-gray-50/50"
-              >
-                🎓 Bằng cấp/Chứng chỉ
-              </a>
-            )}
-          </div>
-        </div>
+      <div className="grid gap-6 xl:grid-cols-2">
+        <InfoSection title="Cá nhân & liên hệ" icon={<UserRound size={18} />}>
+          <InfoItem label="Giới tính" value={getGenderText(profile.gender)} />
+          <InfoItem label="Ngày sinh" value={formatDate(profile.birthDate)} />
+          <InfoItem label="Số điện thoại" value={fallback(profile.phoneNumber)} />
+          <InfoItem label="Email cá nhân" value={fallback(profile.personalEmail)} />
+          <InfoItem label="Chỗ ở hiện tại" value={fallback(profile.currentAddress)} />
+          <InfoItem label="Địa chỉ thường trú" value={fallback(profile.permanentAddress)} />
+        </InfoSection>
 
-        <div className="pt-6 border-t">
-          <h3 className="font-bold text-gray-700 text-sm mb-3 uppercase">
-            Người phụ thuộc
-          </h3>
-          {loadingDependents ? (
-            <p className="text-sm text-gray-500">Đang tải người phụ thuộc...</p>
-          ) : dependents.length === 0 ? (
-            <p className="rounded border border-dashed bg-gray-50 p-4 text-sm text-gray-500">
-              Chưa có người phụ thuộc đang hiệu lực.
-            </p>
+        <InfoSection title="Liên hệ khẩn cấp" icon={<HeartPulse size={18} />}>
+          <InfoItem label="Người liên hệ" value={fallback(profile.emergencyContactName)} />
+          <InfoItem label="Số điện thoại" value={fallback(profile.emergencyPhone)} />
+          <InfoItem label="Quan hệ" value={fallback(profile.emergencyRelation)} />
+        </InfoSection>
+
+        <InfoSection title="Giấy tờ & bảo hiểm" icon={<IdCard size={18} />}>
+          <InfoItem label="Số CCCD" value={fallback(profile.identityNumber)} />
+          <InfoItem label="Mã số thuế" value={fallback(profile.taxCode)} />
+          <InfoItem label="Số BHXH" value={fallback(profile.socialInsCode)} />
+          <InfoItem label="Ngày tham gia BHXH" value={formatDate(profile.socialInsJoinDate)} />
+          <InfoItem label="Nơi khám chữa bệnh" value={fallback(profile.insuranceHospital)} />
+        </InfoSection>
+
+        <InfoSection title="Thanh toán lương" icon={<Landmark size={18} />}>
+          <InfoItem label="Ngân hàng" value={fallback(profile.bankName)} />
+          <InfoItem label="Số tài khoản" value={fallback(profile.bankAccount)} />
+          <InfoItem label="Ngày gia nhập" value={formatDate(profile.joinedDate)} />
+        </InfoSection>
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+        <Card
+          title="Tài liệu minh chứng"
+          description="Các giấy tờ đã được lưu kèm hồ sơ cá nhân."
+          actions={<FileText size={20} className="text-[var(--hicas-orange)]" />}
+        >
+          {documentLinks.length === 0 ? (
+            <EmptyState
+              title="Chưa có tài liệu"
+              description="Hồ sơ hiện chưa có tài liệu minh chứng được tải lên."
+            />
           ) : (
-            <div className="overflow-hidden rounded border border-gray-200">
-              <table className="min-w-full divide-y divide-gray-200 text-sm">
-                <thead className="bg-gray-50 text-left text-xs font-semibold uppercase text-gray-500">
+            <div className="grid gap-3">
+              {documentLinks.map((item) => (
+                <a
+                  key={item.label}
+                  href={`${BACKEND_URL}${item.url}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center justify-between rounded-[var(--radius-md)] border border-[var(--hicas-border)] bg-white px-4 py-3 text-sm font-semibold text-[var(--hicas-text-main)] transition hover:border-[var(--hicas-orange)] hover:bg-[var(--hicas-orange-lighter)]"
+                >
+                  <span className="flex items-center gap-2">
+                    <FileText size={16} className="text-[var(--hicas-orange)]" />
+                    {item.label}
+                  </span>
+                  <span className="text-xs text-[var(--hicas-text-secondary)]">Mở</span>
+                </a>
+              ))}
+            </div>
+          )}
+        </Card>
+
+        <Card
+          title="Người phụ thuộc"
+          description="Danh sách người phụ thuộc đang được ghi nhận trong hồ sơ."
+          actions={<Building2 size={20} className="text-[var(--hicas-orange)]" />}
+        >
+          {loadingDependents ? (
+            <LoadingState title="Đang tải người phụ thuộc..." className="border-0 bg-transparent" />
+          ) : dependents.length === 0 ? (
+            <EmptyState
+              title="Chưa có người phụ thuộc"
+              description="Hiện chưa có người phụ thuộc đang hiệu lực."
+            />
+          ) : (
+            <div className="overflow-auto rounded-[var(--radius-lg)] border border-[var(--hicas-border)]">
+              <table className="min-w-full divide-y divide-[var(--hicas-border-soft)] text-sm">
+                <thead className="bg-[var(--hicas-bg)] text-left text-xs font-semibold uppercase text-[var(--hicas-text-secondary)]">
                   <tr>
                     <th className="px-4 py-3">Họ tên</th>
                     <th className="px-4 py-3">Quan hệ</th>
@@ -271,41 +264,27 @@ export const MyProfile: React.FC = () => {
                     <th className="px-4 py-3">Trạng thái</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 bg-white">
+                <tbody className="divide-y divide-[var(--hicas-border-soft)] bg-white">
                   {dependents.map((item) => (
                     <tr key={item.id}>
                       <td className="px-4 py-3">
-                        <div className="font-medium text-gray-800">
+                        <div className="font-semibold text-[var(--hicas-text-main)]">
                           {item.fullName}
                         </div>
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs text-[var(--hicas-text-secondary)]">
                           {item.idNumber || "Chưa có CCCD"}
                         </div>
                       </td>
+                      <td className="px-4 py-3">{getDependentRelationText(item.relationship)}</td>
+                      <td className="px-4 py-3">{item.taxDependentCode || "-"}</td>
                       <td className="px-4 py-3">
-                        {getDependentRelationText(item.relationship)}
+                        {formatDate(item.validFrom)}
+                        {item.validTo ? ` - ${formatDate(item.validTo)}` : ""}
                       </td>
                       <td className="px-4 py-3">
-                        {item.taxDependentCode || "-"}
-                      </td>
-                      <td className="px-4 py-3">
-                        {item.validFrom
-                          ? new Date(item.validFrom).toLocaleDateString("vi-VN")
-                          : "-"}
-                        {item.validTo
-                          ? ` - ${new Date(item.validTo).toLocaleDateString("vi-VN")}`
-                          : ""}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={`rounded-full px-2 py-1 text-xs font-medium ${
-                            item.isActive
-                              ? "bg-green-50 text-green-700"
-                              : "bg-gray-100 text-gray-500"
-                          }`}
-                        >
+                        <Badge variant={item.isActive ? "success" : "neutral"}>
                           {item.isActive ? "Đang hiệu lực" : "Ngừng hiệu lực"}
-                        </span>
+                        </Badge>
                       </td>
                     </tr>
                   ))}
@@ -313,8 +292,7 @@ export const MyProfile: React.FC = () => {
               </table>
             </div>
           )}
-        </div>
-
+        </Card>
       </div>
     </div>
   );
