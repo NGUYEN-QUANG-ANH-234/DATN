@@ -9,6 +9,14 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.EmployeePr
     {
         public ContractRepository(MyDbContext context) : base(context) { }
 
+        public new async Task<Contract?> GetByIdAsync(int id, CancellationToken ct = default)
+        {
+            return await _dbSet
+                .Include(c => c.Employee)
+                .Include(c => c.LegalSnapshots)
+                .FirstOrDefaultAsync(c => c.Id == id, ct);
+        }
+
         public async Task SaveRequestAsync(Contract contract)
         {
             await _dbSet.AddAsync(contract);
@@ -37,7 +45,7 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.EmployeePr
         public async Task<bool> ActivateContractAsync(int id)
         {
             var contract = await _dbSet.FindAsync(id);
-            if (contract != null && contract.Status == ContractStatus.PendingDirector)
+            if (contract != null && contract.Status == ContractStatus.ApprovedByDirector)
             {
                 contract.Status = ContractStatus.Active;
                 return true;
@@ -48,6 +56,7 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.EmployeePr
         public async Task<List<Contract>> GetByEmployeeIdAsync(int employeeId, CancellationToken ct = default)
         {
             return await _dbSet
+                .Include(c => c.LegalSnapshots)
                 .Where(c => c.EmployeeId == employeeId)
                 .OrderByDescending(c => c.StartDate)
                 .ThenByDescending(c => c.Version)
@@ -59,6 +68,7 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.EmployeePr
         {
             return await _dbSet
                 .Include(c => c.Employee)
+                .Include(c => c.LegalSnapshots)
                 .Where(c => c.Status == status)
                 .OrderByDescending(c => c.Id)
                 .AsNoTracking()
@@ -70,6 +80,7 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.EmployeePr
             var statusList = statuses.ToList();
             return await _dbSet
                 .Include(c => c.Employee)
+                .Include(c => c.LegalSnapshots)
                 .Where(c => statusList.Contains(c.Status))
                 .OrderByDescending(c => c.Id)
                 .AsNoTracking()
@@ -80,6 +91,7 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.EmployeePr
         {
             return await _dbSet
                 .Include(c => c.Employee)
+                .Include(c => c.LegalSnapshots)
                 .OrderByDescending(c => c.Id)
                 .AsNoTracking()
                 .ToListAsync(ct);
@@ -89,6 +101,7 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.EmployeePr
         {
             return await _dbSet
                 .Where(c => contractIds.Contains(c.Id))
+                .Include(c => c.LegalSnapshots)
                 .Include(c => c.Employee)
                     .ThenInclude(e => e.Department)
                 .Include(c => c.Employee)

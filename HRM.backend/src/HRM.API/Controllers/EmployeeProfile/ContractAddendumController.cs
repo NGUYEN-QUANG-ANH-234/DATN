@@ -61,7 +61,7 @@ namespace HRM.backend.src.HRM.API.Controllers.EmployeeProfile
         [HttpGet("addendums/pending-director")]
         public async Task<IActionResult> GetPendingDirector(CancellationToken ct)
         {
-            var result = await _useCase.GetPendingDirectorAsync(ct);
+            var result = await _useCase.GetPendingDirectorAsync(GetAccountId(), GetRole(), ct);
             return Ok(new { Success = true, Data = result });
         }
 
@@ -84,6 +84,34 @@ namespace HRM.backend.src.HRM.API.Controllers.EmployeeProfile
             });
         }
 
+        [HttpGet("addendums/{id}/document-preview")]
+        public async Task<IActionResult> PreviewDocument(int id, CancellationToken ct)
+        {
+            var result = await _useCase.PreviewDocumentAsync(id, ct);
+            return Ok(new { Success = true, Data = result });
+        }
+
+        [HttpGet("addendums/{id}/document-doc")]
+        public async Task<IActionResult> DownloadDocumentDoc(int id, CancellationToken ct)
+        {
+            var result = await _useCase.DownloadDocumentDocAsync(id, ct);
+            return File(result.Content, result.ContentType, result.FileName);
+        }
+
+        [HttpGet("addendums/{id}/document-pdf")]
+        public async Task<IActionResult> DownloadDocumentPdf(int id, CancellationToken ct)
+        {
+            var result = await _useCase.DownloadDocumentPdfAsync(id, ct);
+            return File(result.Content, result.ContentType, result.FileName);
+        }
+
+        [HttpPatch("addendums/{id}/issue-document")]
+        public async Task<IActionResult> IssueDocument(int id, [FromBody] IssueContractDocumentDto dto, CancellationToken ct)
+        {
+            var result = await _useCase.IssueDocumentAsync(id, dto, GetAccountId(), GetRole(), ct);
+            return Ok(new { Success = true, Message = "Văn bản phụ lục đã được phát hành.", Data = result });
+        }
+
         [HttpPatch("addendums/{id}/submit")]
         public async Task<IActionResult> Submit(int id, CancellationToken ct)
         {
@@ -100,7 +128,7 @@ namespace HRM.backend.src.HRM.API.Controllers.EmployeeProfile
                 Success = true,
                 Message = dto.IsApproved
                     ? "Trưởng phòng đã xác nhận phụ lục, chuyển HR kiểm tra chính sách."
-                    : "Trưởng phòng đã từ chối phụ lục."
+                    : "Đã chuyển phụ lục về HR chỉnh sửa."
             });
         }
 
@@ -113,7 +141,7 @@ namespace HRM.backend.src.HRM.API.Controllers.EmployeeProfile
                 Success = true,
                 Message = dto.IsApproved
                     ? "HR đã xác nhận chính sách, chuyển người lao động xác nhận điều khoản."
-                    : "HR đã từ chối phụ lục."
+                    : "Đã chuyển phụ lục về HR chỉnh sửa."
             });
         }
 
@@ -126,7 +154,7 @@ namespace HRM.backend.src.HRM.API.Controllers.EmployeeProfile
                 Success = true,
                 Message = dto.IsApproved
                     ? "Đã xác nhận điều khoản phụ lục, chờ Giám đốc phê duyệt."
-                    : "Đã từ chối điều khoản phụ lục."
+                    : "Đã gửi yêu cầu chỉnh sửa phụ lục về HR."
             });
         }
 
@@ -135,6 +163,26 @@ namespace HRM.backend.src.HRM.API.Controllers.EmployeeProfile
         {
             await _useCase.ApproveAsync(id, GetAccountId(), GetRole(), ct);
             return Ok(new { Success = true, Message = "Phụ lục hợp đồng đã có hiệu lực." });
+        }
+
+        [HttpPatch("addendums/{id}/director-review")]
+        public async Task<IActionResult> DirectorReview(int id, [FromBody] ReviewContractAddendumDto dto, CancellationToken ct)
+        {
+            await _useCase.DirectorReviewAsync(id, GetAccountId(), GetRole(), dto, ct);
+            return Ok(new
+            {
+                Success = true,
+                Message = dto.IsApproved
+                    ? "Phu luc da duoc Giam doc duyet."
+                    : "Da chuyen phu luc ve HR chinh sua."
+            });
+        }
+
+        [HttpPatch("addendums/{id}/request-revision")]
+        public async Task<IActionResult> RequestRevision(int id, [FromBody] RequestRevisionDto dto, CancellationToken ct)
+        {
+            await _useCase.RequestRevisionAsync(id, GetAccountId(), GetRole(), dto, ct);
+            return Ok(new { Success = true, Message = "Da gui yeu cau chinh sua ve HR." });
         }
 
         [HttpPatch("addendums/{id}/reject")]

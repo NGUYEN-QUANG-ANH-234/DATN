@@ -15,6 +15,8 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.EmployeePr
                 .Include(a => a.Details)
                 .Include(a => a.Contract)
                     .ThenInclude(c => c!.Employee)
+                .Include(a => a.Contract)
+                    .ThenInclude(c => c!.LegalSnapshots)
                 .FirstOrDefaultAsync(a => a.Id == id, ct);
         }
 
@@ -24,6 +26,8 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.EmployeePr
                 .Include(a => a.Details)
                 .Include(a => a.Contract)
                     .ThenInclude(c => c!.Employee)
+                .Include(a => a.Contract)
+                    .ThenInclude(c => c!.LegalSnapshots)
                 .Where(a => a.ContractId == contractId)
                 .OrderByDescending(a => a.CreatedAt)
                 .AsNoTracking()
@@ -36,6 +40,8 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.EmployeePr
                 .Include(a => a.Details)
                 .Include(a => a.Contract)
                     .ThenInclude(c => c!.Employee)
+                .Include(a => a.Contract)
+                    .ThenInclude(c => c!.LegalSnapshots)
                 .Where(a => a.Status == status)
                 .OrderByDescending(a => a.CreatedAt)
                 .AsNoTracking()
@@ -48,6 +54,8 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.EmployeePr
                 .Include(a => a.Details)
                 .Include(a => a.Contract)
                     .ThenInclude(c => c!.Employee)
+                .Include(a => a.Contract)
+                    .ThenInclude(c => c!.LegalSnapshots)
                 .OrderByDescending(a => a.CreatedAt)
                 .AsNoTracking()
                 .ToListAsync(ct);

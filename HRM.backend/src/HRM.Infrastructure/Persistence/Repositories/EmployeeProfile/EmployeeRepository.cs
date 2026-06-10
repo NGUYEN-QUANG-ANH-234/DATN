@@ -34,6 +34,30 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.EmployeePr
                 .FirstOrDefaultAsync(e => e.AccountId == accountId, ct);
         }
 
+        public async Task<Employee?> GetDocumentProfileByIdAsync(int id, CancellationToken ct = default)
+        {
+            return await BuildDocumentProfileQuery()
+                .FirstOrDefaultAsync(e => e.Id == id, ct);
+        }
+
+        public async Task<Employee?> GetDocumentProfileByAccountIdAsync(int accountId, CancellationToken ct = default)
+        {
+            return await BuildDocumentProfileQuery()
+                .FirstOrDefaultAsync(e => e.AccountId == accountId, ct);
+        }
+
+        private IQueryable<Employee> BuildDocumentProfileQuery()
+        {
+            return _dbSet
+                .Include(e => e.Account)
+                .Include(e => e.Department)
+                .Include(e => e.Position)
+                .Include(e => e.JobLevel)
+                .Include(e => e.Manager)
+                .Include(e => e.Contracts)
+                .AsNoTracking();
+        }
+
         public async Task<List<Employee>> GetActiveByDeptWithDepartmentAsync(int deptId, int? excludeEmployeeId = null, CancellationToken ct = default)
         {
             return await _dbSet

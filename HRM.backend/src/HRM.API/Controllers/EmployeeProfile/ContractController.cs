@@ -29,7 +29,7 @@ namespace HRM.backend.src.HRM.API.Controllers.EmployeeProfile
         public async Task<IActionResult> DeptReview(int id, [FromBody] ReviewContractDto dto, CancellationToken ct)
         {
             await _useCase.DeptReviewAsync(id, GetAccountId(), GetRole(), dto, ct);
-            return Ok(new { Success = true, Message = dto.IsApproved ? "Đã chuyển yêu cầu sang HR." : "Đã từ chối yêu cầu hợp đồng." });
+            return Ok(new { Success = true, Message = dto.IsApproved ? "Đã chuyển yêu cầu sang HR." : "Đã cập nhật phản hồi hợp đồng." });
         }
 
         [HttpPatch("requests/{id}/dept-confirm")]
@@ -75,6 +75,13 @@ namespace HRM.backend.src.HRM.API.Controllers.EmployeeProfile
             return Ok(new { Success = true, Message = "Da chuyen y kien thuong luong toi HR." });
         }
 
+        [HttpPatch("{id}/request-revision")]
+        public async Task<IActionResult> RequestRevision(int id, [FromBody] RequestRevisionDto dto, CancellationToken ct)
+        {
+            await _useCase.RequestRevisionAsync(id, GetAccountId(), GetRole(), dto, ct);
+            return Ok(new { Success = true, Message = "Da gui yeu cau chinh sua ve HR." });
+        }
+
         [HttpPatch("{id}/emp-accept")]
         public async Task<IActionResult> EmployeeAccept(int id, CancellationToken ct)
         {
@@ -86,7 +93,7 @@ namespace HRM.backend.src.HRM.API.Controllers.EmployeeProfile
         public async Task<IActionResult> DirectorApprove(int id, [FromBody] ReviewContractDto dto, CancellationToken ct)
         {
             await _useCase.DirectorReviewAsync(id, GetAccountId(), GetRole(), dto, ct);
-            return Ok(new { Success = true, Message = dto.IsApproved ? "Hợp đồng chính thức có hiệu lực." : "Giám đốc đã từ chối hợp đồng." });
+            return Ok(new { Success = true, Message = dto.IsApproved ? "Hợp đồng chính thức có hiệu lực." : "Đã chuyển hợp đồng về HR chỉnh sửa." });
         }
 
         [HttpGet("my-contracts")]
@@ -101,6 +108,41 @@ namespace HRM.backend.src.HRM.API.Controllers.EmployeeProfile
         {
             var result = await _useCase.GetAllContractsAsync(ct);
             return Ok(new { Success = true, Data = result });
+        }
+
+        [HttpGet("{id}/draft-defaults")]
+        public async Task<IActionResult> GetDraftDefaults(int id, CancellationToken ct)
+        {
+            var result = await _useCase.GetDraftDefaultsAsync(id, ct);
+            return Ok(new { Success = true, Data = result });
+        }
+
+        [HttpGet("{id}/document-preview")]
+        public async Task<IActionResult> PreviewDocument(int id, CancellationToken ct)
+        {
+            var result = await _useCase.PreviewDocumentAsync(id, ct);
+            return Ok(new { Success = true, Data = result });
+        }
+
+        [HttpGet("{id}/document-doc")]
+        public async Task<IActionResult> DownloadDocumentDoc(int id, CancellationToken ct)
+        {
+            var result = await _useCase.DownloadDocumentDocAsync(id, ct);
+            return File(result.Content, result.ContentType, result.FileName);
+        }
+
+        [HttpGet("{id}/document-pdf")]
+        public async Task<IActionResult> DownloadDocumentPdf(int id, CancellationToken ct)
+        {
+            var result = await _useCase.DownloadDocumentPdfAsync(id, ct);
+            return File(result.Content, result.ContentType, result.FileName);
+        }
+
+        [HttpPatch("{id}/issue-document")]
+        public async Task<IActionResult> IssueDocument(int id, [FromBody] IssueContractDocumentDto dto, CancellationToken ct)
+        {
+            var result = await _useCase.IssueDocumentAsync(id, dto, GetAccountId(), GetRole(), ct);
+            return Ok(new { Success = true, Message = "Văn bản hợp đồng đã được phát hành.", Data = result });
         }
 
         [HttpGet("pending-dept")]
@@ -120,7 +162,7 @@ namespace HRM.backend.src.HRM.API.Controllers.EmployeeProfile
         [HttpGet("pending-director")]
         public async Task<IActionResult> GetPendingDirector(CancellationToken ct)
         {
-            var result = await _useCase.GetPendingDirectorAsync(ct);
+            var result = await _useCase.GetPendingDirectorAsync(GetAccountId(), GetRole(), ct);
             return Ok(new { Success = true, Data = result });
         }
 

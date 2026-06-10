@@ -18,6 +18,7 @@ namespace HRM.backend.src.HRM.Core.Entities.EmployeeProfile
         [StringLength(50)] public required string ContractNumber { get; set; }
 
         public ContractType ContractType { get; set; } = ContractType.Probation;
+        public ContractLegalDocumentType? LegalDocumentType { get; set; }
         public PayBasis PayBasis { get; set; } = PayBasis.Monthly;
         public TaxMethod? TaxMethodOverride { get; set; }
         public bool IsInsuranceEligible { get; set; } = true;
@@ -41,6 +42,10 @@ namespace HRM.backend.src.HRM.Core.Entities.EmployeeProfile
         [StringLength(1000)]
         public string? NegotiationNote { get; set; } // Ý kiến thương lượng của nhân viên
 
+        [StringLength(80)] public string? LegalDocumentNumber { get; set; }
+        [StringLength(80)] public string? DocumentTemplateCode { get; set; }
+        public DateTime? IssuedAt { get; set; }
+
         // Các mốc SLA để Worker chạy ngầm quét
         public DateTime? EmployeeDeadline { get; set; }
         public DateTime? DirectorDeadline { get; set; }
@@ -48,5 +53,6 @@ namespace HRM.backend.src.HRM.Core.Entities.EmployeeProfile
         public ContractStatus Status { get; set; } = ContractStatus.Draft;
 
         public virtual ICollection<ContractAddendum> Addendums { get; set; } = new List<ContractAddendum>();
+        public virtual ICollection<ContractLegalSnapshot> LegalSnapshots { get; set; } = new List<ContractLegalSnapshot>();
     }
 }
