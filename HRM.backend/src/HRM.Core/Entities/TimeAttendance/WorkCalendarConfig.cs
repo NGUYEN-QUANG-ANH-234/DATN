@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using HRM.backend.src.HRM.Core.Entities.Organization;
+using HRM.backend.src.HRM.Core.Enums;
 
 namespace HRM.backend.src.HRM.Core.Entities.TimeAttendance
 {
@@ -26,8 +27,28 @@ namespace HRM.backend.src.HRM.Core.Entities.TimeAttendance
         [StringLength(50)]
         public string? WorkingDaysOfWeek { get; set; }
 
+        public int? CompanyCalendarId { get; set; }
+        [ForeignKey("CompanyCalendarId")] public virtual CompanyCalendar? CompanyCalendar { get; set; }
+
         public string? HolidayDatesJson { get; set; }
+        public TimeSpan? HolidayWorkingStartTime { get; set; }
+        public TimeSpan? HolidayWorkingEndTime { get; set; }
         public bool IsLocked { get; set; }
+
+        [StringLength(80)]
+        public string? VersionCode { get; set; }
+
+        public DateTime? EffectiveFrom { get; set; }
+        public DateTime? EffectiveTo { get; set; }
+        public PolicyVersionStatus Status { get; set; } = PolicyVersionStatus.Active;
+
+        [StringLength(200)]
+        public string? SourceRef { get; set; }
+
+        public int? SupersedesVersionId { get; set; }
+        public int? CreatedByAccountId { get; set; }
+        public DateTime? ActivatedAt { get; set; }
+        public bool LockedAfterUsed { get; set; }
 
         [StringLength(500)]
         public string? Note { get; set; }

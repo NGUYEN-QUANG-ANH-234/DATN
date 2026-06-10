@@ -20,6 +20,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
         private readonly IBaseRepository<EmploymentServicePeriod> _servicePeriodRepo;
         private readonly IAttendanceRepository _attendanceRepo;
         private readonly IEmployeeRepository _employeeRepo;
+        private readonly ICompanyCalendarRepository _companyCalendarRepo;
         private readonly IApprovalConflictGuard _approvalConflictGuard;
         private readonly IEmailService _emailService;
         private readonly INotificationTemplateRenderer _templateRenderer;
@@ -35,6 +36,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
             IBaseRepository<EmploymentServicePeriod> servicePeriodRepo,
             IAttendanceRepository attendanceRepo,
             IEmployeeRepository employeeRepo,
+            ICompanyCalendarRepository companyCalendarRepo,
             IApprovalConflictGuard approvalConflictGuard,
             IEmailService emailService,
             INotificationTemplateRenderer templateRenderer,
@@ -49,6 +51,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
             _servicePeriodRepo = servicePeriodRepo;
             _attendanceRepo = attendanceRepo;
             _employeeRepo = employeeRepo;
+            _companyCalendarRepo = companyCalendarRepo;
             _approvalConflictGuard = approvalConflictGuard;
             _emailService = emailService;
             _templateRenderer = templateRenderer;
@@ -75,7 +78,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
                     var leaveType = await _leaveTypeRepo.GetByIdAsync(dto.LeaveTypeId, innerCt)
                         ?? throw new InvalidOperationException("Loại phép không tồn tại.");
 
-                    var requestedDays = CountBusinessDays(dto.StartDate, dto.EndDate);
+                    var requestedDays = await CountBusinessDaysAsync(dto.StartDate, dto.EndDate, innerCt);
                     var finalLeaveType = leaveType;
 
                     if (ShouldDeductLeaveBalance(leaveType))
@@ -177,7 +180,8 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
                     request.DeadlineAt = null;
                     await _leaveReqRepo.UpdateAsync(request, innerCt);
                     await _unitOfWork.CommitAsync(innerCt);
-                    await SendLeaveNotificationAsync("LEAVE_REQUEST_REJECTED", request, request.Employee, request.LeaveType, CountBusinessDays(request.StartDate!.Value, request.EndDate!.Value), innerCt, dto.Note);
+                    var rejectedDays = await CountBusinessDaysAsync(request.StartDate!.Value, request.EndDate!.Value, innerCt);
+                    await SendLeaveNotificationAsync("LEAVE_REQUEST_REJECTED", request, request.Employee, request.LeaveType, rejectedDays, innerCt, dto.Note);
                     return true;
                 }
 
@@ -190,7 +194,8 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
                     },
                     cancellationToken: innerCt);
 
-                await SendLeaveNotificationAsync("LEAVE_REQUEST_APPROVED", request, request.Employee, request.LeaveType, CountBusinessDays(request.StartDate!.Value, request.EndDate!.Value), innerCt);
+                var approvedDays = await CountBusinessDaysAsync(request.StartDate!.Value, request.EndDate!.Value, innerCt);
+                await SendLeaveNotificationAsync("LEAVE_REQUEST_APPROVED", request, request.Employee, request.LeaveType, approvedDays, innerCt);
                 return true;
             }, cancellationToken: ct);
         }
@@ -200,7 +205,8 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
             if (request.EmployeeId == null || request.LeaveTypeId == null || request.StartDate == null || request.EndDate == null)
                 throw new InvalidOperationException("Don nghi phep thieu du lieu bat buoc.");
 
-            var days = CountBusinessDays(request.StartDate.Value, request.EndDate.Value);
+            var businessDates = await EnumerateBusinessDatesAsync(request.StartDate.Value, request.EndDate.Value, ct);
+            var days = businessDates.Count;
             var leaveType = request.LeaveType ?? await _leaveTypeRepo.GetByIdAsync(request.LeaveTypeId.Value, ct)
                 ?? throw new InvalidOperationException("Loại phép không tồn tại.");
 
@@ -212,7 +218,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
 
             await _attendanceRepo.SyncLeaveToAttendanceAsync(
                 request.EmployeeId.Value,
-                EnumerateBusinessDates(request.StartDate.Value, request.EndDate.Value).ToList(),
+                businessDates,
                 AttendanceStatus.OnLeave);
 
             await SyncMaternityLeaveAsync(request, leaveType, approvedByAccountId, ct);
@@ -379,6 +385,58 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
                 if (date.DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday)
                     yield return date;
             }
+        }
+
+        private async Task<decimal> CountBusinessDaysAsync(DateTime startDate, DateTime endDate, CancellationToken ct)
+        {
+            return (await EnumerateBusinessDatesAsync(startDate, endDate, ct)).Count;
+        }
+
+        private async Task<List<DateTime>> EnumerateBusinessDatesAsync(DateTime startDate, DateTime endDate, CancellationToken ct)
+        {
+            var calendars = await LoadCompanyCalendarsAsync(startDate, endDate, ct);
+            var dayOffDates = calendars
+                .SelectMany(calendar => calendar.Days)
+                .Where(day => !day.IsWorkingDayOverride &&
+                              day.DayType is CompanyCalendarDayType.PublicHoliday
+                                  or CompanyCalendarDayType.CompanyHoliday
+                                  or CompanyCalendarDayType.CompensatoryDayOff
+                                  or CompanyCalendarDayType.SpecialPaidLeave
+                                  or CompanyCalendarDayType.UnpaidCompanyClosure)
+                .Select(day => day.Date.Date)
+                .ToHashSet();
+            var workingOverrides = calendars
+                .SelectMany(calendar => calendar.Days)
+                .Where(day => day.IsWorkingDayOverride ||
+                              day.DayType == CompanyCalendarDayType.CompensatoryWorkingDay)
+                .Select(day => day.Date.Date)
+                .ToHashSet();
+
+            var dates = new List<DateTime>();
+            for (var date = startDate.Date; date <= endDate.Date; date = date.AddDays(1))
+            {
+                if (workingOverrides.Contains(date) ||
+                    (date.DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday &&
+                     !dayOffDates.Contains(date)))
+                {
+                    dates.Add(date);
+                }
+            }
+
+            return dates;
+        }
+
+        private async Task<List<CompanyCalendar>> LoadCompanyCalendarsAsync(DateTime startDate, DateTime endDate, CancellationToken ct)
+        {
+            var calendars = new List<CompanyCalendar>();
+            for (var year = startDate.Year; year <= endDate.Year; year++)
+            {
+                var calendar = await _companyCalendarRepo.GetActiveByYearAsync((short)year, ct);
+                if (calendar != null)
+                    calendars.Add(calendar);
+            }
+
+            return calendars;
         }
 
         private static void EnsureDirectorOrAdmin(string actorRoleName)

@@ -21,6 +21,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
         private readonly IEmployeeRepository _employeeRepo;
         private readonly IAttendanceSummaryRepository _summaryRepo;
         private readonly IWorkCalendarConfigRepository _calendarRepo;
+        private readonly ICompanyCalendarRepository _companyCalendarRepo;
         private readonly IAuditLogRepository _auditLogRepo;
         private readonly IUnitOfWork _unitOfWork;
         private readonly ILockService _lockService;
@@ -34,6 +35,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
             IEmployeeRepository employeeRepo,
             IAttendanceSummaryRepository summaryRepo,
             IWorkCalendarConfigRepository calendarRepo,
+            ICompanyCalendarRepository companyCalendarRepo,
             IAuditLogRepository auditLogRepo,
             IUnitOfWork unitOfWork,
             ILockService lockService,
@@ -46,6 +48,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
             _employeeRepo = employeeRepo;
             _summaryRepo = summaryRepo;
             _calendarRepo = calendarRepo;
+            _companyCalendarRepo = companyCalendarRepo;
             _auditLogRepo = auditLogRepo;
             _unitOfWork = unitOfWork;
             _lockService = lockService;
@@ -73,6 +76,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
             var approvedOt = await _overtimeRepo.GetApprovedByPeriodAsync(periodStart, periodEnd, ct);
             var approvedLeaves = await _leaveReqRepo.GetApprovedByPeriodAsync(periodStart, periodEnd, ct);
             var calendarConfigs = await _calendarRepo.GetByPeriodAsync(dto.Month, dto.Year, ct);
+            var companyCalendar = await _companyCalendarRepo.GetActiveByYearAsync(dto.Year, ct);
             var activeEmployees = (await _employeeRepo.GetActiveWithDepartmentAsync(ct))
                 .Where(e => !e.JoinedDate.HasValue || e.JoinedDate.Value.Date < periodEnd)
                 .ToList();
@@ -94,7 +98,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
                 var employeeOt = approvedOt.Where(o => o.EmployeeId == employeeId && !o.IsPayrollLocked).ToList();
                 var employeeLeaves = approvedLeaves.Where(l => l.EmployeeId == employeeId).ToList();
                 employeesById.TryGetValue(employeeId, out var employee);
-                var policy = ResolveWorkdayPolicy(employee, employeeLogs, calendarConfigs);
+                var policy = ResolveWorkdayPolicy(employee, employeeLogs, calendarConfigs, companyCalendar);
 
                 foreach (var otRequest in employeeOt)
                 {
@@ -272,7 +276,8 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
         private static WorkdayPolicy ResolveWorkdayPolicy(
             Employee? employee,
             List<AttendanceLog> employeeLogs,
-            List<WorkCalendarConfig> calendarConfigs)
+            List<WorkCalendarConfig> calendarConfigs,
+            CompanyCalendar? companyCalendar)
         {
             var deptId = employee?.DeptId ?? employeeLogs
                 .Select(l => l.Employee?.DeptId)
@@ -280,12 +285,15 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
             var config = deptId.HasValue
                 ? calendarConfigs.FirstOrDefault(c => c.DeptId == deptId.Value)
                 : null;
+            var holidayDates = ParseHolidayDates(config?.HolidayDatesJson);
+            holidayDates.UnionWith(ResolveCompanyDayOffDates(companyCalendar));
 
             return new WorkdayPolicy(
                 config is { StandardHoursPerDay: > 0 } ? config.StandardHoursPerDay : 8m,
                 config?.IncludePaidLeaveInWorkDays ?? true,
                 ParseWorkingDays(config?.WorkingDaysOfWeek),
-                ParseHolidayDates(config?.HolidayDatesJson));
+                holidayDates,
+                ResolveCompanyWorkingDayOverrides(companyCalendar));
         }
 
         private static WorkdayResult CalculateWorkdayResult(
@@ -503,8 +511,39 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
 
         private static bool IsWorkingDate(DateTime workDate, WorkdayPolicy policy)
         {
+            if (policy.WorkingDayOverrides.Contains(workDate.Date))
+                return true;
+
             return policy.WorkingDaysOfWeek.Contains(workDate.DayOfWeek) &&
                    !policy.HolidayDates.Contains(workDate.Date);
+        }
+
+        private static HashSet<DateTime> ResolveCompanyDayOffDates(CompanyCalendar? companyCalendar)
+        {
+            if (companyCalendar == null)
+                return new HashSet<DateTime>();
+
+            return companyCalendar.Days
+                .Where(day => !day.IsWorkingDayOverride &&
+                              day.DayType is CompanyCalendarDayType.PublicHoliday
+                                  or CompanyCalendarDayType.CompanyHoliday
+                                  or CompanyCalendarDayType.CompensatoryDayOff
+                                  or CompanyCalendarDayType.SpecialPaidLeave
+                                  or CompanyCalendarDayType.UnpaidCompanyClosure)
+                .Select(day => day.Date.Date)
+                .ToHashSet();
+        }
+
+        private static HashSet<DateTime> ResolveCompanyWorkingDayOverrides(CompanyCalendar? companyCalendar)
+        {
+            if (companyCalendar == null)
+                return new HashSet<DateTime>();
+
+            return companyCalendar.Days
+                .Where(day => day.IsWorkingDayOverride ||
+                              day.DayType == CompanyCalendarDayType.CompensatoryWorkingDay)
+                .Select(day => day.Date.Date)
+                .ToHashSet();
         }
 
         private static HashSet<DayOfWeek> ParseWorkingDays(string? workingDaysOfWeek)
@@ -656,7 +695,8 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
             decimal StandardHoursPerDay,
             bool IncludePaidLeaveInWorkDays,
             HashSet<DayOfWeek> WorkingDaysOfWeek,
-            HashSet<DateTime> HolidayDates);
+            HashSet<DateTime> HolidayDates,
+            HashSet<DateTime> WorkingDayOverrides);
 
         private sealed record WorkdayResult(
             int WorkedMinutes,
