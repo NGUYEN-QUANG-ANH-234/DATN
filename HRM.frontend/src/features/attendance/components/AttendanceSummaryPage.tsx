@@ -108,7 +108,7 @@ export const AttendanceSummaryPage = () => {
     },
     { key: "late", header: "Đi muộn", render: (item) => formatMinutes(item.lateMinutes) },
     { key: "early", header: "Về sớm", render: (item) => formatMinutes(item.earlyLeaveMinutes) },
-    { key: "ot", header: "OT hợp lệ", render: (item) => formatMinutes(item.actualOtMinutes) },
+    { key: "ot", header: "Làm thêm hợp lệ", render: (item) => formatMinutes(item.actualOtMinutes) },
     {
       key: "status",
       header: "Trạng thái",
@@ -124,7 +124,7 @@ export const AttendanceSummaryPage = () => {
   return (
     <FeaturePage
       title="Tổng hợp bảng công"
-      description="Dữ liệu tổng hợp tháng dùng làm cầu nối sang công thức lương: ngày công, đi muộn, về sớm và OT hợp lệ."
+      description="Tổng hợp ngày công, đi muộn, về sớm và giờ làm thêm hợp lệ."
       width="wide"
     >
       <Card title="Kỳ tổng hợp">
@@ -254,8 +254,8 @@ const buildExcelHtml = (
             <th>Giờ tính lương</th>
             <th>Đi muộn (phút)</th>
             <th>Về sớm (phút)</th>
-            <th>OT hợp lệ (phút)</th>
-            <th>OT hợp lệ (giờ)</th>
+            <th>Làm thêm hợp lệ (phút)</th>
+            <th>Làm thêm hợp lệ (giờ)</th>
             <th>Trạng thái</th>
             <th>Ngày tổng hợp</th>
           </tr>

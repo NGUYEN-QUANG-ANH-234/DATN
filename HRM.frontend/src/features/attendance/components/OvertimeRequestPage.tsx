@@ -19,14 +19,14 @@ export const OvertimeRequestPage = () => {
 
   return (
     <FeaturePage
-      title="Làm thêm giờ (OT)"
-      description="Tạo yêu cầu OT và theo dõi trạng thái xử lý của các yêu cầu đã gửi."
+      title="Làm thêm giờ"
+      description="Tạo yêu cầu làm thêm và theo dõi trạng thái xử lý."
       width="wide"
     >
-      <Card title="Tạo yêu cầu OT">
+      <Card title="Tạo yêu cầu làm thêm">
         <form className="grid gap-4 md:grid-cols-2 xl:grid-cols-6" onSubmit={submitRequest}>
           {canCreateForOther && (
-            <Field label={canCreateBulk ? "Chọn nhân viên OT" : "Nhân viên OT"}>
+            <Field label={canCreateBulk ? "Chọn nhân viên" : "Nhân viên"}>
               <select
                 multiple={canCreateBulk}
                 value={canCreateBulk ? selectedEmployeeIds : form.employeeId}
@@ -59,7 +59,7 @@ export const OvertimeRequestPage = () => {
             </Field>
           )}
 
-          <Field label="Ngày OT">
+          <Field label="Ngày làm thêm">
             <input
               type="date"
               required
@@ -95,7 +95,7 @@ export const OvertimeRequestPage = () => {
           </Field>
 
           <div className="md:col-span-2 xl:col-span-6">
-            <Field label="Lý do OT">
+            <Field label="Lý do làm thêm">
               <textarea
                 required
                 value={form.reason}
@@ -108,16 +108,16 @@ export const OvertimeRequestPage = () => {
 
           <div className="md:col-span-2 xl:col-span-6">
             <Button type="submit" isLoading={loading}>
-              Gửi yêu cầu OT
+              Gửi yêu cầu
             </Button>
           </div>
         </form>
       </Card>
 
       <OvertimeTable
-        title="Yêu cầu OT của tôi"
+        title="Yêu cầu làm thêm của tôi"
         data={myRequests}
-        emptyText="Bạn chưa có yêu cầu OT nào."
+        emptyText="Bạn chưa có yêu cầu làm thêm nào."
       />
     </FeaturePage>
   );

@@ -86,18 +86,18 @@ export const AttendanceLogPage = () => {
       triggerAlert(
         "warning",
         "Tài khoản quản trị",
-        "Admin chỉ quản trị cấu hình, OT và bảng công; check-in/check-out cá nhân cần dùng tài khoản nhân viên có hồ sơ nhân sự.",
+        "Admin chỉ quản trị cấu hình, làm thêm và bảng công; vào ca/ra ca cá nhân cần dùng tài khoản nhân viên có hồ sơ nhân sự.",
       );
       return;
     }
 
     if (todayStatus?.nextAction === "DONE") {
-      triggerAlert("warning", "Đã hoàn tất", "Bạn đã check-in và check-out trong ngày hôm nay.");
+      triggerAlert("warning", "Đã hoàn tất", "Bạn đã vào ca và ra ca trong ngày hôm nay.");
       return;
     }
 
     if (!navigator.geolocation) {
-      triggerAlert("error", "Không hỗ trợ GPS", "Trình duyệt hiện tại không hỗ trợ Geolocation API.");
+      triggerAlert("error", "Không hỗ trợ GPS", "Trình duyệt hiện tại không hỗ trợ truy cập vị trí.");
       return;
     }
 
@@ -149,13 +149,13 @@ export const AttendanceLogPage = () => {
       triggerAlert(
         "warning",
         "Tài khoản quản trị",
-        "Admin không thực hiện check-in/check-out cá nhân. Hãy dùng các mục quản trị chấm công, OT hoặc tổng hợp bảng công.",
+        "Admin không thực hiện vào ca/ra ca cá nhân. Hãy dùng các mục quản trị chấm công, làm thêm hoặc tổng hợp bảng công.",
       );
       return;
     }
 
     if (todayStatus?.nextAction === "DONE") {
-      triggerAlert("warning", "Đã hoàn tất", "Bạn đã check-in và check-out trong ngày hôm nay.");
+      triggerAlert("warning", "Đã hoàn tất", "Bạn đã vào ca và ra ca trong ngày hôm nay.");
       return;
     }
 
@@ -171,14 +171,14 @@ export const AttendanceLogPage = () => {
   return (
     <FeaturePage
       title="Chấm công"
-      description="Ghi nhận check-in/check-out qua Web. Hệ thống xác thực IP từ request và lưu GPS để đối chiếu khi cần."
+      description="Ghi nhận vào ra và lưu vị trí để đối chiếu khi cần."
       width="normal"
     >
       {isAdmin && (
         <FeatureCard title="Chế độ quản trị chấm công">
           <p className="text-sm leading-6 text-gray-600">
-            Tài khoản Admin không dùng để check-in/check-out cá nhân vì không đại diện cho một hồ sơ nhân sự cụ thể.
-            Admin vẫn có thể cấu hình tham số chấm công, xem mạng backend, quản lý OT và tổng hợp bảng công.
+            Tài khoản Admin không dùng để vào ca/ra ca cá nhân vì không đại diện cho một hồ sơ nhân sự cụ thể.
+            Admin vẫn có thể cấu hình tham số chấm công, kiểm tra mạng ghi nhận, quản lý làm thêm và tổng hợp bảng công.
           </p>
         </FeatureCard>
       )}
@@ -222,8 +222,8 @@ export const AttendanceLogPage = () => {
         <div className="grid gap-4 sm:grid-cols-2">
           <InfoItem label="Trạng thái" value={todayStatus?.message || "Chưa có dữ liệu"} />
           <InfoItem label="Hành động kế tiếp" value={getActionLabel(todayStatus?.nextAction)} />
-          <InfoItem label="Check-in" value={formatDateTime(todayStatus?.checkIn || lastResult?.checkIn)} />
-          <InfoItem label="Check-out" value={formatDateTime(todayStatus?.checkOut || lastResult?.checkOut)} />
+          <InfoItem label="Vào ca" value={formatDateTime(todayStatus?.checkIn || lastResult?.checkIn)} />
+          <InfoItem label="Ra ca" value={formatDateTime(todayStatus?.checkOut || lastResult?.checkOut)} />
           <InfoItem label="Đi muộn" value={formatMinutes(todayStatus?.lateMinutes ?? lastResult?.lateMinutes)} />
           <InfoItem label="Về sớm" value={formatMinutes(todayStatus?.earlyLeaveMinutes ?? lastResult?.earlyLeaveMinutes)} />
           <InfoItem label="Ở lại sau ca" value={formatMinutes(todayStatus?.overtimeMinutes ?? lastResult?.overtimeMinutes)} />
@@ -233,7 +233,7 @@ export const AttendanceLogPage = () => {
       </FeatureCard>
 
       {isAdmin && (
-        <FeatureCard title="Mạng backend đang nhìn thấy">
+        <FeatureCard title="Mạng ghi nhận hiện tại">
           <div className="grid gap-4 sm:grid-cols-3">
             <InfoItem label="Client IP" value={networkInfo?.clientIp || "Chưa xác định"} />
             <InfoItem label="CIDR gợi ý" value={networkInfo?.suggestedCidr || "Chưa xác định"} />
@@ -256,8 +256,8 @@ const InfoItem = ({ label, value }: { label: string; value: string }) => (
 );
 
 const getActionLabel = (action?: string) => {
-  if (action === "CHECK_IN") return "Check-in";
-  if (action === "CHECK_OUT") return "Check-out";
+  if (action === "CHECK_IN") return "Vào ca";
+  if (action === "CHECK_OUT") return "Ra ca";
   if (action === "DONE") return "Đã hoàn tất";
   return "Chấm công";
 };

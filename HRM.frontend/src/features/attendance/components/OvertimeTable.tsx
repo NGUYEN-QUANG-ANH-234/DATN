@@ -33,7 +33,7 @@ export const OvertimeTable = ({
     { key: "workDate", header: "Ngày", render: (item) => formatDate(item.workDate) },
     {
       key: "time",
-      header: "Khung OT / hệ số",
+      header: "Khung làm thêm",
       render: (item) => (
         <div>
           <p>{formatDateTime(item.startAt)}</p>
@@ -43,7 +43,7 @@ export const OvertimeTable = ({
               {item.segments
                 .map(
                   (segment) =>
-                    `${segment.policyCode}: ${formatMinutes(segment.minutes)} x${segment.rateMultiplierSnapshot}`,
+                    `${formatMinutes(segment.minutes)} x${segment.rateMultiplierSnapshot}`,
                 )
                 .join("; ")}
             </p>

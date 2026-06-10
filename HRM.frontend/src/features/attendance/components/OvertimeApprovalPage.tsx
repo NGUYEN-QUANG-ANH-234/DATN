@@ -57,10 +57,10 @@ export const OvertimeApprovalPage = () => {
   ) => {
     triggerAlert(
       "confirm",
-      isApproved ? "Xác nhận duyệt OT" : "Xác nhận từ chối OT",
+      isApproved ? "Xác nhận phê duyệt" : "Xác nhận từ chối",
       isApproved
-        ? "Bạn chắc chắn muốn duyệt yêu cầu OT này?"
-        : "Bạn chắc chắn muốn từ chối yêu cầu OT này?",
+        ? "Bạn chắc chắn muốn phê duyệt yêu cầu làm thêm này?"
+        : "Bạn chắc chắn muốn từ chối yêu cầu làm thêm này?",
       async () => {
         try {
           if (scope === "manager") {
@@ -71,12 +71,12 @@ export const OvertimeApprovalPage = () => {
 
           triggerAlert(
             "success",
-            "Đã xử lý OT",
-            "Trạng thái yêu cầu OT đã được cập nhật.",
+            "Đã xử lý yêu cầu",
+            "Trạng thái yêu cầu làm thêm đã được cập nhật.",
           );
           await fetchData();
         } catch (error) {
-          triggerAlert("error", "Không thể xử lý OT", getErrorMessage(error));
+          triggerAlert("error", "Không thể xử lý yêu cầu", getErrorMessage(error));
         }
       },
     );
@@ -87,24 +87,24 @@ export const OvertimeApprovalPage = () => {
       await overtimeApi.reconcile(id);
       triggerAlert(
         "success",
-        "Đã đối chiếu OT",
-        "Hệ thống đã đối chiếu yêu cầu OT với dữ liệu chấm công.",
+        "Đã đối chiếu làm thêm",
+        "Yêu cầu làm thêm đã được đối chiếu với dữ liệu chấm công.",
       );
       await fetchData();
     } catch (error) {
-      triggerAlert("error", "Không thể đối chiếu OT", getErrorMessage(error));
+      triggerAlert("error", "Không thể đối chiếu làm thêm", getErrorMessage(error));
     }
   };
 
   return (
     <FeaturePage
-      title="Phê duyệt OT"
-      description="Xử lý yêu cầu OT theo vai trò: Trưởng phòng duyệt nghiệp vụ, HR xác nhận chính sách và đối chiếu chấm công."
+      title="Phê duyệt làm thêm"
+      description="Xử lý yêu cầu làm thêm theo vai trò được phân công."
       width="wide"
     >
       {loading && (
         <Card className="border-[var(--hicas-info)] bg-[var(--hicas-info-soft)] text-sm text-[var(--hicas-info)]">
-          Đang tải danh sách phê duyệt OT...
+          Đang tải dữ liệu...
         </Card>
       )}
 
@@ -112,7 +112,7 @@ export const OvertimeApprovalPage = () => {
         <OvertimeTable
           title="Chờ Trưởng phòng duyệt"
           data={managerRequests}
-          emptyText="Không có yêu cầu OT chờ duyệt nghiệp vụ."
+          emptyText="Chưa có yêu cầu làm thêm chờ duyệt."
           renderActions={(item) => (
             <OvertimeActionButtons
               onApprove={() => review(item.id, true, "manager")}
@@ -126,7 +126,7 @@ export const OvertimeApprovalPage = () => {
         <OvertimeTable
           title="Chờ HR xác nhận"
           data={hrRequests}
-          emptyText="Không có yêu cầu OT chờ HR xác nhận."
+          emptyText="Chưa có yêu cầu làm thêm chờ HR xác nhận."
           renderActions={(item) => (
             <OvertimeActionButtons
               onApprove={() => review(item.id, true, "hr")}
@@ -138,9 +138,9 @@ export const OvertimeApprovalPage = () => {
 
       {isHr && (
         <OvertimeTable
-          title="OT đã duyệt cần đối chiếu"
+          title="Làm thêm đã duyệt cần đối chiếu"
           data={approvedRequests}
-          emptyText="Chưa có OT đã duyệt trong danh sách."
+          emptyText="Chưa có dữ liệu"
           renderActions={(item) =>
             item.isPayrollLocked ? (
               <span className="text-xs font-semibold text-[var(--hicas-text-secondary)]">
@@ -157,7 +157,7 @@ export const OvertimeApprovalPage = () => {
 
       {!isManager && !isHr && (
         <Card className="border-[var(--hicas-warning)] bg-[var(--hicas-warning-soft)] text-sm text-amber-800">
-          Vai trò hiện tại không có quyền phê duyệt OT.
+          Vai trò hiện tại không có quyền phê duyệt làm thêm.
         </Card>
       )}
     </FeaturePage>

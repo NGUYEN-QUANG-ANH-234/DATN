@@ -84,8 +84,8 @@ export const useOvertimeRequest = () => {
         if (!canCreateBulk) {
           triggerAlert(
             "error",
-            "Không thể tạo OT hàng loạt",
-            "Chỉ Trưởng phòng hoặc Admin được tạo OT cho danh sách nhân viên.",
+            "Không thể tạo yêu cầu hàng loạt",
+            "Chỉ Trưởng phòng hoặc Admin được tạo yêu cầu làm thêm cho danh sách nhân viên.",
           );
           return;
         }
@@ -103,13 +103,13 @@ export const useOvertimeRequest = () => {
 
       triggerAlert(
         "success",
-        "Đã gửi yêu cầu OT",
+        "Đã gửi yêu cầu làm thêm",
         "Yêu cầu làm thêm giờ đã được ghi nhận.",
       );
       setForm((prev) => ({ ...prev, reason: "", projectCode: "" }));
       await fetchData();
     } catch (error) {
-      triggerAlert("error", "Không thể gửi OT", getErrorMessage(error));
+      triggerAlert("error", "Không thể gửi yêu cầu làm thêm", getErrorMessage(error));
     } finally {
       setLoading(false);
     }

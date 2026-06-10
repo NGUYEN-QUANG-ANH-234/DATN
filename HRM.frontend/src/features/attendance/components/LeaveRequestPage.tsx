@@ -86,7 +86,7 @@ export const LeaveRequestPage = () => {
   return (
     <FeaturePage
       title="Nghỉ phép"
-      description="Tạo đơn nghỉ phép và theo dõi trạng thái xử lý của cá nhân. Các bước phê duyệt được xử lý tập trung tại mục Phê duyệt."
+      description="Tạo đơn nghỉ phép và theo dõi trạng thái xử lý."
       width="wide"
     >
       {!isAdmin && (
