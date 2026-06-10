@@ -18,6 +18,13 @@ namespace HRM.backend.src.HRM.Application.Services.PayrollAllowances
                 var raw = EvaluateDecimal(line.Expression, variables, source);
                 var amount = line.IsDeduction ? -Math.Abs(raw) : raw;
                 var incomeAmount = !line.IsDeduction && line.IsGrossComponent ? Math.Max(0, amount) : 0;
+                var taxableAmount = line.IsTaxable ? RoundMoney(incomeAmount) : 0;
+                var insuranceBaseAmount = line.IsInsuranceBased ? RoundMoney(incomeAmount) : 0;
+                if (IsCode(line.ComponentCode, "PROJECT_BONUS"))
+                {
+                    taxableAmount = RoundMoney(Math.Max(0, variables.GetValueOrDefault("project_bonus_taxable_amount")));
+                    insuranceBaseAmount = RoundMoney(Math.Max(0, variables.GetValueOrDefault("project_bonus_insurance_base_amount")));
+                }
 
                 var result = new PayrollLineResult
                 {
@@ -27,8 +34,8 @@ namespace HRM.backend.src.HRM.Application.Services.PayrollAllowances
                     ComponentGroup = line.SalaryComponentType?.ComponentGroup.ToString(),
                     RawAmount = RoundMoney(raw),
                     Amount = RoundMoney(amount),
-                    TaxableAmount = line.IsTaxable ? RoundMoney(incomeAmount) : 0,
-                    InsuranceBaseAmount = line.IsInsuranceBased ? RoundMoney(incomeAmount) : 0,
+                    TaxableAmount = taxableAmount,
+                    InsuranceBaseAmount = insuranceBaseAmount,
                     IsIncome = !line.IsDeduction && line.IsGrossComponent,
                     IsDeduction = line.IsDeduction,
                     IsTaxable = line.IsTaxable,
@@ -186,7 +193,8 @@ namespace HRM.backend.src.HRM.Application.Services.PayrollAllowances
                 "LEGACY_INSURANCE_ALLOWANCE" => "Phu cap cu tinh BH",
                 "LEGACY_TAXABLE_ALLOWANCE" => "Phu cap cu chiu thue",
                 "LEGACY_NONTAXABLE_ALLOWANCE" => "Phụ cấp cũ không chịu thuế",
-                "KPI_BONUS" => "Thuong KPI",
+                "KPI_BONUS" => "Thưởng KPI thực nhận",
+                "PROJECT_BONUS" => "Thưởng dự án",
                 "OT_BASE" => "OT phan 100% chiu thue",
                 "OT_PREMIUM" => "OT phan he so tang them",
                 "PAYROLL_ADJUSTMENT_TAXABLE_INSURANCE" => "Truy linh chiu thue va tinh bao hiem",

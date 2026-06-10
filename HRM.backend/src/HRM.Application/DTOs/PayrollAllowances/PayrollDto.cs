@@ -110,6 +110,25 @@ namespace HRM.backend.src.HRM.Application.DTOs.PayrollAllowances
         public bool IsTaxable { get; set; }
         public bool IsInsuranceBased { get; set; }
         public string? Note { get; set; }
+        public List<ProjectBonusPayrollSourceDto> ProjectBonusSources { get; set; } = new();
+    }
+
+    public class ProjectBonusPayrollSourceDto
+    {
+        public int Id { get; set; }
+        public int BatchId { get; set; }
+        public string? FileName { get; set; }
+        public string? PayrollPeriod { get; set; }
+        public DateTime? ApprovedAt { get; set; }
+        public string EmployeeCode { get; set; } = string.Empty;
+        public string? EmployeeName { get; set; }
+        public string ProjectCode { get; set; } = string.Empty;
+        public string ProjectName { get; set; } = string.Empty;
+        public decimal BonusAmount { get; set; }
+        public bool Taxable { get; set; }
+        public bool InsuranceContributable { get; set; }
+        public string? Reason { get; set; }
+        public string? Note { get; set; }
     }
 
     public class SalarySlipExportRequestDto

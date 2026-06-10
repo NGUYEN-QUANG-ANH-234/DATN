@@ -15,12 +15,21 @@ namespace HRM.backend.src.HRM.Application.Services.PayrollAllowances
     {
         private const decimal DefaultStandardWorkdays = 22m;
         private const decimal DefaultStandardHoursPerDay = 8m;
+        private const string KpiBonusPayoutExpression = "kpi_bonus_amount * kpi_score / 100";
+        private static readonly DateTime KpiBonusPayoutEffectiveFrom = new(2026, 6, 1);
 
         private readonly IPayrollRepository _payrollRepo;
+        private readonly IPayrollLegalPolicyResolver _policyResolver;
+        private readonly IPayrollFeatureToggleResolver _featureToggleResolver;
 
-        public PayrollSourceResolver(IPayrollRepository payrollRepo)
+        public PayrollSourceResolver(
+            IPayrollRepository payrollRepo,
+            IPayrollLegalPolicyResolver policyResolver,
+            IPayrollFeatureToggleResolver featureToggleResolver)
         {
             _payrollRepo = payrollRepo;
+            _policyResolver = policyResolver;
+            _featureToggleResolver = featureToggleResolver;
         }
 
         public async Task<PayrollSourceBatch> ResolveAsync(PayrollPeriodDto period, CancellationToken ct = default)
@@ -39,26 +48,37 @@ namespace HRM.backend.src.HRM.Application.Services.PayrollAllowances
                 PeriodEnd = periodEnd
             };
 
+            var featureToggles = await _featureToggleResolver.GetAsync(ct);
             var attendanceInputs = await _payrollRepo.GetAttendanceInputsAsync(period.Month, period.Year, ct);
-            var externalTimesheetLines = await _payrollRepo.GetApprovedExternalTimesheetLinesAsync(periodStart, periodEnd, ct);
+            var externalTimesheetLines = featureToggles.EnableExternalTimesheetPay
+                ? await _payrollRepo.GetApprovedExternalTimesheetLinesAsync(periodStart, periodEnd, ct)
+                : new List<ExternalTimesheetLine>();
             var externalEmployeeIds = externalTimesheetLines
                 .Where(l => l.CollaboratorEmployeeId.HasValue)
                 .Select(l => l.CollaboratorEmployeeId!.Value)
                 .Distinct()
                 .ToList();
+            var projectBonusLines = SelectLatestProjectBonusLines(
+                await _payrollRepo.GetApprovedProjectBonusLinesAsync(period.Month, period.Year, ct));
+            var projectBonusEmployeeIds = projectBonusLines
+                .Where(l => l.EmployeeId.HasValue)
+                .Select(l => l.EmployeeId!.Value)
+                .Distinct()
+                .ToList();
 
-            if (attendanceInputs.Count == 0 && externalEmployeeIds.Count == 0)
+            if (attendanceInputs.Count == 0 && externalEmployeeIds.Count == 0 && projectBonusEmployeeIds.Count == 0)
             {
                 batch.Warnings.Add("Chưa có bảng công tổng hợp cho kỳ lương này.");
                 return batch;
             }
 
             if (attendanceInputs.Count == 0)
-                batch.Warnings.Add("Chưa có bảng công tổng hợp; hệ thống chỉ xử lý các dòng timesheet ngoài đã duyệt trong kỳ.");
+                batch.Warnings.Add("Chưa có bảng công tổng hợp; hệ thống chỉ xử lý timesheet ngoài hoặc thưởng dự án đã duyệt trong kỳ.");
 
             var employeeIds = attendanceInputs
                 .Select(a => a.EmployeeId)
                 .Concat(externalEmployeeIds)
+                .Concat(projectBonusEmployeeIds)
                 .Distinct()
                 .ToList();
             var contracts = await _payrollRepo.GetActiveContractsAsync(employeeIds, periodStart, periodEnd, ct);
@@ -67,6 +87,7 @@ namespace HRM.backend.src.HRM.Application.Services.PayrollAllowances
                 .GroupBy(c => c.EmployeeId!.Value)
                 .ToDictionary(g => g.Key, g => g.OrderBy(c => c.StartDate).ThenBy(c => c.Version).ToList());
             AppendExternalTimesheetAttendanceInputs(attendanceInputs, externalTimesheetLines, contractsByEmployee, period, batch);
+            AppendProjectBonusAttendanceInputs(attendanceInputs, projectBonusLines, contractsByEmployee, period, batch);
             employeeIds = attendanceInputs.Select(a => a.EmployeeId).Distinct().ToList();
 
             var dailySummaries = await _payrollRepo.GetApprovedDailySummariesAsync(employeeIds, periodStart, periodEnd, ct);
@@ -74,16 +95,19 @@ namespace HRM.backend.src.HRM.Application.Services.PayrollAllowances
             var salaryComponents = await _payrollRepo.GetEmployeeSalaryComponentsAsync(employeeIds, periodStart, periodEnd, ct);
             var reviews = await _payrollRepo.GetPerformanceReviewsAsync(employeeIds, periodText, ct);
             var dependentCounts = await _payrollRepo.GetActiveDependentCountsAsync(employeeIds, periodEnd, ct);
-            var overtimeSegments = await _payrollRepo.GetOvertimeSegmentsAsync(employeeIds, periodStart, periodEndExclusive, ct);
+            var overtimeSegments = featureToggles.EnableOvertime
+                ? await _payrollRepo.GetOvertimeSegmentsAsync(employeeIds, periodStart, periodEndExclusive, ct)
+                : new List<OvertimeSegment>();
             var formulas = await _payrollRepo.GetApprovedPayrollFormulasAsync(periodEnd, ct);
-            var taxConfig = await _payrollRepo.GetActiveTaxConfigAsync(periodEnd, ct) ?? DefaultTaxConfig();
-            var pitBrackets = await _payrollRepo.GetActivePitTaxBracketsAsync(periodEnd, ct);
-            if (pitBrackets.Count == 0) pitBrackets = DefaultPitBrackets();
-            var insuranceConfig = await _payrollRepo.GetActiveInsuranceConfigAsync(periodEnd, ct) ?? DefaultInsuranceConfig();
+            var legalPolicies = await _policyResolver.ResolvePayrollPoliciesAsync(period, featureToggles, ct);
+            var taxConfig = legalPolicies.TaxConfig;
+            var pitBrackets = legalPolicies.PitBrackets;
+            var insuranceConfig = legalPolicies.InsuranceConfig;
             var insuranceStatuses = await _payrollRepo.GetMonthlyInsuranceStatusesAsync(employeeIds, period.Month, period.Year, ct);
             var payrollAdjustments = await _payrollRepo.GetApprovedPayrollAdjustmentsAsync(employeeIds, period.Month, period.Year, ct);
-            var overtimeRateConfigs = await _payrollRepo.GetActiveOvertimeRateConfigsAsync(periodEnd, ct);
-            var seniorityPolicies = await _payrollRepo.GetActivePayrollPoliciesAsync(PayrollPolicyType.Seniority, periodEnd, ct);
+            var overtimeRateConfigs = legalPolicies.OvertimeRateConfigs;
+            var allowanceTaxPolicies = legalPolicies.AllowanceTaxPolicies;
+            var seniorityPolicies = legalPolicies.SeniorityPolicies;
             var servicePeriods = await _payrollRepo.GetEmploymentServicePeriodsAsync(employeeIds, periodEnd, ct);
 
             var jobLevelIds = attendanceInputs
@@ -117,6 +141,10 @@ namespace HRM.backend.src.HRM.Application.Services.PayrollAllowances
                 .Where(l => l.CollaboratorEmployeeId.HasValue)
                 .GroupBy(l => l.CollaboratorEmployeeId!.Value)
                 .ToDictionary(g => g.Key, g => g.ToList());
+            var projectBonusByEmployee = projectBonusLines
+                .Where(l => l.EmployeeId.HasValue)
+                .GroupBy(l => l.EmployeeId!.Value)
+                .ToDictionary(g => g.Key, g => g.ToList());
 
             foreach (var attendance in attendanceInputs)
             {
@@ -146,7 +174,7 @@ namespace HRM.backend.src.HRM.Application.Services.PayrollAllowances
                     Attendance = attendance,
                     Employee = employee,
                     Contract = contract,
-                    Formula = SelectFormula(formulas, contract, employee, jobLevelId, periodEnd),
+                    Formula = ApplyFeatureToggles(SelectFormula(formulas, contract, employee, jobLevelId, periodEnd), featureToggles),
                     TaxConfig = taxConfig,
                     InsuranceConfig = insuranceConfig,
                     PositionJobLevelPolicy = policy,
@@ -160,8 +188,11 @@ namespace HRM.backend.src.HRM.Application.Services.PayrollAllowances
                     Adjustments = adjustmentsByEmployee.GetValueOrDefault(attendance.EmployeeId) ?? new List<PayrollAdjustment>(),
                     OvertimeRateConfigs = overtimeRateConfigs,
                     ExternalTimesheetLines = externalTimesheetByEmployee.GetValueOrDefault(attendance.EmployeeId) ?? new List<ExternalTimesheetLine>(),
+                    ProjectBonusLines = projectBonusByEmployee.GetValueOrDefault(attendance.EmployeeId) ?? new List<ProjectBonusImportLine>(),
                     EmploymentServicePeriods = servicePeriodsByEmployee.GetValueOrDefault(attendance.EmployeeId) ?? new List<EmploymentServicePeriod>(),
+                    AllowanceTaxPolicies = allowanceTaxPolicies,
                     SeniorityPolicies = seniorityPolicies,
+                    FeatureToggles = featureToggles,
                     DependentCount = dependentCounts.GetValueOrDefault(attendance.EmployeeId),
                     TaxMethod = ResolveTaxMethod(employee, contract),
                     PeriodStart = periodStart,
@@ -220,6 +251,60 @@ namespace HRM.backend.src.HRM.Application.Services.PayrollAllowances
             }
         }
 
+        private static void AppendProjectBonusAttendanceInputs(
+            List<AttendanceSummary> attendanceInputs,
+            List<ProjectBonusImportLine> projectBonusLines,
+            Dictionary<int, List<Contract>> contractsByEmployee,
+            PayrollPeriodDto period,
+            PayrollSourceBatch batch)
+        {
+            var existingEmployeeIds = attendanceInputs.Select(a => a.EmployeeId).ToHashSet();
+            var bonusOnlyGroups = projectBonusLines
+                .Where(l => l.EmployeeId.HasValue && !existingEmployeeIds.Contains(l.EmployeeId.Value))
+                .GroupBy(l => l.EmployeeId!.Value);
+
+            foreach (var group in bonusOnlyGroups)
+            {
+                if (!contractsByEmployee.TryGetValue(group.Key, out var contracts) || contracts.Count == 0)
+                {
+                    batch.Warnings.Add($"Nhân viên Id {group.Key} có thưởng dự án nhưng chưa có hợp đồng Active trong kỳ.");
+                    continue;
+                }
+
+                var contract = SelectPrimaryContract(contracts, new DateTime(period.Year, period.Month, 1).AddMonths(1).AddTicks(-1));
+                if (contract.Employee == null)
+                {
+                    batch.Warnings.Add($"Nhân viên Id {group.Key} có thưởng dự án nhưng hợp đồng chưa nạp hồ sơ nhân sự.");
+                    continue;
+                }
+
+                attendanceInputs.Add(new AttendanceSummary
+                {
+                    EmployeeId = group.Key,
+                    Employee = contract.Employee,
+                    Month = period.Month,
+                    Year = period.Year,
+                    WorkDays = 0,
+                    WorkedMinutes = 0,
+                    PayableWorkHours = 0,
+                    GeneratedAt = DateTime.UtcNow
+                });
+            }
+        }
+
+        private static List<ProjectBonusImportLine> SelectLatestProjectBonusLines(List<ProjectBonusImportLine> lines)
+        {
+            return lines
+                .Where(l => l.EmployeeId.HasValue)
+                .GroupBy(l => $"{l.EmployeeId!.Value}|{l.ProjectCode.Trim().ToUpperInvariant()}", StringComparer.OrdinalIgnoreCase)
+                .Select(g => g
+                    .OrderByDescending(l => l.Batch.ApprovedAt ?? l.Batch.CreatedAt)
+                    .ThenByDescending(l => l.BatchId)
+                    .ThenByDescending(l => l.Id)
+                    .First())
+                .ToList();
+        }
+
         private static Contract SelectPrimaryContract(List<Contract> contracts, DateTime periodEnd)
         {
             return contracts
@@ -253,6 +338,85 @@ namespace HRM.backend.src.HRM.Application.Services.PayrollAllowances
             return selected ?? DefaultFormula(effectiveDate);
         }
 
+        private static PayrollFormula ApplyFeatureToggles(PayrollFormula formula, PayrollFeatureToggleDto toggles)
+        {
+            var disabledCodes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (!toggles.EnableInsurance)
+            {
+                disabledCodes.Add("EMPLOYEE_INSURANCE");
+            }
+
+            if (!toggles.EnableOvertime)
+            {
+                disabledCodes.Add("OT_BASE");
+                disabledCodes.Add("OT_PREMIUM");
+            }
+
+            if (!toggles.EnableMealAllowance)
+            {
+                disabledCodes.Add("MEAL_ALLOWANCE");
+            }
+
+            if (!toggles.EnableExternalTimesheetPay)
+            {
+                disabledCodes.Add("EXTERNAL_TIMESHEET_PAY");
+            }
+
+            var lines = formula.Lines
+                .Where(line => !disabledCodes.Contains(line.ComponentCode) &&
+                               (toggles.EnableOvertime || !line.ComponentCode.StartsWith("OT_", StringComparison.OrdinalIgnoreCase)))
+                .Select(line => CloneFormulaLine(line, toggles))
+                .ToList();
+            if (!lines.Any(line => string.Equals(line.ComponentCode, "PROJECT_BONUS", StringComparison.OrdinalIgnoreCase)))
+                lines.Add(Line("PROJECT_BONUS", "project_bonus_amount", 87, true, true, false, false));
+
+            return new PayrollFormula
+            {
+                Id = formula.Id,
+                FormulaCode = formula.FormulaCode,
+                FormulaName = formula.FormulaName,
+                Expression = formula.Expression,
+                IsActive = formula.IsActive,
+                ContractType = formula.ContractType,
+                PayBasis = formula.PayBasis,
+                EmployeeType = formula.EmployeeType,
+                DeptId = formula.DeptId,
+                PositionId = formula.PositionId,
+                JobLevelId = formula.JobLevelId,
+                Version = formula.Version,
+                EffectiveFrom = formula.EffectiveFrom,
+                EffectiveTo = formula.EffectiveTo,
+                Status = formula.Status,
+                DeadlineAt = formula.DeadlineAt,
+                ApprovedByAccountId = formula.ApprovedByAccountId,
+                ApprovedAt = formula.ApprovedAt,
+                RejectReason = formula.RejectReason,
+                CreatedAt = formula.CreatedAt,
+                Lines = lines
+            };
+        }
+
+        private static PayrollFormulaLine CloneFormulaLine(PayrollFormulaLine line, PayrollFeatureToggleDto toggles)
+        {
+            return new PayrollFormulaLine
+            {
+                Id = line.Id,
+                PayrollFormulaId = line.PayrollFormulaId,
+                SalaryComponentTypeId = line.SalaryComponentTypeId,
+                SalaryComponentType = line.SalaryComponentType,
+                ComponentCode = line.ComponentCode,
+                Expression = line.Expression,
+                CalculationOrder = line.CalculationOrder,
+                IsGrossComponent = line.IsGrossComponent,
+                IsTaxable = line.IsTaxable,
+                IsInsuranceBased = toggles.EnableInsurance && line.IsInsuranceBased,
+                IsDeduction = line.IsDeduction,
+                IsSnapshotRequired = line.IsSnapshotRequired,
+                Note = line.Note,
+                CreatedAt = line.CreatedAt
+            };
+        }
+
         private static bool ScopeMatch<T>(T? expected, T? actual) where T : struct
         {
             return !expected.HasValue || (actual.HasValue && EqualityComparer<T>.Default.Equals(expected.Value, actual.Value));
@@ -278,6 +442,7 @@ namespace HRM.backend.src.HRM.Application.Services.PayrollAllowances
             var monthlyBase = RoundMoney(contract.BasicSalary * contract.SalaryPercentage / 100m);
             var standardWorkdays = contract.StandardWorkdaysSnapshot > 0 ? contract.StandardWorkdaysSnapshot : DefaultStandardWorkdays;
             var standardHours = contract.StandardHoursPerDaySnapshot > 0 ? contract.StandardHoursPerDaySnapshot : DefaultStandardHoursPerDay;
+            var featureToggles = source.FeatureToggles;
             var metrics = ResolveAttendanceMetrics(source, standardWorkdays, standardHours);
             var seniority = ResolveSeniorityMetrics(source, monthlyBase, standardWorkdays, metrics.Workdays);
             var actualWorkdays = metrics.Workdays;
@@ -290,7 +455,7 @@ namespace HRM.backend.src.HRM.Application.Services.PayrollAllowances
                 : contractSegmentSalary;
             var contractSegmentInsuranceBase = source.ContractSegments.Count > 0
                 ? source.ContractSegments.Sum(s => s.InsuranceBaseAmount)
-                : (contract.IsInsuranceEligible ? contractSegmentSalary : 0);
+                : (featureToggles.EnableInsurance && contract.IsInsuranceEligible ? contractSegmentSalary : 0);
 
             var employeeComponentAmounts = source.SalaryComponents
                 .GroupBy(c => c.SalaryComponentType.Code, StringComparer.OrdinalIgnoreCase)
@@ -340,10 +505,24 @@ namespace HRM.backend.src.HRM.Application.Services.PayrollAllowances
             var adjustmentDeduction = source.Adjustments
                 .Where(a => a.IsDeduction)
                 .Sum(a => Math.Abs(a.Amount));
-            var externalTimesheetHours = source.ExternalTimesheetLines.Sum(l => l.ApprovedHours);
-            var externalTimesheetAmount = source.ExternalTimesheetLines.Sum(l => l.Amount);
+            var externalTimesheetHours = featureToggles.EnableExternalTimesheetPay
+                ? source.ExternalTimesheetLines.Sum(l => l.ApprovedHours)
+                : 0m;
+            var externalTimesheetAmount = featureToggles.EnableExternalTimesheetPay
+                ? source.ExternalTimesheetLines.Sum(l => l.Amount)
+                : 0m;
+            var projectBonusAmount = source.ProjectBonusLines.Sum(l => l.BonusAmount);
+            var projectBonusTaxableAmount = source.ProjectBonusLines
+                .Where(l => l.Taxable)
+                .Sum(l => l.BonusAmount);
+            var projectBonusInsuranceBaseAmount = featureToggles.EnableInsurance
+                ? source.ProjectBonusLines
+                    .Where(l => l.InsuranceContributable)
+                    .Sum(l => l.BonusAmount)
+                : 0m;
 
-            var insuranceContributionEnabled = IsInsuranceContributionEnabled(source, metrics.UnpaidLeaveWorkdays);
+            var insuranceContributionEnabled = featureToggles.EnableInsurance &&
+                                               IsInsuranceContributionEnabled(source, metrics.UnpaidLeaveWorkdays);
             var unemploymentContributionEnabled = insuranceContributionEnabled && IsUnemploymentContributionEnabled(source);
             var employeeInsuranceRate = insuranceContributionEnabled
                 ? source.InsuranceConfig.SocialInsuranceEmployeeRate +
@@ -396,9 +575,14 @@ namespace HRM.backend.src.HRM.Application.Services.PayrollAllowances
                 ["overtime_premium_amount"] = RoundMoney(overtimePremium),
                 ["external_timesheet_hours"] = externalTimesheetHours,
                 ["external_timesheet_amount"] = externalTimesheetAmount,
+                ["project_bonus_amount"] = RoundMoney(projectBonusAmount),
+                ["project_bonus_taxable_amount"] = RoundMoney(projectBonusTaxableAmount),
+                ["project_bonus_insurance_base_amount"] = RoundMoney(projectBonusInsuranceBaseAmount),
                 ["position_allowance"] = ResolveComponentOrPolicy(employeeComponentAmounts, "POSITION_ALLOWANCE", policy?.PositionAllowance ?? 0),
                 ["responsibility_allowance"] = ResolveComponentOrPolicy(employeeComponentAmounts, "RESPONSIBILITY_ALLOWANCE", policy?.ResponsibilityAllowance ?? 0),
-                ["meal_allowance_per_day"] = employeeComponentAmounts.GetValueOrDefault("MEAL_ALLOWANCE"),
+                ["meal_allowance_per_day"] = featureToggles.EnableMealAllowance
+                    ? employeeComponentAmounts.GetValueOrDefault("MEAL_ALLOWANCE")
+                    : 0m,
                 ["kpi_bonus_amount"] = employeeComponentAmounts.GetValueOrDefault("KPI_BONUS"),
                 ["kpi_score"] = source.PerformanceReview?.TotalScore ?? 0,
                 ["dependent_count"] = source.DependentCount,
@@ -455,18 +639,31 @@ namespace HRM.backend.src.HRM.Application.Services.PayrollAllowances
                 ["taxMethod"] = source.TaxMethod.ToString(),
                 ["jobLevelId"] = jobLevelId,
                 ["taxConfigCode"] = source.TaxConfig.Code,
+                ["taxConfigVersion"] = source.TaxConfig.Version,
+                ["taxConfigVersionCode"] = source.TaxConfig.VersionCode,
                 ["insuranceConfigCode"] = source.InsuranceConfig.Code,
+                ["insuranceConfigVersion"] = source.InsuranceConfig.Version,
+                ["insuranceConfigVersionCode"] = source.InsuranceConfig.VersionCode,
                 ["formulaCode"] = source.Formula.FormulaCode,
                 ["formulaVersion"] = source.Formula.Version,
+                ["featureToggles"] = source.FeatureToggles,
+                ["insurancePolicy"] = source.FeatureToggles.EnableInsurance ? "Applied" : "NotApplied",
                 ["dependentCount"] = source.DependentCount,
                 ["dailySummaryCount"] = source.DailySummaries.Count,
                 ["employmentServicePeriodCount"] = source.EmploymentServicePeriods.Count,
+                ["allowanceTaxPolicyCodes"] = source.AllowanceTaxPolicies.Select(p => p.Code).ToList(),
                 ["seniorityPolicyCodes"] = source.SeniorityPolicies.Select(p => p.Code).ToList(),
                 ["contractSegmentCount"] = source.ContractSegments.Count,
                 ["adjustmentCount"] = source.Adjustments.Count,
                 ["adjustmentAmount"] = source.Adjustments.Sum(a => a.IsDeduction ? -Math.Abs(a.Amount) : a.Amount),
                 ["externalTimesheetLineCount"] = source.ExternalTimesheetLines.Count,
                 ["externalTimesheetAmount"] = source.ExternalTimesheetLines.Sum(l => l.Amount),
+                ["projectBonusLineCount"] = source.ProjectBonusLines.Count,
+                ["projectBonusAmount"] = source.ProjectBonusLines.Sum(l => l.BonusAmount),
+                ["projectBonusTaxableAmount"] = source.ProjectBonusLines.Where(l => l.Taxable).Sum(l => l.BonusAmount),
+                ["projectBonusInsuranceBaseAmount"] = source.FeatureToggles.EnableInsurance
+                    ? source.ProjectBonusLines.Where(l => l.InsuranceContributable).Sum(l => l.BonusAmount)
+                    : 0m,
                 ["monthlyInsuranceStatus"] = source.MonthlyInsuranceStatus?.Status.ToString(),
                 ["isSocialInsuranceContributed"] = source.MonthlyInsuranceStatus?.IsSocialInsuranceContributed,
                 ["isUnemploymentInsuranceContributed"] = source.MonthlyInsuranceStatus?.IsUnemploymentInsuranceContributed
@@ -475,14 +672,19 @@ namespace HRM.backend.src.HRM.Application.Services.PayrollAllowances
 
         private static PayrollFormula DefaultFormula(DateTime effectiveDate)
         {
+            var useKpiScorePayout = effectiveDate.Date >= KpiBonusPayoutEffectiveFrom.Date;
+
             return new PayrollFormula
             {
                 Id = 0,
                 FormulaCode = "DEFAULT_PAYROLL_V2",
-                FormulaName = "Default payroll formula v2",
+                FormulaName = useKpiScorePayout
+                    ? "Default payroll formula v2 - KPI score payout"
+                    : "Default payroll formula v2",
                 Status = FormulaStatus.Approved,
                 IsActive = true,
-                Version = 1,
+                Version = useKpiScorePayout ? 2 : 1,
+                VersionCode = useKpiScorePayout ? "KPI_PAYOUT_V2" : "LEGACY_KPI_TARGET_V1",
                 EffectiveFrom = effectiveDate.Date,
                 Lines = new List<PayrollFormulaLine>
                 {
@@ -494,8 +696,9 @@ namespace HRM.backend.src.HRM.Application.Services.PayrollAllowances
                     Line("LEGACY_INSURANCE_ALLOWANCE", "legacy_insurance_allowance", 50, true, true, true, false),
                     Line("LEGACY_TAXABLE_ALLOWANCE", "legacy_taxable_allowance", 60, true, true, false, false),
                     Line("LEGACY_NONTAXABLE_ALLOWANCE", "legacy_nontaxable_allowance", 70, true, false, false, false),
-                    Line("KPI_BONUS", "kpi_bonus_amount", 80, true, true, false, false),
+                    Line("KPI_BONUS", useKpiScorePayout ? KpiBonusPayoutExpression : "kpi_bonus_amount", 80, true, true, false, false),
                     Line("EXTERNAL_TIMESHEET_PAY", "external_timesheet_amount", 85, true, true, false, false),
+                    Line("PROJECT_BONUS", "project_bonus_amount", 87, true, true, false, false),
                     Line("OT_BASE", "overtime_base_amount", 90, true, true, false, false),
                     Line("OT_PREMIUM", "overtime_premium_amount", 100, true, false, false, false),
                     Line("PAYROLL_ADJUSTMENT_TAXABLE_INSURANCE", "payroll_adjustment_taxable_insurance", 110, true, true, true, false),
@@ -594,7 +797,7 @@ namespace HRM.backend.src.HRM.Application.Services.PayrollAllowances
 
                 var monthlyBase = RoundMoney(contract.BasicSalary * contract.SalaryPercentage / 100m);
                 var salaryAmount = RoundMoney(standardWorkdays > 0 ? monthlyBase / standardWorkdays * actualWorkdays : 0);
-                var insuranceBase = contract.IsInsuranceEligible
+                var insuranceBase = source.FeatureToggles.EnableInsurance && contract.IsInsuranceEligible
                     ? RoundMoney(standardWorkdays > 0 ? (contract.InsuranceSalary > 0 ? contract.InsuranceSalary : monthlyBase) / standardWorkdays * actualWorkdays : 0)
                     : 0;
 
@@ -607,7 +810,7 @@ namespace HRM.backend.src.HRM.Application.Services.PayrollAllowances
                     ContractType = contract.ContractType,
                     PayBasis = contract.PayBasis,
                     TaxMethod = ResolveTaxMethod(source.Employee, contract),
-                    IsInsuranceEligible = contract.IsInsuranceEligible,
+                    IsInsuranceEligible = source.FeatureToggles.EnableInsurance && contract.IsInsuranceEligible,
                     SegmentType = PayrollContractSegmentType.Contract,
                     BaseSalary = contract.BasicSalary,
                     SalaryPercentage = contract.SalaryPercentage,
@@ -627,6 +830,7 @@ namespace HRM.backend.src.HRM.Application.Services.PayrollAllowances
                         contract.BasicSalary,
                         contract.SalaryPercentage,
                         contract.InsuranceSalary,
+                        insurancePolicy = source.FeatureToggles.EnableInsurance ? "Applied" : "NotApplied",
                         actualWorkdays
                     })
                 });
@@ -883,75 +1087,6 @@ namespace HRM.backend.src.HRM.Application.Services.PayrollAllowances
                 return TaxMethod.Flat10Percent;
 
             return TaxMethod.Progressive;
-        }
-
-        private static TaxConfig DefaultTaxConfig()
-        {
-            return new TaxConfig
-            {
-                Code = "VN_PERSONAL_INCOME_TAX_2020",
-                Name = "Default PIT config",
-                PersonalDeduction = 11_000_000m,
-                DependentDeduction = 4_400_000m,
-                FlatTaxThreshold = 2_000_000m,
-                FlatTaxRate = 0.10m,
-                NonResidentTaxRate = 0.20m,
-                EffectiveFrom = new DateTime(2020, 7, 1),
-                Version = 1,
-                IsActive = true
-            };
-        }
-
-        private static InsuranceConfig DefaultInsuranceConfig()
-        {
-            return new InsuranceConfig
-            {
-                Code = "VN_STANDARD_INSURANCE_2025",
-                Name = "Default insurance config",
-                SocialInsuranceEmployeeRate = 0.08m,
-                HealthInsuranceEmployeeRate = 0.015m,
-                UnemploymentInsuranceEmployeeRate = 0.01m,
-                SocialInsuranceEmployerRate = 0.175m,
-                HealthInsuranceEmployerRate = 0.03m,
-                UnemploymentInsuranceEmployerRate = 0.01m,
-                UnionFeeEmployerRate = 0.02m,
-                UnpaidLeaveNoContributionThresholdDays = 14,
-                MinContractMonthsForContribution = 1,
-                EffectiveFrom = new DateTime(2025, 7, 1),
-                Version = 1,
-                IsActive = true
-            };
-        }
-
-        private static List<PITTaxBracket> DefaultPitBrackets()
-        {
-            var effective = new DateTime(2020, 7, 1);
-            return new List<PITTaxBracket>
-            {
-                Bracket(1, 0, 5_000_000m, 0.05m, 0, effective),
-                Bracket(2, 5_000_000m, 10_000_000m, 0.10m, 250_000m, effective),
-                Bracket(3, 10_000_000m, 18_000_000m, 0.15m, 750_000m, effective),
-                Bracket(4, 18_000_000m, 32_000_000m, 0.20m, 1_650_000m, effective),
-                Bracket(5, 32_000_000m, 52_000_000m, 0.25m, 3_250_000m, effective),
-                Bracket(6, 52_000_000m, 80_000_000m, 0.30m, 5_850_000m, effective),
-                Bracket(7, 80_000_000m, null, 0.35m, 9_850_000m, effective)
-            };
-        }
-
-        private static PITTaxBracket Bracket(int level, decimal min, decimal? max, decimal rate, decimal quickDeduction, DateTime effective)
-        {
-            return new PITTaxBracket
-            {
-                Code = "VN_PROGRESSIVE_PIT_2020",
-                Level = level,
-                MinIncome = min,
-                MaxIncome = max,
-                TaxRate = rate,
-                QuickDeduction = quickDeduction,
-                EffectiveFrom = effective,
-                Version = 1,
-                IsActive = true
-            };
         }
 
         private static string SafeVariableName(string value)

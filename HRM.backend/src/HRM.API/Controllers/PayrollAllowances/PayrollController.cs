@@ -20,6 +20,25 @@ namespace HRM.backend.src.HRM.API.Controllers.PayrollAllowances
             _calculationUseCase = calculationUseCase;
         }
 
+        [HttpGet("preflight")]
+        [RequirePermission("PAYROLL_CALCULATE", GroupName = SystemModules.SalaryBonus, Description = "Kiểm tra cấu hình trước khi tính lương")]
+        public async Task<IActionResult> Preflight([FromQuery] byte month, [FromQuery] short year, CancellationToken ct)
+        {
+            try
+            {
+                var result = await _calculationUseCase.GetPreflightAsync(new PayrollPeriodDto { Month = month, Year = year }, GetRole(), ct);
+                return Ok(new { Success = true, Data = result });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new { Success = false, Message = ex.Message });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { Success = false, Message = ex.Message });
+            }
+        }
+
         [HttpPost("calculate")]
         [RequirePermission("PAYROLL_CALCULATE", GroupName = SystemModules.SalaryBonus, Description = "Tổng hợp bảng lương nháp theo kỳ")]
         public async Task<IActionResult> Calculate([FromBody] PayrollPeriodDto dto, CancellationToken ct)

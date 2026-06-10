@@ -15,11 +15,14 @@ namespace HRM.backend.src.HRM.Core.Interfaces.Repositories.PayrollAllowances
         Task<List<Contract>> GetActiveContractsAsync(IEnumerable<int> employeeIds, DateTime periodStart, DateTime periodEnd, CancellationToken ct = default);
         Task<List<EmployeeAllowance>> GetEmployeeAllowancesAsync(IEnumerable<int> employeeIds, CancellationToken ct = default);
         Task<List<EmployeeSalaryComponent>> GetEmployeeSalaryComponentsAsync(IEnumerable<int> employeeIds, DateTime periodStart, DateTime periodEnd, CancellationToken ct = default);
+        Task<List<SalaryComponentType>> GetActiveSalaryComponentTypesAsync(DateTime effectiveDate, CancellationToken ct = default);
         Task<List<PerformanceReview>> GetPerformanceReviewsAsync(IEnumerable<int> employeeIds, string period, CancellationToken ct = default);
         Task<Dictionary<int, int>> GetActiveDependentCountsAsync(IEnumerable<int> employeeIds, DateTime periodEnd, CancellationToken ct = default);
         Task<List<OvertimeSegment>> GetOvertimeSegmentsAsync(IEnumerable<int> employeeIds, DateTime periodStart, DateTime periodEnd, CancellationToken ct = default);
         Task<List<ExternalTimesheetLine>> GetApprovedExternalTimesheetLinesAsync(DateTime periodStart, DateTime periodEnd, CancellationToken ct = default);
         Task<List<ExternalTimesheetLine>> GetApprovedExternalTimesheetLinesAsync(IEnumerable<int> employeeIds, DateTime periodStart, DateTime periodEnd, CancellationToken ct = default);
+        Task<List<ProjectBonusImportLine>> GetApprovedProjectBonusLinesAsync(byte month, short year, CancellationToken ct = default);
+        Task<List<ProjectBonusImportLine>> GetApprovedProjectBonusLinesAsync(IEnumerable<int> employeeIds, byte month, short year, CancellationToken ct = default);
         Task<List<PayrollFormula>> GetApprovedPayrollFormulasAsync(DateTime effectiveDate, CancellationToken ct = default);
         Task<TaxConfig?> GetActiveTaxConfigAsync(DateTime effectiveDate, CancellationToken ct = default);
         Task<List<PITTaxBracket>> GetActivePitTaxBracketsAsync(DateTime effectiveDate, CancellationToken ct = default);
@@ -30,6 +33,7 @@ namespace HRM.backend.src.HRM.Core.Interfaces.Repositories.PayrollAllowances
         Task AddPayrollAdjustmentAsync(PayrollAdjustment adjustment, CancellationToken ct = default);
         Task<List<OvertimeRateConfig>> GetActiveOvertimeRateConfigsAsync(DateTime effectiveDate, CancellationToken ct = default);
         Task<List<PayrollPolicy>> GetActivePayrollPoliciesAsync(PayrollPolicyType policyType, DateTime effectiveDate, CancellationToken ct = default);
+        Task<List<WorkCalendarConfig>> GetWorkCalendarConfigsAsync(byte month, short year, CancellationToken ct = default);
         Task<List<EmploymentServicePeriod>> GetEmploymentServicePeriodsAsync(IEnumerable<int> employeeIds, DateTime periodEnd, CancellationToken ct = default);
         Task<List<PositionJobLevelPolicy>> GetPositionJobLevelPoliciesAsync(IEnumerable<int> positionIds, IEnumerable<int> jobLevelIds, DateTime effectiveDate, CancellationToken ct = default);
         Task<bool> HasLockedPayrollAsync(byte month, short year, CancellationToken ct = default);

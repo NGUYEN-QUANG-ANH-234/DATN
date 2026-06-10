@@ -50,6 +50,7 @@ namespace HRM.backend.src.HRM.Application.Services.PayrollAllowances
 
             foreach (var line in output.Lines.Where(l => l.FormulaLine.IsSnapshotRequired || l.Amount != 0))
             {
+                var isProjectBonusLine = string.Equals(line.ComponentCode, "PROJECT_BONUS", StringComparison.OrdinalIgnoreCase);
                 payroll.Details.Add(new PayrollDetail
                 {
                     ComponentCode = line.ComponentCode,
@@ -63,7 +64,9 @@ namespace HRM.backend.src.HRM.Application.Services.PayrollAllowances
                     IsInsuranceBased = line.IsInsuranceBased,
                     ProrationType = line.ProrationType,
                     CalculationMethod = line.CalculationMethod,
-                    Note = line.Note,
+                    Note = isProjectBonusLine && source.ProjectBonusLines.Count > 0
+                        ? $"Nguồn: {source.ProjectBonusLines.Count} dòng thưởng dự án đã duyệt."
+                        : line.Note,
                     SnapshotJson = JsonSerializer.Serialize(new
                     {
                         formulaLineId = line.FormulaLine.Id,
@@ -73,7 +76,26 @@ namespace HRM.backend.src.HRM.Application.Services.PayrollAllowances
                         line.RawAmount,
                         line.Amount,
                         line.TaxableAmount,
-                        line.InsuranceBaseAmount
+                        line.InsuranceBaseAmount,
+                        projectBonusSources = isProjectBonusLine
+                            ? source.ProjectBonusLines.Select(l => new
+                            {
+                                l.Id,
+                                l.BatchId,
+                                l.Batch.FileName,
+                                l.Batch.PayrollPeriod,
+                                l.Batch.ApprovedAt,
+                                l.EmployeeCodeSnapshot,
+                                l.EmployeeNameSnapshot,
+                                l.ProjectCode,
+                                l.ProjectName,
+                                l.BonusAmount,
+                                l.Taxable,
+                                l.InsuranceContributable,
+                                l.Reason,
+                                l.Note
+                            })
+                            : null
                     }, JsonOptions),
                     CreatedAt = DateTime.UtcNow
                 });
@@ -139,13 +161,18 @@ namespace HRM.backend.src.HRM.Application.Services.PayrollAllowances
             return JsonSerializer.Serialize(new
             {
                 source.Snapshot,
+                featureToggles = source.FeatureToggles,
                 sourceVariables = source.Variables,
                 finalVariables = output.FinalVariables,
                 tax = new
                 {
                     source.TaxConfig.Code,
                     source.TaxConfig.Version,
+                    source.TaxConfig.VersionCode,
+                    source.TaxConfig.Status,
                     source.TaxConfig.EffectiveFrom,
+                    source.TaxConfig.EffectiveTo,
+                    source.TaxConfig.SourceRef,
                     source.TaxConfig.PersonalDeduction,
                     source.TaxConfig.DependentDeduction,
                     source.TaxConfig.FlatTaxThreshold,
@@ -155,13 +182,38 @@ namespace HRM.backend.src.HRM.Application.Services.PayrollAllowances
                 },
                 insurance = new
                 {
+                    policy = source.FeatureToggles.EnableInsurance ? "Applied" : "NotApplied",
                     source.InsuranceConfig.Code,
                     source.InsuranceConfig.Version,
+                    source.InsuranceConfig.VersionCode,
+                    source.InsuranceConfig.Status,
                     source.InsuranceConfig.EffectiveFrom,
+                    source.InsuranceConfig.EffectiveTo,
+                    source.InsuranceConfig.SourceRef,
                     employeeRate = output.FinalVariables.GetValueOrDefault("employee_insurance_rate"),
                     employerRate = output.FinalVariables.GetValueOrDefault("employer_contribution_rate"),
                     source.InsuranceConfig.UnpaidLeaveNoContributionThresholdDays,
                     source.InsuranceConfig.MinContractMonthsForContribution
+                },
+                allowanceTax = new
+                {
+                    policies = source.AllowanceTaxPolicies.Select(p => new
+                    {
+                        p.Id,
+                        p.Code,
+                        p.Name,
+                        p.ValueType,
+                        p.RatePercent,
+                        p.Amount,
+                        p.FromAmount,
+                        p.ToAmount,
+                        p.EffectiveFrom,
+                        p.EffectiveTo,
+                        p.Version,
+                        p.VersionCode,
+                        p.Status,
+                        p.SourceRef
+                    })
                 },
                 seniority = new
                 {
@@ -181,7 +233,11 @@ namespace HRM.backend.src.HRM.Application.Services.PayrollAllowances
                         p.FromAmount,
                         p.ToAmount,
                         p.EffectiveFrom,
-                        p.Version
+                        p.EffectiveTo,
+                        p.Version,
+                        p.VersionCode,
+                        p.Status,
+                        p.SourceRef
                     })
                 },
                 monthlyInsuranceStatus = source.MonthlyInsuranceStatus == null ? null : new
@@ -208,6 +264,23 @@ namespace HRM.backend.src.HRM.Application.Services.PayrollAllowances
                     l.ApprovedHours,
                     l.HourlyRate,
                     l.Amount
+                }),
+                projectBonuses = source.ProjectBonusLines.Select(l => new
+                {
+                    l.Id,
+                    l.BatchId,
+                    l.Batch.FileName,
+                    l.Batch.PayrollPeriod,
+                    l.Batch.ApprovedAt,
+                    l.EmployeeCodeSnapshot,
+                    l.EmployeeNameSnapshot,
+                    l.ProjectCode,
+                    l.ProjectName,
+                    l.BonusAmount,
+                    l.Taxable,
+                    l.InsuranceContributable,
+                    l.Reason,
+                    l.Note
                 }),
                 attendanceDaily = new
                 {

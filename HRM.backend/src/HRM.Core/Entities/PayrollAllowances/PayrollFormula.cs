@@ -25,6 +25,7 @@ namespace HRM.backend.src.HRM.Core.Entities.PayrollAllowances
         public int? JobLevelId { get; set; }
 
         public int Version { get; set; } = 1;
+        [StringLength(80)] public string? VersionCode { get; set; }
         public DateTime EffectiveFrom { get; set; } = new(2020, 7, 1);
         public DateTime? EffectiveTo { get; set; }
 

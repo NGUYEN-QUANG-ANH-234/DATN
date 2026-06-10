@@ -64,11 +64,90 @@ namespace HRM.backend.src.HRM.Application.UseCases.PayrollAllowances
                             IsDeduction = d.IsDeduction,
                             IsTaxable = d.IsTaxable,
                             IsInsuranceBased = d.IsInsuranceBased,
-                            Note = d.Note
+                            Note = d.Note,
+                            ProjectBonusSources = ExtractProjectBonusSources(d.SnapshotJson)
                         })
                         .ToList()
                     : new List<SalarySlipDetailDto>()
             };
+        }
+
+        private static List<ProjectBonusPayrollSourceDto> ExtractProjectBonusSources(string? detailSnapshotJson)
+        {
+            if (string.IsNullOrWhiteSpace(detailSnapshotJson))
+                return new List<ProjectBonusPayrollSourceDto>();
+
+            try
+            {
+                using var document = JsonDocument.Parse(detailSnapshotJson);
+                if (!document.RootElement.TryGetProperty("projectBonusSources", out var sources) ||
+                    sources.ValueKind != JsonValueKind.Array)
+                    return new List<ProjectBonusPayrollSourceDto>();
+
+                var result = new List<ProjectBonusPayrollSourceDto>();
+                foreach (var source in sources.EnumerateArray())
+                {
+                    result.Add(new ProjectBonusPayrollSourceDto
+                    {
+                        Id = GetInt(source, "id"),
+                        BatchId = GetInt(source, "batchId"),
+                        FileName = GetString(source, "fileName"),
+                        PayrollPeriod = GetString(source, "payrollPeriod"),
+                        ApprovedAt = GetNullableDateTime(source, "approvedAt"),
+                        EmployeeCode = GetString(source, "employeeCodeSnapshot") ?? string.Empty,
+                        EmployeeName = GetString(source, "employeeNameSnapshot"),
+                        ProjectCode = GetString(source, "projectCode") ?? string.Empty,
+                        ProjectName = GetString(source, "projectName") ?? string.Empty,
+                        BonusAmount = GetDecimal(source, "bonusAmount"),
+                        Taxable = GetBool(source, "taxable"),
+                        InsuranceContributable = GetBool(source, "insuranceContributable"),
+                        Reason = GetString(source, "reason"),
+                        Note = GetString(source, "note")
+                    });
+                }
+
+                return result;
+            }
+            catch (JsonException)
+            {
+                return new List<ProjectBonusPayrollSourceDto>();
+            }
+        }
+
+        private static string? GetString(JsonElement element, string propertyName)
+        {
+            return element.TryGetProperty(propertyName, out var property) && property.ValueKind != JsonValueKind.Null
+                ? property.GetString()
+                : null;
+        }
+
+        private static int GetInt(JsonElement element, string propertyName)
+        {
+            return element.TryGetProperty(propertyName, out var property) && property.TryGetInt32(out var value)
+                ? value
+                : 0;
+        }
+
+        private static decimal GetDecimal(JsonElement element, string propertyName)
+        {
+            return element.TryGetProperty(propertyName, out var property) && property.TryGetDecimal(out var value)
+                ? value
+                : 0;
+        }
+
+        private static bool GetBool(JsonElement element, string propertyName)
+        {
+            return element.TryGetProperty(propertyName, out var property) &&
+                   property.ValueKind == JsonValueKind.True;
+        }
+
+        private static DateTime? GetNullableDateTime(JsonElement element, string propertyName)
+        {
+            return element.TryGetProperty(propertyName, out var property) &&
+                   property.ValueKind != JsonValueKind.Null &&
+                   property.TryGetDateTime(out var value)
+                ? value
+                : null;
         }
 
         private static Dictionary<string, decimal> ExtractFinalVariables(string? policySnapshotJson)

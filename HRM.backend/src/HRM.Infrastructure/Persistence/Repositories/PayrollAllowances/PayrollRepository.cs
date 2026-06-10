@@ -93,12 +93,29 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.PayrollAll
                 .ToListAsync(ct);
         }
 
+        public async Task<List<SalaryComponentType>> GetActiveSalaryComponentTypesAsync(DateTime effectiveDate, CancellationToken ct = default)
+        {
+            return await _context.SalaryComponentTypes
+                .Where(type => type.IsActive &&
+                               type.Status == PolicyVersionStatus.Active &&
+                               type.EffectiveFrom.Date <= effectiveDate.Date &&
+                               (!type.EffectiveTo.HasValue || type.EffectiveTo.Value.Date >= effectiveDate.Date))
+                .OrderBy(type => type.ComponentGroup)
+                .ThenBy(type => type.Name)
+                .AsNoTracking()
+                .ToListAsync(ct);
+        }
+
         public async Task<List<PerformanceReview>> GetPerformanceReviewsAsync(IEnumerable<int> employeeIds, string period, CancellationToken ct = default)
         {
             var ids = employeeIds.Distinct().ToList();
             return await _context.PerformanceReviews
                 .Include(r => r.Details)
-                .Where(r => ids.Contains(r.EmployeeId) && r.Period == period)
+                .Where(r => ids.Contains(r.EmployeeId) &&
+                            r.Period == period &&
+                            (r.Status == ReviewStatus.Evaluated ||
+                             r.Status == ReviewStatus.AutoEvaluated ||
+                             r.Status == ReviewStatus.Approved))
                 .AsNoTracking()
                 .ToListAsync(ct);
         }
@@ -120,6 +137,7 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.PayrollAll
         {
             return await _context.TaxConfigs
                 .Where(t => t.IsActive &&
+                            t.Status != PolicyVersionStatus.Draft &&
                             t.EffectiveFrom.Date <= effectiveDate.Date &&
                             (!t.EffectiveTo.HasValue || t.EffectiveTo.Value.Date >= effectiveDate.Date))
                 .OrderByDescending(t => t.EffectiveFrom)
@@ -130,10 +148,25 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.PayrollAll
 
         public async Task<List<PITTaxBracket>> GetActivePitTaxBracketsAsync(DateTime effectiveDate, CancellationToken ct = default)
         {
-            return await _context.PITTaxBrackets
+            var selectedVersion = await _context.PITTaxBrackets
                 .Where(t => t.IsActive &&
+                            t.Status != PolicyVersionStatus.Draft &&
                             t.EffectiveFrom.Date <= effectiveDate.Date &&
                             (!t.EffectiveTo.HasValue || t.EffectiveTo.Value.Date >= effectiveDate.Date))
+                .OrderByDescending(t => t.EffectiveFrom)
+                .ThenByDescending(t => t.Version)
+                .Select(t => new { t.Code, t.Version, t.VersionCode, t.EffectiveFrom })
+                .FirstOrDefaultAsync(ct);
+
+            if (selectedVersion == null) return new List<PITTaxBracket>();
+
+            return await _context.PITTaxBrackets
+                .Where(t => t.IsActive &&
+                            t.Status != PolicyVersionStatus.Draft &&
+                            t.Code == selectedVersion.Code &&
+                            t.Version == selectedVersion.Version &&
+                            t.EffectiveFrom == selectedVersion.EffectiveFrom &&
+                            t.VersionCode == selectedVersion.VersionCode)
                 .OrderBy(t => t.Level)
                 .AsNoTracking()
                 .ToListAsync(ct);
@@ -143,6 +176,7 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.PayrollAll
         {
             return await _context.InsuranceConfigs
                 .Where(i => i.IsActive &&
+                            i.Status != PolicyVersionStatus.Draft &&
                             i.EffectiveFrom.Date <= effectiveDate.Date &&
                             (!i.EffectiveTo.HasValue || i.EffectiveTo.Value.Date >= effectiveDate.Date))
                 .OrderByDescending(i => i.EffectiveFrom)
@@ -194,8 +228,9 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.PayrollAll
 
         public async Task<List<OvertimeRateConfig>> GetActiveOvertimeRateConfigsAsync(DateTime effectiveDate, CancellationToken ct = default)
         {
-            return await _context.OvertimeRateConfigs
+            var configs = await _context.OvertimeRateConfigs
                 .Where(o => o.IsActive &&
+                            o.Status != PolicyVersionStatus.Draft &&
                             o.EffectiveFrom.Date <= effectiveDate.Date &&
                             (!o.EffectiveTo.HasValue || o.EffectiveTo.Value.Date >= effectiveDate.Date))
                 .OrderBy(o => o.OvertimeType)
@@ -203,6 +238,15 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.PayrollAll
                 .ThenByDescending(o => o.Version)
                 .AsNoTracking()
                 .ToListAsync(ct);
+
+            return configs
+                .GroupBy(o => o.OvertimeType)
+                .Select(g => g
+                    .OrderByDescending(o => o.EffectiveFrom)
+                    .ThenByDescending(o => o.Version)
+                    .First())
+                .OrderBy(o => o.OvertimeType)
+                .ToList();
         }
 
         public async Task<List<PayrollPolicy>> GetActivePayrollPoliciesAsync(PayrollPolicyType policyType, DateTime effectiveDate, CancellationToken ct = default)
@@ -210,10 +254,24 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.PayrollAll
             return await _context.PayrollPolicies
                 .Where(p => p.PolicyType == policyType &&
                             p.IsActive &&
+                            p.Status != PolicyVersionStatus.Draft &&
                             p.EffectiveFrom.Date <= effectiveDate.Date &&
                             (!p.EffectiveTo.HasValue || p.EffectiveTo.Value.Date >= effectiveDate.Date))
                 .OrderByDescending(p => p.EffectiveFrom)
                 .ThenByDescending(p => p.Version)
+                .AsNoTracking()
+                .ToListAsync(ct);
+        }
+
+        public async Task<List<WorkCalendarConfig>> GetWorkCalendarConfigsAsync(byte month, short year, CancellationToken ct = default)
+        {
+            return await _context.WorkCalendarConfigs
+                .Include(c => c.Department)
+                .Include(c => c.CompanyCalendar)
+                .Where(c => c.Month == month &&
+                            c.Year == year &&
+                            c.Status != PolicyVersionStatus.Draft)
+                .OrderBy(c => c.DeptId)
                 .AsNoTracking()
                 .ToListAsync(ct);
         }
@@ -307,6 +365,42 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.PayrollAll
                             l.WorkDate.Date >= periodStart.Date &&
                             l.WorkDate.Date <= periodEnd.Date &&
                             l.Import.Status == ExternalTimesheetImportStatus.Approved)
+                .AsNoTracking()
+                .ToListAsync(ct);
+        }
+
+        public async Task<List<ProjectBonusImportLine>> GetApprovedProjectBonusLinesAsync(byte month, short year, CancellationToken ct = default)
+        {
+            return await _context.ProjectBonusImportLines
+                .Include(l => l.Batch)
+                .Include(l => l.Employee)
+                    .ThenInclude(e => e!.Department)
+                .Include(l => l.Employee)
+                    .ThenInclude(e => e!.Position)
+                .Include(l => l.Employee)
+                    .ThenInclude(e => e!.JobLevel)
+                .Where(l => l.EmployeeId.HasValue &&
+                            l.Batch.PeriodMonth == month &&
+                            l.Batch.PeriodYear == year &&
+                            l.Batch.Status == ProjectBonusImportStatus.Approved &&
+                            l.ValidationStatus == ProjectBonusLineValidationStatus.Valid)
+                .AsNoTracking()
+                .ToListAsync(ct);
+        }
+
+        public async Task<List<ProjectBonusImportLine>> GetApprovedProjectBonusLinesAsync(IEnumerable<int> employeeIds, byte month, short year, CancellationToken ct = default)
+        {
+            var ids = employeeIds.Distinct().ToList();
+            if (ids.Count == 0) return new List<ProjectBonusImportLine>();
+
+            return await _context.ProjectBonusImportLines
+                .Include(l => l.Batch)
+                .Where(l => l.EmployeeId.HasValue &&
+                            ids.Contains(l.EmployeeId.Value) &&
+                            l.Batch.PeriodMonth == month &&
+                            l.Batch.PeriodYear == year &&
+                            l.Batch.Status == ProjectBonusImportStatus.Approved &&
+                            l.ValidationStatus == ProjectBonusLineValidationStatus.Valid)
                 .AsNoTracking()
                 .ToListAsync(ct);
         }
