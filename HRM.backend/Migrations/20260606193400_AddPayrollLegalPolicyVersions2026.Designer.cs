@@ -4,6 +4,7 @@ using HRM.backend.src.HRM.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace HRM.backend.Migrations
 {
     [DbContext(typeof(MyDbContext))]
-    partial class MyDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260606193400_AddPayrollLegalPolicyVersions2026")]
+    partial class AddPayrollLegalPolicyVersions2026
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -423,32 +426,6 @@ namespace HRM.backend.Migrations
                     b.Property<string>("JobTitle")
                         .HasMaxLength(150)
                         .HasColumnType("varchar(150)");
-
-                    b.Property<string>("KpiBonusApproverRole")
-                        .HasColumnType("text");
-
-                    b.Property<string>("KpiBonusEligibilityRule")
-                        .HasColumnType("text");
-
-                    b.Property<string>("KpiBonusPaymentPeriod")
-                        .HasColumnType("text");
-
-                    b.Property<string>("KpiBonusPolicyCode")
-                        .HasMaxLength(80)
-                        .HasColumnType("varchar(80)");
-
-                    b.Property<string>("KpiBonusPolicyVersionCode")
-                        .HasMaxLength(80)
-                        .HasColumnType("varchar(80)");
-
-                    b.Property<decimal?>("KpiBonusTargetAmount")
-                        .HasColumnType("DECIMAL(15,2)");
-
-                    b.Property<string>("KpiPayoutFormula")
-                        .HasColumnType("text");
-
-                    b.Property<string>("KpiScoreFormula")
-                        .HasColumnType("text");
 
                     b.Property<string>("LaborProtectionPolicy")
                         .HasMaxLength(1000)
@@ -1679,7 +1656,9 @@ namespace HRM.backend.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .HasColumnType("VARCHAR(50)");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("VARCHAR(50)")
+                        .HasDefaultValue("Active");
 
                     b.Property<int?>("SupersedesVersionId")
                         .HasColumnType("int");
@@ -1905,7 +1884,9 @@ namespace HRM.backend.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .HasColumnType("VARCHAR(50)");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("VARCHAR(50)")
+                        .HasDefaultValue("Active");
 
                     b.Property<int?>("SupersedesVersionId")
                         .HasColumnType("int");
@@ -2104,7 +2085,9 @@ namespace HRM.backend.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .HasColumnType("VARCHAR(50)");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("VARCHAR(50)")
+                        .HasDefaultValue("Active");
 
                     b.Property<int?>("SupersedesVersionId")
                         .HasColumnType("int");
@@ -2848,10 +2831,6 @@ namespace HRM.backend.Migrations
                         .HasColumnType("int")
                         .HasDefaultValue(1);
 
-                    b.Property<string>("VersionCode")
-                        .HasMaxLength(80)
-                        .HasColumnType("varchar(80)");
-
                     b.HasKey("Id");
 
                     b.HasIndex("FormulaCode", "Version")
@@ -2925,147 +2904,6 @@ namespace HRM.backend.Migrations
                     b.ToTable("payroll_formula_lines");
                 });
 
-            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.ProjectBonusImportBatch", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime?>("ApprovedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<int?>("ApprovedByAccountId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<int>("ErrorRows")
-                        .HasColumnType("int");
-
-                    b.Property<string>("FileName")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("varchar(255)");
-
-                    b.Property<string>("Note")
-                        .HasMaxLength(1000)
-                        .HasColumnType("varchar(1000)");
-
-                    b.Property<string>("PayrollPeriod")
-                        .IsRequired()
-                        .HasMaxLength(7)
-                        .HasColumnType("varchar(7)");
-
-                    b.Property<byte>("PeriodMonth")
-                        .HasColumnType("tinyint unsigned");
-
-                    b.Property<short>("PeriodYear")
-                        .HasColumnType("smallint");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("VARCHAR(50)");
-
-                    b.Property<decimal>("TotalAmount")
-                        .HasColumnType("DECIMAL(15,2)");
-
-                    b.Property<int>("TotalRows")
-                        .HasColumnType("int");
-
-                    b.Property<int>("UploadedByAccountId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("ValidRows")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ApprovedByAccountId");
-
-                    b.HasIndex("UploadedByAccountId", "CreatedAt")
-                        .HasDatabaseName("IX_project_bonus_batches_Uploader_CreatedAt");
-
-                    b.HasIndex("PeriodYear", "PeriodMonth", "Status")
-                        .HasDatabaseName("IX_project_bonus_batches_Period_Status");
-
-                    b.ToTable("project_bonus_import_batches");
-                });
-
-            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.ProjectBonusImportLine", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("BatchId")
-                        .HasColumnType("int");
-
-                    b.Property<decimal>("BonusAmount")
-                        .HasColumnType("DECIMAL(15,2)");
-
-                    b.Property<string>("EmployeeCodeSnapshot")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("varchar(50)");
-
-                    b.Property<int?>("EmployeeId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("EmployeeNameSnapshot")
-                        .HasMaxLength(200)
-                        .HasColumnType("varchar(200)");
-
-                    b.Property<string>("ErrorMessage")
-                        .HasMaxLength(1000)
-                        .HasColumnType("varchar(1000)");
-
-                    b.Property<bool>("InsuranceContributable")
-                        .HasColumnType("tinyint(1)");
-
-                    b.Property<string>("Note")
-                        .HasMaxLength(1000)
-                        .HasColumnType("varchar(1000)");
-
-                    b.Property<string>("ProjectCode")
-                        .IsRequired()
-                        .HasMaxLength(80)
-                        .HasColumnType("varchar(80)");
-
-                    b.Property<string>("ProjectName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("varchar(200)");
-
-                    b.Property<string>("Reason")
-                        .HasMaxLength(500)
-                        .HasColumnType("varchar(500)");
-
-                    b.Property<int>("RowNumber")
-                        .HasColumnType("int");
-
-                    b.Property<bool>("Taxable")
-                        .HasColumnType("tinyint(1)");
-
-                    b.Property<string>("ValidationStatus")
-                        .IsRequired()
-                        .HasColumnType("VARCHAR(50)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("EmployeeId", "ValidationStatus")
-                        .HasDatabaseName("IX_project_bonus_lines_Employee_Validation");
-
-                    b.HasIndex("BatchId", "EmployeeId", "ProjectCode")
-                        .HasDatabaseName("IX_project_bonus_lines_Batch_Employee_Project");
-
-                    b.ToTable("project_bonus_import_lines");
-                });
-
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.SalaryComponentType", b =>
                 {
                     b.Property<int>("Id")
@@ -3136,19 +2974,11 @@ namespace HRM.backend.Migrations
                         .IsRequired()
                         .HasColumnType("VARCHAR(50)");
 
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("VARCHAR(50)");
-
                     b.Property<decimal?>("TaxExemptCap")
                         .HasColumnType("DECIMAL(15,2)");
 
                     b.Property<int>("Version")
                         .HasColumnType("int");
-
-                    b.Property<string>("VersionCode")
-                        .HasMaxLength(80)
-                        .HasColumnType("varchar(80)");
 
                     b.HasKey("Id");
 
@@ -3182,7 +3012,6 @@ namespace HRM.backend.Migrations
                             Name = "Lương cơ bản theo công",
                             Note = "Base salary prorated by approved workdays.",
                             ProrationType = "ByWorkingDays",
-                            Status = "Active",
                             Version = 1
                         },
                         new
@@ -3205,7 +3034,6 @@ namespace HRM.backend.Migrations
                             Name = "Phụ cấp chức vụ",
                             Note = "Configured by PositionJobLevelPolicy when fixed and recurring.",
                             ProrationType = "ByWorkingDays",
-                            Status = "Active",
                             Version = 1
                         },
                         new
@@ -3227,7 +3055,6 @@ namespace HRM.backend.Migrations
                             IsTaxable = true,
                             Name = "Phụ cấp trách nhiệm",
                             ProrationType = "ByWorkingDays",
-                            Status = "Active",
                             Version = 1
                         },
                         new
@@ -3250,7 +3077,6 @@ namespace HRM.backend.Migrations
                             Name = "Phụ cấp ăn ca",
                             Note = "Tax-exempt cap is stored as policy data and should be versioned when changed.",
                             ProrationType = "FixedPerDay",
-                            Status = "Active",
                             TaxExemptCap = 730000m,
                             Version = 1
                         },
@@ -3271,9 +3097,8 @@ namespace HRM.backend.Migrations
                             IsInsuranceBased = false,
                             IsOvertime = false,
                             IsTaxable = true,
-                            Name = "Mức thưởng KPI tối đa",
+                            Name = "Thưởng KPI",
                             ProrationType = "None",
-                            Status = "Active",
                             Version = 1
                         },
                         new
@@ -3295,7 +3120,6 @@ namespace HRM.backend.Migrations
                             IsTaxable = true,
                             Name = "OT phần 100% chịu thuế",
                             ProrationType = "ByHours",
-                            Status = "Active",
                             Version = 1
                         },
                         new
@@ -3317,7 +3141,6 @@ namespace HRM.backend.Migrations
                             IsTaxable = false,
                             Name = "OT phần hệ số tăng thêm",
                             ProrationType = "ByHours",
-                            Status = "Active",
                             Version = 1
                         },
                         new
@@ -3339,7 +3162,6 @@ namespace HRM.backend.Migrations
                             IsTaxable = false,
                             Name = "Bảo hiểm người lao động đóng",
                             ProrationType = "None",
-                            Status = "Active",
                             Version = 1
                         },
                         new
@@ -3361,7 +3183,6 @@ namespace HRM.backend.Migrations
                             IsTaxable = false,
                             Name = "Thuế thu nhập cá nhân",
                             ProrationType = "None",
-                            Status = "Active",
                             Version = 1
                         },
                         new
@@ -3383,7 +3204,6 @@ namespace HRM.backend.Migrations
                             IsTaxable = true,
                             Name = "Truy lĩnh chịu thuế và tính bảo hiểm",
                             ProrationType = "None",
-                            Status = "Active",
                             Version = 1
                         },
                         new
@@ -3405,7 +3225,6 @@ namespace HRM.backend.Migrations
                             IsTaxable = true,
                             Name = "Truy lĩnh/truy thu chịu thuế",
                             ProrationType = "None",
-                            Status = "Active",
                             Version = 1
                         },
                         new
@@ -3427,7 +3246,6 @@ namespace HRM.backend.Migrations
                             IsTaxable = false,
                             Name = "Truy lĩnh/truy thu không chịu thuế",
                             ProrationType = "None",
-                            Status = "Active",
                             Version = 1
                         },
                         new
@@ -3449,7 +3267,6 @@ namespace HRM.backend.Migrations
                             IsTaxable = false,
                             Name = "Khoản truy thu/điều chỉnh khấu trừ",
                             ProrationType = "None",
-                            Status = "Active",
                             Version = 1
                         },
                         new
@@ -3472,32 +3289,7 @@ namespace HRM.backend.Migrations
                             Name = "Thu nhập từ timesheet ngoài",
                             Note = "Used for collaborators/freelancers imported from approved external timesheets.",
                             ProrationType = "ByHours",
-                            Status = "Active",
                             Version = 1
-                        },
-                        new
-                        {
-                            Id = 15,
-                            CalculationMethod = "Formula",
-                            Code = "PROJECT_BONUS",
-                            ComponentGroup = "Bonus",
-                            CreatedAt = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            EffectiveFrom = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            IsActive = true,
-                            IsAllowance = false,
-                            IsBonus = true,
-                            IsDeduction = false,
-                            IsFixed = false,
-                            IsIncome = true,
-                            IsInsuranceBased = false,
-                            IsOvertime = false,
-                            IsTaxable = true,
-                            Name = "Thưởng dự án",
-                            Note = "Approved project bonus imported from ERP/accounting and included as taxable bonus income by default.",
-                            ProrationType = "None",
-                            Status = "Active",
-                            Version = 1,
-                            VersionCode = "PROJECT_BONUS_V1"
                         });
                 });
 
@@ -3565,7 +3357,9 @@ namespace HRM.backend.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .HasColumnType("VARCHAR(50)");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("VARCHAR(50)")
+                        .HasDefaultValue("Active");
 
                     b.Property<int?>("SupersedesVersionId")
                         .HasColumnType("int");
@@ -4592,7 +4386,9 @@ namespace HRM.backend.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .HasColumnType("VARCHAR(50)");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("VARCHAR(50)")
+                        .HasDefaultValue("Active");
 
                     b.Property<int?>("SupersedesVersionId")
                         .HasColumnType("int");
@@ -4707,25 +4503,6 @@ namespace HRM.backend.Migrations
                             ValueType = "Amount",
                             Version = 1,
                             VersionCode = "VN_MIN_WAGE_2026"
-                        },
-                        new
-                        {
-                            Id = 20260601,
-                            ActivatedAt = new DateTime(2026, 6, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            Code = "HICAS_KPI_BONUS_2026",
-                            CreatedAt = new DateTime(2026, 6, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            Description = "Lưu quy chế thưởng KPI theo version. Hợp đồng chỉ viện dẫn nguyên tắc; thay đổi công thức tạo version mới, không cần ký lại phụ lục từng lần.",
-                            EffectiveFrom = new DateTime(2026, 6, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            FormulaJson = "{\"kpiBonusTargetSource\":\"EmployeeSalaryComponent.KPI_BONUS\",\"scoreFormula\":\"Điểm KPI chính thức = tổng max(0, trọng số KPI * điểm trưởng phòng / 100 - điểm trừ).\",\"payoutFormula\":\"Thưởng KPI thực nhận = mức thưởng KPI tối đa * điểm KPI / 100.\",\"eligibilityRule\":\"Người lao động chỉ nhận thưởng KPI khi kết quả KPI kỳ đó đã được chốt, không thuộc trường hợp bị hủy hoặc không áp dụng theo quy chế lương thưởng và quyết định kỷ luật liên quan.\",\"paymentPeriod\":\"Chi trả theo kỳ lương sau khi kết quả KPI được chốt và bảng lương được phê duyệt.\",\"approverRole\":\"Trưởng phòng chốt điểm KPI; HR kiểm tra chính sách; Giám đốc phê duyệt bảng lương.\"}",
-                            IsActive = true,
-                            LockedAfterUsed = false,
-                            Name = "Quy chế thưởng KPI HICAS 2026",
-                            PolicyType = "KpiBonus",
-                            SourceRef = "HICAS compensation policy 2026",
-                            Status = "Active",
-                            ValueType = "Formula",
-                            Version = 1,
-                            VersionCode = "HICAS_KPI_BONUS_2026_V1"
                         });
                 });
 
@@ -5281,10 +5058,6 @@ namespace HRM.backend.Migrations
                     b.Property<int?>("ReviewerAccountId")
                         .HasColumnType("int");
 
-                    b.Property<string>("ScoringVersion")
-                        .HasMaxLength(40)
-                        .HasColumnType("varchar(40)");
-
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("VARCHAR(50)");
@@ -5790,7 +5563,9 @@ namespace HRM.backend.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .HasColumnType("VARCHAR(50)");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("VARCHAR(50)")
+                        .HasDefaultValue("Draft");
 
                     b.Property<int?>("SupersedesVersionId")
                         .HasColumnType("int");
@@ -6193,7 +5968,9 @@ namespace HRM.backend.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .HasColumnType("VARCHAR(50)");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("VARCHAR(50)")
+                        .HasDefaultValue("Active");
 
                     b.Property<int?>("SupersedesVersionId")
                         .HasColumnType("int");
@@ -6730,42 +6507,6 @@ namespace HRM.backend.Migrations
                     b.Navigation("PayrollFormula");
 
                     b.Navigation("SalaryComponentType");
-                });
-
-            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.ProjectBonusImportBatch", b =>
-                {
-                    b.HasOne("HRM.backend.src.HRM.Core.Entities.System.Account", "ApprovedByAccount")
-                        .WithMany()
-                        .HasForeignKey("ApprovedByAccountId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("HRM.backend.src.HRM.Core.Entities.System.Account", "UploadedByAccount")
-                        .WithMany()
-                        .HasForeignKey("UploadedByAccountId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("ApprovedByAccount");
-
-                    b.Navigation("UploadedByAccount");
-                });
-
-            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.ProjectBonusImportLine", b =>
-                {
-                    b.HasOne("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.ProjectBonusImportBatch", "Batch")
-                        .WithMany("Lines")
-                        .HasForeignKey("BatchId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.Employee", "Employee")
-                        .WithMany()
-                        .HasForeignKey("EmployeeId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("Batch");
-
-                    b.Navigation("Employee");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PersonnelChanges.PersonnelChangeApproval", b =>
@@ -7520,11 +7261,6 @@ namespace HRM.backend.Migrations
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.PayrollFormula", b =>
-                {
-                    b.Navigation("Lines");
-                });
-
-            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.ProjectBonusImportBatch", b =>
                 {
                     b.Navigation("Lines");
                 });

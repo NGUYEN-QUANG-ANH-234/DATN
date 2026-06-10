@@ -1,5 +1,6 @@
 using HRM.backend.src.HRM.API.Extensions;
 using HRM.backend.src.HRM.Infrastructure.Configurations;
+using HRM.backend.src.HRM.Infrastructure.Persistence;
 using Serilog;
 using System.Text;
 using System.IdentityModel.Tokens.Jwt;
@@ -44,6 +45,7 @@ public class Program
             // 4. Cấu hình HTTP Request Pipeline (Middleware)
             app.UseCustomPipeline();
 
+            await HicasDepartmentSeeder.AutoSyncAsync(app.Services);
             await PermissionSeederExtension.AutoSyncPermissionsAsync(app.Services);
 
             Log.Information(" HRM HICAS System is running...");

@@ -73,6 +73,7 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
         public DbSet<Dependent> Dependents { get; set; }
         public DbSet<DependentUpdateRequest> DependentUpdateRequests { get; set; }
         public DbSet<Contract> Contracts { get; set; }
+        public DbSet<ContractLegalSnapshot> ContractLegalSnapshots { get; set; }
         public DbSet<ContractAddendum> ContractAddendums { get; set; }
         public DbSet<ContractAddendumDetail> ContractAddendumDetails { get; set; }
         public DbSet<MaternityLeave> MaternityLeaves { get; set; }
@@ -89,6 +90,8 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
         public DbSet<AttendanceDailySummary> AttendanceDailySummaries { get; set; }
         public DbSet<AttendanceAdjustmentLog> AttendanceAdjustmentLogs { get; set; }
         public DbSet<WorkCalendarConfig> WorkCalendarConfigs { get; set; }
+        public DbSet<CompanyCalendar> CompanyCalendars { get; set; }
+        public DbSet<CompanyCalendarDay> CompanyCalendarDays { get; set; }
         public DbSet<LeaveType> LeaveTypes { get; set; }
         public DbSet<LeaveBalance> LeaveBalances { get; set; }
         public DbSet<LeaveRequest> LeaveRequests { get; set; }
@@ -124,6 +127,8 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
         public DbSet<OvertimeRateConfig> OvertimeRateConfigs { get; set; }
         public DbSet<ExternalTimesheetImport> ExternalTimesheetImports { get; set; }
         public DbSet<ExternalTimesheetLine> ExternalTimesheetLines { get; set; }
+        public DbSet<ProjectBonusImportBatch> ProjectBonusImportBatches { get; set; }
+        public DbSet<ProjectBonusImportLine> ProjectBonusImportLines { get; set; }
 
         // 8. Personnel Changes
         public DbSet<PersonnelChangeRequest> PersonnelChangeRequests { get; set; }
@@ -160,6 +165,7 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
             modelBuilder.Entity<SourceCatalog>().HasIndex(s => s.SourcePath).IsUnique();
             modelBuilder.Entity<PayrollPolicy>().HasIndex(p => new { p.PolicyType, p.Code, p.EffectiveFrom }).IsUnique().HasDatabaseName("UX_payroll_policies_Type_Code_EffectiveFrom");
             modelBuilder.Entity<PayrollPolicy>().HasIndex(p => new { p.PolicyType, p.IsActive, p.EffectiveFrom }).HasDatabaseName("IX_payroll_policies_Type_Active_EffectiveFrom");
+            modelBuilder.Entity<PayrollPolicy>().HasIndex(p => new { p.PolicyType, p.Status, p.IsActive, p.EffectiveFrom }).HasDatabaseName("IX_payroll_policies_Type_Status_EffectiveFrom");
             modelBuilder.Entity<IdempotencyRecord>().HasIndex(i => new { i.Scope, i.IdempotencyKey }).IsUnique();
             modelBuilder.Entity<OutboxMessage>().HasIndex(o => new { o.Status, o.CreatedAt });
             modelBuilder.Entity<Department>().HasIndex(d => d.DeptCode).IsUnique();
@@ -170,8 +176,11 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
             modelBuilder.Entity<PositionJobLevelPolicy>().HasIndex(p => new { p.PositionId, p.JobLevelId, p.IsActive, p.EffectiveFrom }).HasDatabaseName("IX_position_job_level_policies_Lookup");
             modelBuilder.Entity<Contract>().HasIndex(c => c.ContractNumber).IsUnique();
             modelBuilder.Entity<Contract>().HasIndex(c => new { c.EmployeeId, c.Status, c.StartDate }).HasDatabaseName("IX_contracts_Employee_Status_StartDate");
+            modelBuilder.Entity<ContractLegalSnapshot>().HasIndex(s => new { s.ContractId, s.Version }).IsUnique().HasDatabaseName("UX_contract_legal_snapshots_Contract_Version");
+            modelBuilder.Entity<ContractLegalSnapshot>().HasIndex(s => new { s.ContractId, s.CreatedAt }).HasDatabaseName("IX_contract_legal_snapshots_Contract_CreatedAt");
             modelBuilder.Entity<ContractAddendum>().HasIndex(ca => ca.AddendumNumber).IsUnique();
             modelBuilder.Entity<ContractAddendum>().HasIndex(ca => new { ca.ContractId, ca.Status });
+            modelBuilder.Entity<ContractAddendum>().HasIndex(ca => new { ca.AddendumType, ca.Status }).HasDatabaseName("IX_contract_addendums_Type_Status");
             modelBuilder.Entity<ContractAddendumDetail>().HasIndex(d => new { d.ContractAddendumId, d.FieldName }).HasDatabaseName("IX_contract_addendum_details_Addendum_Field");
             modelBuilder.Entity<MaternityLeave>().HasIndex(m => new { m.EmployeeId, m.Status, m.StartDate }).HasDatabaseName("IX_maternity_leaves_Employee_Status_Start");
             modelBuilder.Entity<TerminationRequest>().HasIndex(t => new { t.EmployeeId, t.Status, t.ExpectedLastWorkingDate }).HasDatabaseName("IX_termination_requests_Employee_Status_LastDate");
@@ -180,6 +189,10 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
             modelBuilder.Entity<EmploymentServicePeriod>().HasIndex(p => new { p.EmployeeId, p.PeriodStart, p.PeriodEnd }).HasDatabaseName("IX_employment_service_periods_Employee_Range");
             modelBuilder.Entity<WorkShift>().HasIndex(s => s.DeptId).IsUnique().HasDatabaseName("UX_work_shifts_DeptId");
             modelBuilder.Entity<WorkCalendarConfig>().HasIndex(w => new { w.DeptId, w.Month, w.Year }).IsUnique().HasDatabaseName("UX_work_calendar_configs_DeptId_Month_Year");
+            modelBuilder.Entity<WorkCalendarConfig>().HasIndex(w => w.CompanyCalendarId).HasDatabaseName("IX_work_calendar_configs_CompanyCalendarId");
+            modelBuilder.Entity<CompanyCalendar>().HasIndex(c => new { c.Year, c.VersionCode }).IsUnique().HasDatabaseName("UX_company_calendars_Year_Version");
+            modelBuilder.Entity<CompanyCalendar>().HasIndex(c => new { c.Year, c.Status, c.EffectiveFrom }).HasDatabaseName("IX_company_calendars_Year_Status_EffectiveFrom");
+            modelBuilder.Entity<CompanyCalendarDay>().HasIndex(d => new { d.CalendarId, d.Date }).IsUnique().HasDatabaseName("UX_company_calendar_days_Calendar_Date");
             modelBuilder.Entity<LeaveRequest>().HasIndex(l => new { l.EmployeeId, l.LeaveTypeId, l.StartDate, l.EndDate }).IsUnique().HasDatabaseName("UX_leave_requests_EmployeeId_LeaveTypeId_StartDate_EndDate");
             modelBuilder.Entity<OvertimeRequest>().HasIndex(o => new { o.EmployeeId, o.WorkDate, o.StartTime, o.EndTime }).IsUnique().HasDatabaseName("UX_overtime_requests_EmployeeId_WorkDate_StartTime_EndTime");
             modelBuilder.Entity<OvertimeRequest>().HasIndex(o => new { o.EmployeeId, o.StartAt, o.EndAt }).HasDatabaseName("IX_overtime_requests_EmployeeId_StartAt_EndAt");
@@ -221,8 +234,11 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
             modelBuilder.Entity<SalaryComponentType>().HasIndex(s => new { s.ComponentGroup, s.IsActive, s.EffectiveFrom }).HasDatabaseName("IX_salary_component_types_Group_Active_EffectiveFrom");
             modelBuilder.Entity<EmployeeSalaryComponent>().HasIndex(s => new { s.EmployeeId, s.SalaryComponentTypeId, s.EffectiveFrom }).HasDatabaseName("IX_employee_salary_components_Employee_Type_EffectiveFrom");
             modelBuilder.Entity<TaxConfig>().HasIndex(t => new { t.Code, t.EffectiveFrom }).IsUnique().HasDatabaseName("UX_tax_configs_Code_EffectiveFrom");
+            modelBuilder.Entity<TaxConfig>().HasIndex(t => new { t.Status, t.IsActive, t.EffectiveFrom }).HasDatabaseName("IX_tax_configs_Status_Active_EffectiveFrom");
             modelBuilder.Entity<PITTaxBracket>().HasIndex(t => new { t.Code, t.Level, t.EffectiveFrom }).IsUnique().HasDatabaseName("UX_pit_tax_brackets_Code_Level_EffectiveFrom");
+            modelBuilder.Entity<PITTaxBracket>().HasIndex(t => new { t.Status, t.IsActive, t.Code, t.Version, t.EffectiveFrom }).HasDatabaseName("IX_pit_tax_brackets_Status_Version");
             modelBuilder.Entity<InsuranceConfig>().HasIndex(i => new { i.Code, i.EffectiveFrom }).IsUnique().HasDatabaseName("UX_insurance_configs_Code_EffectiveFrom");
+            modelBuilder.Entity<InsuranceConfig>().HasIndex(i => new { i.Status, i.IsActive, i.EffectiveFrom }).HasDatabaseName("IX_insurance_configs_Status_Active_EffectiveFrom");
             modelBuilder.Entity<MonthlyInsuranceStatus>().HasIndex(i => new { i.EmployeeId, i.Month, i.Year }).IsUnique().HasDatabaseName("UX_monthly_insurance_statuses_Employee_Period");
             modelBuilder.Entity<PayrollContractSegment>().HasIndex(s => s.PayrollId).HasDatabaseName("IX_payroll_contract_segments_Payroll");
             modelBuilder.Entity<PayrollContractSegment>().HasIndex(s => new { s.EmployeeId, s.StartDate, s.EndDate }).HasDatabaseName("IX_payroll_contract_segments_Employee_Range");
@@ -230,9 +246,14 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
             modelBuilder.Entity<PayrollAdjustment>().HasIndex(a => a.AppliedPayrollId).HasDatabaseName("IX_payroll_adjustments_AppliedPayroll");
             modelBuilder.Entity<OvertimeRateConfig>().HasIndex(o => new { o.Code, o.EffectiveFrom }).IsUnique().HasDatabaseName("UX_overtime_rate_configs_Code_EffectiveFrom");
             modelBuilder.Entity<OvertimeRateConfig>().HasIndex(o => new { o.OvertimeType, o.IsActive, o.EffectiveFrom }).HasDatabaseName("IX_overtime_rate_configs_Type_Active_EffectiveFrom");
+            modelBuilder.Entity<OvertimeRateConfig>().HasIndex(o => new { o.OvertimeType, o.Status, o.IsActive, o.EffectiveFrom }).HasDatabaseName("IX_overtime_rate_configs_Type_Status_EffectiveFrom");
             modelBuilder.Entity<ExternalTimesheetImport>().HasIndex(e => new { e.SourceSystem, e.ImportMonth, e.ImportYear, e.Status }).HasDatabaseName("IX_external_timesheet_imports_Source_Period_Status");
             modelBuilder.Entity<ExternalTimesheetLine>().HasIndex(e => new { e.ImportId, e.CollaboratorEmployeeId, e.WorkDate }).HasDatabaseName("IX_external_timesheet_lines_Import_Employee_WorkDate");
             modelBuilder.Entity<ExternalTimesheetLine>().HasIndex(e => new { e.CollaboratorEmployeeId, e.WorkDate, e.IsPayrollImported }).HasDatabaseName("IX_external_timesheet_lines_Employee_WorkDate_Payroll");
+            modelBuilder.Entity<ProjectBonusImportBatch>().HasIndex(b => new { b.PeriodYear, b.PeriodMonth, b.Status }).HasDatabaseName("IX_project_bonus_batches_Period_Status");
+            modelBuilder.Entity<ProjectBonusImportBatch>().HasIndex(b => new { b.UploadedByAccountId, b.CreatedAt }).HasDatabaseName("IX_project_bonus_batches_Uploader_CreatedAt");
+            modelBuilder.Entity<ProjectBonusImportLine>().HasIndex(l => new { l.BatchId, l.EmployeeId, l.ProjectCode }).HasDatabaseName("IX_project_bonus_lines_Batch_Employee_Project");
+            modelBuilder.Entity<ProjectBonusImportLine>().HasIndex(l => new { l.EmployeeId, l.ValidationStatus }).HasDatabaseName("IX_project_bonus_lines_Employee_Validation");
             modelBuilder.Entity<PersonnelChangeRequest>().HasIndex(p => new { p.ChangeType, p.Status, p.RequestedAt }).HasDatabaseName("IX_personnel_change_requests_Type_Status_RequestedAt");
             modelBuilder.Entity<PersonnelChangeRequest>().HasIndex(p => new { p.EmployeeId, p.Status }).HasDatabaseName("IX_personnel_change_requests_Employee_Status");
             modelBuilder.Entity<PersonnelChangeApproval>().HasIndex(p => new { p.RequestId, p.StepName }).HasDatabaseName("IX_personnel_change_approvals_Request_Step");
@@ -316,6 +337,18 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
                 .HasOne(d => d.Dependent)
                 .WithMany()
                 .HasForeignKey(d => d.DependentId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<ContractLegalSnapshot>()
+                .HasOne(s => s.Contract)
+                .WithMany(c => c.LegalSnapshots)
+                .HasForeignKey(s => s.ContractId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<ContractLegalSnapshot>()
+                .HasOne(s => s.CreatedByAccount)
+                .WithMany()
+                .HasForeignKey(s => s.CreatedByAccountId)
                 .OnDelete(DeleteBehavior.SetNull);
 
             modelBuilder.Entity<ContractAddendum>()
@@ -834,6 +867,30 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
                 .HasForeignKey(l => l.PayrollId)
                 .OnDelete(DeleteBehavior.SetNull);
 
+            modelBuilder.Entity<ProjectBonusImportBatch>()
+                .HasOne(b => b.UploadedByAccount)
+                .WithMany()
+                .HasForeignKey(b => b.UploadedByAccountId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<ProjectBonusImportBatch>()
+                .HasOne(b => b.ApprovedByAccount)
+                .WithMany()
+                .HasForeignKey(b => b.ApprovedByAccountId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<ProjectBonusImportBatch>()
+                .HasMany(b => b.Lines)
+                .WithOne(l => l.Batch)
+                .HasForeignKey(l => l.BatchId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<ProjectBonusImportLine>()
+                .HasOne(l => l.Employee)
+                .WithMany()
+                .HasForeignKey(l => l.EmployeeId)
+                .OnDelete(DeleteBehavior.SetNull);
+
             modelBuilder.Entity<PayrollFormula>()
                 .HasMany(f => f.Lines)
                 .WithOne(l => l.PayrollFormula)
@@ -904,6 +961,18 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
                 .HasForeignKey(w => w.DeptId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            modelBuilder.Entity<WorkCalendarConfig>()
+                .HasOne(w => w.CompanyCalendar)
+                .WithMany()
+                .HasForeignKey(w => w.CompanyCalendarId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<CompanyCalendar>()
+                .HasMany(c => c.Days)
+                .WithOne(d => d.Calendar)
+                .HasForeignKey(d => d.CalendarId)
+                .OnDelete(DeleteBehavior.Cascade);
+
             SeedPayrollPhaseOneReferenceData(modelBuilder);
 
             // Tự động chuyển đổi Enum thành String khi lưu vào DB
@@ -965,6 +1034,8 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
         {
             var pitEffectiveFrom = new DateTime(2020, 7, 1);
             var insuranceEffectiveFrom = new DateTime(2025, 7, 1);
+            var pit2026EffectiveFrom = new DateTime(2026, 1, 1);
+            var insurance2026EffectiveFrom = new DateTime(2026, 1, 1);
 
             modelBuilder.Entity<JobLevel>().HasData(
                 new JobLevel { Id = 1, Code = "INTERN", Name = "Thực tập sinh", RankOrder = 1, IsManagementLevel = false, IsActive = true, CreatedAt = pitEffectiveFrom },
@@ -1060,7 +1131,7 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
                 {
                     Id = 5,
                     Code = "KPI_BONUS",
-                    Name = "Thưởng KPI",
+                    Name = "Mức thưởng KPI tối đa",
                     ComponentGroup = SalaryComponentGroup.Bonus,
                     IsIncome = true,
                     IsTaxable = true,
@@ -1226,66 +1297,163 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
                     IsActive = true,
                     CreatedAt = pitEffectiveFrom,
                     Note = "Used for collaborators/freelancers imported from approved external timesheets."
+                },
+                new SalaryComponentType
+                {
+                    Id = 15,
+                    Code = "PROJECT_BONUS",
+                    Name = "Thưởng dự án",
+                    ComponentGroup = SalaryComponentGroup.Bonus,
+                    IsIncome = true,
+                    IsDeduction = false,
+                    IsTaxable = true,
+                    IsInsuranceBased = false,
+                    IsFixed = false,
+                    IsAllowance = false,
+                    IsBonus = true,
+                    IsOvertime = false,
+                    ProrationType = ProrationType.None,
+                    CalculationMethod = CalculationMethod.Formula,
+                    EffectiveFrom = pitEffectiveFrom,
+                    Version = 1,
+                    VersionCode = "PROJECT_BONUS_V1",
+                    Status = PolicyVersionStatus.Active,
+                    IsActive = true,
+                    CreatedAt = pitEffectiveFrom,
+                    Note = "Approved project bonus imported from ERP/accounting and included as taxable bonus income by default."
                 }
             );
 
-            modelBuilder.Entity<TaxConfig>().HasData(new TaxConfig
-            {
-                Id = 1,
-                Code = "VN_PERSONAL_INCOME_TAX_2020",
-                Name = "Cấu hình thuế TNCN Việt Nam",
-                PersonalDeduction = 11000000m,
-                DependentDeduction = 4400000m,
-                FlatTaxThreshold = 2000000m,
-                FlatTaxRate = 0.10m,
-                NonResidentTaxRate = 0.20m,
-                EffectiveFrom = pitEffectiveFrom,
-                Version = 1,
-                IsActive = true,
-                CreatedAt = pitEffectiveFrom,
-                Note = "Baseline PIT config. Update by creating a newer effective version."
-            });
+            modelBuilder.Entity<TaxConfig>().HasData(
+                new TaxConfig
+                {
+                    Id = 1,
+                    Code = "VN_PERSONAL_INCOME_TAX_2020",
+                    Name = "Cấu hình thuế TNCN Việt Nam",
+                    PersonalDeduction = 11000000m,
+                    DependentDeduction = 4400000m,
+                    FlatTaxThreshold = 2000000m,
+                    FlatTaxRate = 0.10m,
+                    NonResidentTaxRate = 0.20m,
+                    EffectiveFrom = pitEffectiveFrom,
+                    Version = 1,
+                    VersionCode = "VN_PIT_2020",
+                    Status = PolicyVersionStatus.Active,
+                    SourceRef = "Vietnam PIT baseline 2020",
+                    ActivatedAt = pitEffectiveFrom,
+                    IsActive = true,
+                    CreatedAt = pitEffectiveFrom,
+                    Note = "Baseline PIT config. Update by creating a newer effective version."
+                },
+                new TaxConfig
+                {
+                    Id = 202601,
+                    Code = "VN_PERSONAL_INCOME_TAX_2026",
+                    Name = "Cấu hình thuế TNCN Việt Nam 2026",
+                    PersonalDeduction = 15500000m,
+                    DependentDeduction = 6200000m,
+                    FlatTaxThreshold = 2000000m,
+                    FlatTaxRate = 0.10m,
+                    NonResidentTaxRate = 0.20m,
+                    EffectiveFrom = pit2026EffectiveFrom,
+                    Version = 2,
+                    VersionCode = "VN_PIT_2026",
+                    Status = PolicyVersionStatus.Active,
+                    SourceRef = "Vietnam PIT family deduction policy 2026",
+                    SupersedesVersionId = 1,
+                    ActivatedAt = pit2026EffectiveFrom,
+                    IsActive = true,
+                    CreatedAt = pit2026EffectiveFrom,
+                    Note = "PIT 2026 version. Keeps historical 2020 config available for older payroll periods."
+                });
 
             modelBuilder.Entity<PITTaxBracket>().HasData(
-                new PITTaxBracket { Id = 1, Code = "VN_PROGRESSIVE_PIT_2020", Level = 1, MinIncome = 0m, MaxIncome = 5000000m, TaxRate = 0.05m, QuickDeduction = 0m, EffectiveFrom = pitEffectiveFrom, Version = 1, IsActive = true, CreatedAt = pitEffectiveFrom },
-                new PITTaxBracket { Id = 2, Code = "VN_PROGRESSIVE_PIT_2020", Level = 2, MinIncome = 5000000m, MaxIncome = 10000000m, TaxRate = 0.10m, QuickDeduction = 250000m, EffectiveFrom = pitEffectiveFrom, Version = 1, IsActive = true, CreatedAt = pitEffectiveFrom },
-                new PITTaxBracket { Id = 3, Code = "VN_PROGRESSIVE_PIT_2020", Level = 3, MinIncome = 10000000m, MaxIncome = 18000000m, TaxRate = 0.15m, QuickDeduction = 750000m, EffectiveFrom = pitEffectiveFrom, Version = 1, IsActive = true, CreatedAt = pitEffectiveFrom },
-                new PITTaxBracket { Id = 4, Code = "VN_PROGRESSIVE_PIT_2020", Level = 4, MinIncome = 18000000m, MaxIncome = 32000000m, TaxRate = 0.20m, QuickDeduction = 1650000m, EffectiveFrom = pitEffectiveFrom, Version = 1, IsActive = true, CreatedAt = pitEffectiveFrom },
-                new PITTaxBracket { Id = 5, Code = "VN_PROGRESSIVE_PIT_2020", Level = 5, MinIncome = 32000000m, MaxIncome = 52000000m, TaxRate = 0.25m, QuickDeduction = 3250000m, EffectiveFrom = pitEffectiveFrom, Version = 1, IsActive = true, CreatedAt = pitEffectiveFrom },
-                new PITTaxBracket { Id = 6, Code = "VN_PROGRESSIVE_PIT_2020", Level = 6, MinIncome = 52000000m, MaxIncome = 80000000m, TaxRate = 0.30m, QuickDeduction = 5850000m, EffectiveFrom = pitEffectiveFrom, Version = 1, IsActive = true, CreatedAt = pitEffectiveFrom },
-                new PITTaxBracket { Id = 7, Code = "VN_PROGRESSIVE_PIT_2020", Level = 7, MinIncome = 80000000m, MaxIncome = null, TaxRate = 0.35m, QuickDeduction = 9850000m, EffectiveFrom = pitEffectiveFrom, Version = 1, IsActive = true, CreatedAt = pitEffectiveFrom }
+                new PITTaxBracket { Id = 1, Code = "VN_PROGRESSIVE_PIT_2020", Level = 1, MinIncome = 0m, MaxIncome = 5000000m, TaxRate = 0.05m, QuickDeduction = 0m, EffectiveFrom = pitEffectiveFrom, Version = 1, VersionCode = "VN_PIT_BRACKET_2020", Status = PolicyVersionStatus.Active, SourceRef = "Vietnam PIT progressive brackets baseline 2020", ActivatedAt = pitEffectiveFrom, IsActive = true, CreatedAt = pitEffectiveFrom },
+                new PITTaxBracket { Id = 2, Code = "VN_PROGRESSIVE_PIT_2020", Level = 2, MinIncome = 5000000m, MaxIncome = 10000000m, TaxRate = 0.10m, QuickDeduction = 250000m, EffectiveFrom = pitEffectiveFrom, Version = 1, VersionCode = "VN_PIT_BRACKET_2020", Status = PolicyVersionStatus.Active, SourceRef = "Vietnam PIT progressive brackets baseline 2020", ActivatedAt = pitEffectiveFrom, IsActive = true, CreatedAt = pitEffectiveFrom },
+                new PITTaxBracket { Id = 3, Code = "VN_PROGRESSIVE_PIT_2020", Level = 3, MinIncome = 10000000m, MaxIncome = 18000000m, TaxRate = 0.15m, QuickDeduction = 750000m, EffectiveFrom = pitEffectiveFrom, Version = 1, VersionCode = "VN_PIT_BRACKET_2020", Status = PolicyVersionStatus.Active, SourceRef = "Vietnam PIT progressive brackets baseline 2020", ActivatedAt = pitEffectiveFrom, IsActive = true, CreatedAt = pitEffectiveFrom },
+                new PITTaxBracket { Id = 4, Code = "VN_PROGRESSIVE_PIT_2020", Level = 4, MinIncome = 18000000m, MaxIncome = 32000000m, TaxRate = 0.20m, QuickDeduction = 1650000m, EffectiveFrom = pitEffectiveFrom, Version = 1, VersionCode = "VN_PIT_BRACKET_2020", Status = PolicyVersionStatus.Active, SourceRef = "Vietnam PIT progressive brackets baseline 2020", ActivatedAt = pitEffectiveFrom, IsActive = true, CreatedAt = pitEffectiveFrom },
+                new PITTaxBracket { Id = 5, Code = "VN_PROGRESSIVE_PIT_2020", Level = 5, MinIncome = 32000000m, MaxIncome = 52000000m, TaxRate = 0.25m, QuickDeduction = 3250000m, EffectiveFrom = pitEffectiveFrom, Version = 1, VersionCode = "VN_PIT_BRACKET_2020", Status = PolicyVersionStatus.Active, SourceRef = "Vietnam PIT progressive brackets baseline 2020", ActivatedAt = pitEffectiveFrom, IsActive = true, CreatedAt = pitEffectiveFrom },
+                new PITTaxBracket { Id = 6, Code = "VN_PROGRESSIVE_PIT_2020", Level = 6, MinIncome = 52000000m, MaxIncome = 80000000m, TaxRate = 0.30m, QuickDeduction = 5850000m, EffectiveFrom = pitEffectiveFrom, Version = 1, VersionCode = "VN_PIT_BRACKET_2020", Status = PolicyVersionStatus.Active, SourceRef = "Vietnam PIT progressive brackets baseline 2020", ActivatedAt = pitEffectiveFrom, IsActive = true, CreatedAt = pitEffectiveFrom },
+                new PITTaxBracket { Id = 7, Code = "VN_PROGRESSIVE_PIT_2020", Level = 7, MinIncome = 80000000m, MaxIncome = null, TaxRate = 0.35m, QuickDeduction = 9850000m, EffectiveFrom = pitEffectiveFrom, Version = 1, VersionCode = "VN_PIT_BRACKET_2020", Status = PolicyVersionStatus.Active, SourceRef = "Vietnam PIT progressive brackets baseline 2020", ActivatedAt = pitEffectiveFrom, IsActive = true, CreatedAt = pitEffectiveFrom },
+                new PITTaxBracket { Id = 20260101, Code = "VN_PROGRESSIVE_PIT_2026", Level = 1, MinIncome = 0m, MaxIncome = 5000000m, TaxRate = 0.05m, QuickDeduction = 0m, EffectiveFrom = pit2026EffectiveFrom, Version = 2, VersionCode = "VN_PIT_BRACKET_2026", Status = PolicyVersionStatus.Active, SourceRef = "Vietnam PIT progressive brackets 2026", SupersedesVersionId = 1, ActivatedAt = pit2026EffectiveFrom, IsActive = true, CreatedAt = pit2026EffectiveFrom },
+                new PITTaxBracket { Id = 20260102, Code = "VN_PROGRESSIVE_PIT_2026", Level = 2, MinIncome = 5000000m, MaxIncome = 10000000m, TaxRate = 0.10m, QuickDeduction = 250000m, EffectiveFrom = pit2026EffectiveFrom, Version = 2, VersionCode = "VN_PIT_BRACKET_2026", Status = PolicyVersionStatus.Active, SourceRef = "Vietnam PIT progressive brackets 2026", SupersedesVersionId = 2, ActivatedAt = pit2026EffectiveFrom, IsActive = true, CreatedAt = pit2026EffectiveFrom },
+                new PITTaxBracket { Id = 20260103, Code = "VN_PROGRESSIVE_PIT_2026", Level = 3, MinIncome = 10000000m, MaxIncome = 18000000m, TaxRate = 0.15m, QuickDeduction = 750000m, EffectiveFrom = pit2026EffectiveFrom, Version = 2, VersionCode = "VN_PIT_BRACKET_2026", Status = PolicyVersionStatus.Active, SourceRef = "Vietnam PIT progressive brackets 2026", SupersedesVersionId = 3, ActivatedAt = pit2026EffectiveFrom, IsActive = true, CreatedAt = pit2026EffectiveFrom },
+                new PITTaxBracket { Id = 20260104, Code = "VN_PROGRESSIVE_PIT_2026", Level = 4, MinIncome = 18000000m, MaxIncome = 32000000m, TaxRate = 0.20m, QuickDeduction = 1650000m, EffectiveFrom = pit2026EffectiveFrom, Version = 2, VersionCode = "VN_PIT_BRACKET_2026", Status = PolicyVersionStatus.Active, SourceRef = "Vietnam PIT progressive brackets 2026", SupersedesVersionId = 4, ActivatedAt = pit2026EffectiveFrom, IsActive = true, CreatedAt = pit2026EffectiveFrom },
+                new PITTaxBracket { Id = 20260105, Code = "VN_PROGRESSIVE_PIT_2026", Level = 5, MinIncome = 32000000m, MaxIncome = 52000000m, TaxRate = 0.25m, QuickDeduction = 3250000m, EffectiveFrom = pit2026EffectiveFrom, Version = 2, VersionCode = "VN_PIT_BRACKET_2026", Status = PolicyVersionStatus.Active, SourceRef = "Vietnam PIT progressive brackets 2026", SupersedesVersionId = 5, ActivatedAt = pit2026EffectiveFrom, IsActive = true, CreatedAt = pit2026EffectiveFrom },
+                new PITTaxBracket { Id = 20260106, Code = "VN_PROGRESSIVE_PIT_2026", Level = 6, MinIncome = 52000000m, MaxIncome = 80000000m, TaxRate = 0.30m, QuickDeduction = 5850000m, EffectiveFrom = pit2026EffectiveFrom, Version = 2, VersionCode = "VN_PIT_BRACKET_2026", Status = PolicyVersionStatus.Active, SourceRef = "Vietnam PIT progressive brackets 2026", SupersedesVersionId = 6, ActivatedAt = pit2026EffectiveFrom, IsActive = true, CreatedAt = pit2026EffectiveFrom },
+                new PITTaxBracket { Id = 20260107, Code = "VN_PROGRESSIVE_PIT_2026", Level = 7, MinIncome = 80000000m, MaxIncome = null, TaxRate = 0.35m, QuickDeduction = 9850000m, EffectiveFrom = pit2026EffectiveFrom, Version = 2, VersionCode = "VN_PIT_BRACKET_2026", Status = PolicyVersionStatus.Active, SourceRef = "Vietnam PIT progressive brackets 2026", SupersedesVersionId = 7, ActivatedAt = pit2026EffectiveFrom, IsActive = true, CreatedAt = pit2026EffectiveFrom }
             );
 
-            modelBuilder.Entity<InsuranceConfig>().HasData(new InsuranceConfig
-            {
-                Id = 1,
-                Code = "VN_STANDARD_INSURANCE_2025",
-                Name = "Cấu hình bảo hiểm Việt Nam",
-                SocialInsuranceEmployeeRate = 0.08m,
-                HealthInsuranceEmployeeRate = 0.015m,
-                UnemploymentInsuranceEmployeeRate = 0.01m,
-                SocialInsuranceEmployerRate = 0.175m,
-                HealthInsuranceEmployerRate = 0.03m,
-                UnemploymentInsuranceEmployerRate = 0.01m,
-                UnionFeeEmployerRate = 0.02m,
-                MinInsuranceSalary = null,
-                MaxInsuranceSalary = null,
-                UnpaidLeaveNoContributionThresholdDays = 14,
-                MinContractMonthsForContribution = 1,
-                EffectiveFrom = insuranceEffectiveFrom,
-                Version = 1,
-                IsActive = true,
-                CreatedAt = insuranceEffectiveFrom,
-                Note = "Baseline insurance config for payroll engine. Salary caps should be updated by policy version when needed."
-            });
+            modelBuilder.Entity<InsuranceConfig>().HasData(
+                new InsuranceConfig
+                {
+                    Id = 1,
+                    Code = "VN_STANDARD_INSURANCE_2025",
+                    Name = "Cấu hình bảo hiểm Việt Nam",
+                    SocialInsuranceEmployeeRate = 0.08m,
+                    HealthInsuranceEmployeeRate = 0.015m,
+                    UnemploymentInsuranceEmployeeRate = 0.01m,
+                    SocialInsuranceEmployerRate = 0.175m,
+                    HealthInsuranceEmployerRate = 0.03m,
+                    UnemploymentInsuranceEmployerRate = 0.01m,
+                    UnionFeeEmployerRate = 0.02m,
+                    MinInsuranceSalary = null,
+                    MaxInsuranceSalary = null,
+                    UnpaidLeaveNoContributionThresholdDays = 14,
+                    MinContractMonthsForContribution = 1,
+                    EffectiveFrom = insuranceEffectiveFrom,
+                    Version = 1,
+                    VersionCode = "VN_INSURANCE_2025",
+                    Status = PolicyVersionStatus.Active,
+                    SourceRef = "Vietnam insurance baseline 2025",
+                    ActivatedAt = insuranceEffectiveFrom,
+                    IsActive = true,
+                    CreatedAt = insuranceEffectiveFrom,
+                    Note = "Baseline insurance config for payroll engine. Salary caps should be updated by policy version when needed."
+                },
+                new InsuranceConfig
+                {
+                    Id = 202601,
+                    Code = "VN_STANDARD_INSURANCE_2026",
+                    Name = "Cấu hình bảo hiểm Việt Nam 2026",
+                    SocialInsuranceEmployeeRate = 0.08m,
+                    HealthInsuranceEmployeeRate = 0.015m,
+                    UnemploymentInsuranceEmployeeRate = 0.01m,
+                    SocialInsuranceEmployerRate = 0.175m,
+                    HealthInsuranceEmployerRate = 0.03m,
+                    UnemploymentInsuranceEmployerRate = 0.01m,
+                    UnionFeeEmployerRate = 0.02m,
+                    MinInsuranceSalary = null,
+                    MaxInsuranceSalary = null,
+                    UnpaidLeaveNoContributionThresholdDays = 14,
+                    MinContractMonthsForContribution = 1,
+                    EffectiveFrom = insurance2026EffectiveFrom,
+                    Version = 2,
+                    VersionCode = "VN_INSURANCE_2026",
+                    Status = PolicyVersionStatus.Active,
+                    SourceRef = "Vietnam insurance policy 2026",
+                    SupersedesVersionId = 1,
+                    ActivatedAt = insurance2026EffectiveFrom,
+                    IsActive = true,
+                    CreatedAt = insurance2026EffectiveFrom,
+                    Note = "Insurance 2026 version. Minimum wage region policies are tracked separately for cap review."
+                });
 
             modelBuilder.Entity<OvertimeRateConfig>().HasData(
-                new OvertimeRateConfig { Id = 1, Code = "VN_OT_WEEKDAY_2020", OvertimeType = OvertimeType.Weekday, BaseMultiplier = 1.5m, NightAllowanceRate = 0m, NightOvertimeExtraRate = 0m, EffectiveFrom = pitEffectiveFrom, Version = 1, IsActive = true, CreatedAt = pitEffectiveFrom, Note = "Baseline weekday OT multiplier." },
-                new OvertimeRateConfig { Id = 2, Code = "VN_OT_WEEKEND_2020", OvertimeType = OvertimeType.Weekend, BaseMultiplier = 2.0m, NightAllowanceRate = 0m, NightOvertimeExtraRate = 0m, EffectiveFrom = pitEffectiveFrom, Version = 1, IsActive = true, CreatedAt = pitEffectiveFrom, Note = "Baseline weekly rest day OT multiplier." },
-                new OvertimeRateConfig { Id = 3, Code = "VN_OT_HOLIDAY_2020", OvertimeType = OvertimeType.Holiday, BaseMultiplier = 3.0m, NightAllowanceRate = 0m, NightOvertimeExtraRate = 0m, EffectiveFrom = pitEffectiveFrom, Version = 1, IsActive = true, CreatedAt = pitEffectiveFrom, Note = "Baseline public holiday OT multiplier." },
-                new OvertimeRateConfig { Id = 4, Code = "VN_OT_WEEKDAY_NIGHT_2020", OvertimeType = OvertimeType.WeekdayNight, BaseMultiplier = 1.5m, NightAllowanceRate = 0.3m, NightOvertimeExtraRate = 0.2m, EffectiveFrom = pitEffectiveFrom, Version = 1, IsActive = true, CreatedAt = pitEffectiveFrom, Note = "Baseline weekday night OT config." },
-                new OvertimeRateConfig { Id = 5, Code = "VN_OT_WEEKEND_NIGHT_2020", OvertimeType = OvertimeType.WeekendNight, BaseMultiplier = 2.0m, NightAllowanceRate = 0.3m, NightOvertimeExtraRate = 0.2m, EffectiveFrom = pitEffectiveFrom, Version = 1, IsActive = true, CreatedAt = pitEffectiveFrom, Note = "Baseline weekend night OT config." },
-                new OvertimeRateConfig { Id = 6, Code = "VN_OT_HOLIDAY_NIGHT_2020", OvertimeType = OvertimeType.HolidayNight, BaseMultiplier = 3.0m, NightAllowanceRate = 0.3m, NightOvertimeExtraRate = 0.2m, EffectiveFrom = pitEffectiveFrom, Version = 1, IsActive = true, CreatedAt = pitEffectiveFrom, Note = "Baseline holiday night OT config." }
+                new OvertimeRateConfig { Id = 1, Code = "VN_OT_WEEKDAY_2020", OvertimeType = OvertimeType.Weekday, BaseMultiplier = 1.5m, NightAllowanceRate = 0m, NightOvertimeExtraRate = 0m, EffectiveFrom = pitEffectiveFrom, Version = 1, VersionCode = "VN_OT_2020", Status = PolicyVersionStatus.Active, SourceRef = "Vietnam overtime baseline 2020", ActivatedAt = pitEffectiveFrom, IsActive = true, CreatedAt = pitEffectiveFrom, Note = "Baseline weekday OT multiplier." },
+                new OvertimeRateConfig { Id = 2, Code = "VN_OT_WEEKEND_2020", OvertimeType = OvertimeType.Weekend, BaseMultiplier = 2.0m, NightAllowanceRate = 0m, NightOvertimeExtraRate = 0m, EffectiveFrom = pitEffectiveFrom, Version = 1, VersionCode = "VN_OT_2020", Status = PolicyVersionStatus.Active, SourceRef = "Vietnam overtime baseline 2020", ActivatedAt = pitEffectiveFrom, IsActive = true, CreatedAt = pitEffectiveFrom, Note = "Baseline weekly rest day OT multiplier." },
+                new OvertimeRateConfig { Id = 3, Code = "VN_OT_HOLIDAY_2020", OvertimeType = OvertimeType.Holiday, BaseMultiplier = 3.0m, NightAllowanceRate = 0m, NightOvertimeExtraRate = 0m, EffectiveFrom = pitEffectiveFrom, Version = 1, VersionCode = "VN_OT_2020", Status = PolicyVersionStatus.Active, SourceRef = "Vietnam overtime baseline 2020", ActivatedAt = pitEffectiveFrom, IsActive = true, CreatedAt = pitEffectiveFrom, Note = "Baseline public holiday OT multiplier." },
+                new OvertimeRateConfig { Id = 4, Code = "VN_OT_WEEKDAY_NIGHT_2020", OvertimeType = OvertimeType.WeekdayNight, BaseMultiplier = 1.5m, NightAllowanceRate = 0.3m, NightOvertimeExtraRate = 0.2m, EffectiveFrom = pitEffectiveFrom, Version = 1, VersionCode = "VN_OT_2020", Status = PolicyVersionStatus.Active, SourceRef = "Vietnam overtime baseline 2020", ActivatedAt = pitEffectiveFrom, IsActive = true, CreatedAt = pitEffectiveFrom, Note = "Baseline weekday night OT config." },
+                new OvertimeRateConfig { Id = 5, Code = "VN_OT_WEEKEND_NIGHT_2020", OvertimeType = OvertimeType.WeekendNight, BaseMultiplier = 2.0m, NightAllowanceRate = 0.3m, NightOvertimeExtraRate = 0.2m, EffectiveFrom = pitEffectiveFrom, Version = 1, VersionCode = "VN_OT_2020", Status = PolicyVersionStatus.Active, SourceRef = "Vietnam overtime baseline 2020", ActivatedAt = pitEffectiveFrom, IsActive = true, CreatedAt = pitEffectiveFrom, Note = "Baseline weekend night OT config." },
+                new OvertimeRateConfig { Id = 6, Code = "VN_OT_HOLIDAY_NIGHT_2020", OvertimeType = OvertimeType.HolidayNight, BaseMultiplier = 3.0m, NightAllowanceRate = 0.3m, NightOvertimeExtraRate = 0.2m, EffectiveFrom = pitEffectiveFrom, Version = 1, VersionCode = "VN_OT_2020", Status = PolicyVersionStatus.Active, SourceRef = "Vietnam overtime baseline 2020", ActivatedAt = pitEffectiveFrom, IsActive = true, CreatedAt = pitEffectiveFrom, Note = "Baseline holiday night OT config." }
+            );
+
+            modelBuilder.Entity<PayrollPolicy>().HasData(
+                new PayrollPolicy { Id = 20260101, PolicyType = PayrollPolicyType.MinimumWage, Code = "VN_MIN_WAGE_REGION_1_2026", Name = "Lương tối thiểu vùng I 2026", ValueType = PayrollPolicyValueType.Amount, Amount = 5310000m, EffectiveFrom = insurance2026EffectiveFrom, Version = 1, VersionCode = "VN_MIN_WAGE_2026", Status = PolicyVersionStatus.Active, SourceRef = "Vietnam regional minimum wage 2026", ActivatedAt = insurance2026EffectiveFrom, IsActive = true, CreatedAt = insurance2026EffectiveFrom, Description = "Theo dõi lương tối thiểu vùng để đối chiếu trần/sàn chính sách bảo hiểm và lương." },
+                new PayrollPolicy { Id = 20260102, PolicyType = PayrollPolicyType.MinimumWage, Code = "VN_MIN_WAGE_REGION_2_2026", Name = "Lương tối thiểu vùng II 2026", ValueType = PayrollPolicyValueType.Amount, Amount = 4730000m, EffectiveFrom = insurance2026EffectiveFrom, Version = 1, VersionCode = "VN_MIN_WAGE_2026", Status = PolicyVersionStatus.Active, SourceRef = "Vietnam regional minimum wage 2026", ActivatedAt = insurance2026EffectiveFrom, IsActive = true, CreatedAt = insurance2026EffectiveFrom, Description = "Theo dõi lương tối thiểu vùng để đối chiếu trần/sàn chính sách bảo hiểm và lương." },
+                new PayrollPolicy { Id = 20260103, PolicyType = PayrollPolicyType.MinimumWage, Code = "VN_MIN_WAGE_REGION_3_2026", Name = "Lương tối thiểu vùng III 2026", ValueType = PayrollPolicyValueType.Amount, Amount = 4140000m, EffectiveFrom = insurance2026EffectiveFrom, Version = 1, VersionCode = "VN_MIN_WAGE_2026", Status = PolicyVersionStatus.Active, SourceRef = "Vietnam regional minimum wage 2026", ActivatedAt = insurance2026EffectiveFrom, IsActive = true, CreatedAt = insurance2026EffectiveFrom, Description = "Theo dõi lương tối thiểu vùng để đối chiếu trần/sàn chính sách bảo hiểm và lương." },
+                new PayrollPolicy { Id = 20260104, PolicyType = PayrollPolicyType.MinimumWage, Code = "VN_MIN_WAGE_REGION_4_2026", Name = "Lương tối thiểu vùng IV 2026", ValueType = PayrollPolicyValueType.Amount, Amount = 3700000m, EffectiveFrom = insurance2026EffectiveFrom, Version = 1, VersionCode = "VN_MIN_WAGE_2026", Status = PolicyVersionStatus.Active, SourceRef = "Vietnam regional minimum wage 2026", ActivatedAt = insurance2026EffectiveFrom, IsActive = true, CreatedAt = insurance2026EffectiveFrom, Description = "Theo dõi lương tối thiểu vùng để đối chiếu trần/sàn chính sách bảo hiểm và lương." },
+                new PayrollPolicy { Id = 20260601, PolicyType = PayrollPolicyType.KpiBonus, Code = "HICAS_KPI_BONUS_2026", Name = "Quy chế thưởng KPI HICAS 2026", ValueType = PayrollPolicyValueType.Formula, FormulaJson = "{\"kpiBonusTargetSource\":\"EmployeeSalaryComponent.KPI_BONUS\",\"scoreFormula\":\"Điểm KPI chính thức = tổng max(0, trọng số KPI * điểm trưởng phòng / 100 - điểm trừ).\",\"payoutFormula\":\"Thưởng KPI thực nhận = mức thưởng KPI tối đa * điểm KPI / 100.\",\"eligibilityRule\":\"Người lao động chỉ nhận thưởng KPI khi kết quả KPI kỳ đó đã được chốt, không thuộc trường hợp bị hủy hoặc không áp dụng theo quy chế lương thưởng và quyết định kỷ luật liên quan.\",\"paymentPeriod\":\"Chi trả theo kỳ lương sau khi kết quả KPI được chốt và bảng lương được phê duyệt.\",\"approverRole\":\"Trưởng phòng chốt điểm KPI; HR kiểm tra chính sách; Giám đốc phê duyệt bảng lương.\"}", EffectiveFrom = new DateTime(2026, 6, 1), Version = 1, VersionCode = "HICAS_KPI_BONUS_2026_V1", Status = PolicyVersionStatus.Active, SourceRef = "HICAS compensation policy 2026", ActivatedAt = new DateTime(2026, 6, 1), IsActive = true, CreatedAt = new DateTime(2026, 6, 1), Description = "Lưu quy chế thưởng KPI theo version. Hợp đồng chỉ viện dẫn nguyên tắc; thay đổi công thức tạo version mới, không cần ký lại phụ lục từng lần." }
             );
         }
         

@@ -40,14 +40,7 @@ public static class DbInitializer
         context.Roles.AddRange(roles);
         await context.SaveChangesAsync();
 
-        var departments = new List<Department>
-        {
-            new Department { DeptCode = "TECH", DeptName = "Phòng Kỹ thuật", Status = DeptStatus.Active },
-            new Department { DeptCode = "SALE", DeptName = "Phòng Kinh doanh", Status = DeptStatus.Active },
-            new Department { DeptCode = "HR", DeptName = "Phòng Nhân sự", Status = DeptStatus.Active },
-            new Department { DeptCode = "ACC", DeptName = "Phòng Kế toán", Status = DeptStatus.Active }
-        };
-        context.Departments.AddRange(departments);
+        var departments = (await HicasDepartmentSeeder.SyncAsync(context)).ToList();
 
         var positions = new List<Position>
         {
@@ -315,6 +308,7 @@ public static class DbInitializer
                 EmployeeId = employees[i].Id,
                 Period = $"{DateTime.Now.Month:D2}/{DateTime.Now.Year}", // VD: "05/2026"
                 TotalScore = faker.Random.Decimal(75, 100),
+                ScoringVersion = "Legacy",
                 FinalRating = faker.PickRandom(new[] { "A", "B", "C" }),
                 Status = ReviewStatus.Approved
             };
@@ -349,6 +343,7 @@ public static class DbInitializer
             Status = FormulaStatus.Approved,
             IsActive = true,
             Version = 1,
+            VersionCode = "LEGACY_KPI_TARGET_V1",
             EffectiveFrom = new DateTime(2020, 7, 1),
             ApprovedAt = DateTime.UtcNow,
             Lines = new List<PayrollFormulaLine>
@@ -362,6 +357,41 @@ public static class DbInitializer
                 new PayrollFormulaLine { ComponentCode = "LEGACY_TAXABLE_ALLOWANCE", Expression = "legacy_taxable_allowance", CalculationOrder = 60, IsGrossComponent = true, IsTaxable = true, IsInsuranceBased = false, IsDeduction = false, IsSnapshotRequired = true },
                 new PayrollFormulaLine { ComponentCode = "LEGACY_NONTAXABLE_ALLOWANCE", Expression = "legacy_nontaxable_allowance", CalculationOrder = 70, IsGrossComponent = true, IsTaxable = false, IsInsuranceBased = false, IsDeduction = false, IsSnapshotRequired = true },
                 new PayrollFormulaLine { ComponentCode = "KPI_BONUS", Expression = "kpi_bonus_amount", CalculationOrder = 80, IsGrossComponent = true, IsTaxable = true, IsInsuranceBased = false, IsDeduction = false, IsSnapshotRequired = true },
+                new PayrollFormulaLine { ComponentCode = "PROJECT_BONUS", Expression = "project_bonus_amount", CalculationOrder = 87, IsGrossComponent = true, IsTaxable = true, IsInsuranceBased = false, IsDeduction = false, IsSnapshotRequired = true },
+                new PayrollFormulaLine { ComponentCode = "OT_BASE", Expression = "overtime_base_amount", CalculationOrder = 90, IsGrossComponent = true, IsTaxable = true, IsInsuranceBased = false, IsDeduction = false, IsSnapshotRequired = true },
+                new PayrollFormulaLine { ComponentCode = "OT_PREMIUM", Expression = "overtime_premium_amount", CalculationOrder = 100, IsGrossComponent = true, IsTaxable = false, IsInsuranceBased = false, IsDeduction = false, IsSnapshotRequired = true },
+                new PayrollFormulaLine { ComponentCode = "PAYROLL_ADJUSTMENT_TAXABLE_INSURANCE", Expression = "payroll_adjustment_taxable_insurance", CalculationOrder = 110, IsGrossComponent = true, IsTaxable = true, IsInsuranceBased = true, IsDeduction = false, IsSnapshotRequired = true },
+                new PayrollFormulaLine { ComponentCode = "PAYROLL_ADJUSTMENT_TAXABLE", Expression = "payroll_adjustment_taxable", CalculationOrder = 120, IsGrossComponent = true, IsTaxable = true, IsInsuranceBased = false, IsDeduction = false, IsSnapshotRequired = true },
+                new PayrollFormulaLine { ComponentCode = "PAYROLL_ADJUSTMENT_NONTAXABLE", Expression = "payroll_adjustment_nontaxable", CalculationOrder = 130, IsGrossComponent = true, IsTaxable = false, IsInsuranceBased = false, IsDeduction = false, IsSnapshotRequired = true },
+                new PayrollFormulaLine { ComponentCode = "EMPLOYEE_INSURANCE", Expression = "insurance_salary * employee_insurance_rate", CalculationOrder = 200, IsGrossComponent = false, IsTaxable = false, IsInsuranceBased = false, IsDeduction = true, IsSnapshotRequired = true },
+                new PayrollFormulaLine { ComponentCode = "PIT", Expression = "pit(pit_tax_base)", CalculationOrder = 210, IsGrossComponent = false, IsTaxable = false, IsInsuranceBased = false, IsDeduction = true, IsSnapshotRequired = true },
+                new PayrollFormulaLine { ComponentCode = "PAYROLL_ADJUSTMENT_DEDUCTION", Expression = "payroll_adjustment_deduction", CalculationOrder = 220, IsGrossComponent = false, IsTaxable = false, IsInsuranceBased = false, IsDeduction = true, IsSnapshotRequired = true }
+            }
+        });
+
+        context.PayrollFormulas.Add(new PayrollFormula
+        {
+            FormulaCode = "DEFAULT_PAYROLL_V2",
+            FormulaName = "Công thức lương mặc định - KPI theo điểm",
+            Expression = "gross_income = sum(payroll_formula_lines)",
+            Status = FormulaStatus.Approved,
+            IsActive = true,
+            Version = 2,
+            VersionCode = "KPI_PAYOUT_V2",
+            EffectiveFrom = new DateTime(2026, 6, 1),
+            ApprovedAt = DateTime.UtcNow,
+            Lines = new List<PayrollFormulaLine>
+            {
+                new PayrollFormulaLine { ComponentCode = "BASE_SALARY_ACTUAL", Expression = "contract_segment_salary_amount", CalculationOrder = 10, IsGrossComponent = true, IsTaxable = true, IsInsuranceBased = true, IsDeduction = false, IsSnapshotRequired = true },
+                new PayrollFormulaLine { ComponentCode = "POSITION_ALLOWANCE", Expression = "position_allowance / standard_workdays * actual_workdays", CalculationOrder = 20, IsGrossComponent = true, IsTaxable = true, IsInsuranceBased = true, IsDeduction = false, IsSnapshotRequired = true },
+                new PayrollFormulaLine { ComponentCode = "RESPONSIBILITY_ALLOWANCE", Expression = "responsibility_allowance / standard_workdays * actual_workdays", CalculationOrder = 30, IsGrossComponent = true, IsTaxable = true, IsInsuranceBased = true, IsDeduction = false, IsSnapshotRequired = true },
+                new PayrollFormulaLine { ComponentCode = "SENIORITY_ALLOWANCE", Expression = "seniority_allowance_prorated", CalculationOrder = 35, IsGrossComponent = true, IsTaxable = true, IsInsuranceBased = true, IsDeduction = false, IsSnapshotRequired = true },
+                new PayrollFormulaLine { ComponentCode = "MEAL_ALLOWANCE", Expression = "meal_allowance_per_day * actual_attendance_days", CalculationOrder = 40, IsGrossComponent = true, IsTaxable = false, IsInsuranceBased = false, IsDeduction = false, IsSnapshotRequired = true },
+                new PayrollFormulaLine { ComponentCode = "LEGACY_INSURANCE_ALLOWANCE", Expression = "legacy_insurance_allowance", CalculationOrder = 50, IsGrossComponent = true, IsTaxable = true, IsInsuranceBased = true, IsDeduction = false, IsSnapshotRequired = true },
+                new PayrollFormulaLine { ComponentCode = "LEGACY_TAXABLE_ALLOWANCE", Expression = "legacy_taxable_allowance", CalculationOrder = 60, IsGrossComponent = true, IsTaxable = true, IsInsuranceBased = false, IsDeduction = false, IsSnapshotRequired = true },
+                new PayrollFormulaLine { ComponentCode = "LEGACY_NONTAXABLE_ALLOWANCE", Expression = "legacy_nontaxable_allowance", CalculationOrder = 70, IsGrossComponent = true, IsTaxable = false, IsInsuranceBased = false, IsDeduction = false, IsSnapshotRequired = true },
+                new PayrollFormulaLine { ComponentCode = "KPI_BONUS", Expression = "kpi_bonus_amount * kpi_score / 100", CalculationOrder = 80, IsGrossComponent = true, IsTaxable = true, IsInsuranceBased = false, IsDeduction = false, IsSnapshotRequired = true, Note = "Khoản thưởng KPI thực nhận = mức thưởng KPI tối đa * điểm KPI / 100." },
+                new PayrollFormulaLine { ComponentCode = "PROJECT_BONUS", Expression = "project_bonus_amount", CalculationOrder = 87, IsGrossComponent = true, IsTaxable = true, IsInsuranceBased = false, IsDeduction = false, IsSnapshotRequired = true },
                 new PayrollFormulaLine { ComponentCode = "OT_BASE", Expression = "overtime_base_amount", CalculationOrder = 90, IsGrossComponent = true, IsTaxable = true, IsInsuranceBased = false, IsDeduction = false, IsSnapshotRequired = true },
                 new PayrollFormulaLine { ComponentCode = "OT_PREMIUM", Expression = "overtime_premium_amount", CalculationOrder = 100, IsGrossComponent = true, IsTaxable = false, IsInsuranceBased = false, IsDeduction = false, IsSnapshotRequired = true },
                 new PayrollFormulaLine { ComponentCode = "PAYROLL_ADJUSTMENT_TAXABLE_INSURANCE", Expression = "payroll_adjustment_taxable_insurance", CalculationOrder = 110, IsGrossComponent = true, IsTaxable = true, IsInsuranceBased = true, IsDeduction = false, IsSnapshotRequired = true },

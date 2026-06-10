@@ -1,6 +1,8 @@
 using HRM.backend.src.HRM.Application.DTOs.System;
 using HRM.backend.src.HRM.Application.Interfaces;
+using HRM.backend.src.HRM.Application.Interfaces.Dashboard.UseCases;
 using HRM.backend.src.HRM.Application.Interfaces.EmployeeProfile.Usecases;
+using HRM.backend.src.HRM.Application.Interfaces.EmployeeProfile.Services;
 using HRM.backend.src.HRM.Application.Interfaces.PayrollAllowances.Services;
 using HRM.backend.src.HRM.Application.Interfaces.PayrollAllowances.Usecases;
 using HRM.backend.src.HRM.Application.Interfaces.PersonnelChanges.Services;
@@ -15,9 +17,12 @@ using HRM.backend.src.HRM.Application.Interfaces.TasksTraining.Usecases;
 using HRM.backend.src.HRM.Application.Interfaces.TimeAttendance.Services;
 using HRM.backend.src.HRM.Application.Interfaces.TimeAttendance.Usecases;
 using HRM.backend.src.HRM.Application.Services.System;
+using HRM.backend.src.HRM.Application.Services.EmployeeProfile;
+using HRM.backend.src.HRM.Application.Services.System.PayrollSources;
 using HRM.backend.src.HRM.Application.Services.PayrollAllowances;
 using HRM.backend.src.HRM.Application.Services.TasksTraining;
 using HRM.backend.src.HRM.Application.Services.TimeAttendance;
+using HRM.backend.src.HRM.Application.UseCases.Dashboard;
 using HRM.backend.src.HRM.Application.UseCases.EmployeeProfile;
 using HRM.backend.src.HRM.Application.UseCases.PayrollAllowances;
 using HRM.backend.src.HRM.Application.UseCases.PersonnelChanges;
@@ -37,17 +42,23 @@ namespace HRM.backend.src.HRM.Infrastructure.Configurations
         public static IServiceCollection AddServicesConfig(this IServiceCollection services, Microsoft.Extensions.Configuration.IConfiguration configuration)
         {
             // UseCases chứa business logic -> Scoped
+            services.AddScoped<IDashboardUseCase, DashboardUseCase>();
+
             // Module: System
             services.AddScoped<IIdentityUseCase, IdentityUseCase>();
             services.AddScoped<ISalaryVariableUseCase, SalaryVariableUseCase>();
             services.AddScoped<ISourceCatalogUseCase, SourceCatalogUseCase>();
             services.AddScoped<ISlaManagementUseCase, SlaManagementUseCase>(); 
+            services.AddScoped<ISlaProcessRegistry, SlaProcessRegistry>();
             services.AddScoped<IRbacUseCase, RbacUseCase>();
             services.AddScoped<IAuditManagementUseCase, AuditManagementUseCase>();
             services.AddScoped<IAccountManagementUseCase, AccountManagementUseCase>();
             services.AddScoped<IAttendanceConfigUseCase, AttendanceConfigUseCase>();
+            services.AddScoped<ICompanyCalendarUseCase, CompanyCalendarUseCase>();
             services.AddScoped<ILeaveTypeUseCase, LeaveTypeUseCase>();
             services.AddScoped<IDocumentExportUseCase, DocumentExportUseCase>();
+            services.AddScoped<IDocumentTemplateManagementUseCase, DocumentTemplateManagementUseCase>();
+            services.AddScoped<ITemplateManagementUseCase, TemplateManagementUseCase>();
             services.AddScoped<IPayrollPolicyUseCase, PayrollPolicyUseCase>();
             services.AddScoped<ISlaTrackingService, SlaTrackingService>();
             services.AddScoped<IApprovalConflictGuard, ApprovalConflictGuard>();
@@ -75,12 +86,26 @@ namespace HRM.backend.src.HRM.Infrastructure.Configurations
             services.AddScoped<IExcelKpiParserService, ExcelKpiParserService>();
 
             // Module: Payroll
+            services.AddScoped<PayrollFeatureToggleService>();
+            services.AddScoped<IPayrollFeatureToggleResolver>(provider => provider.GetRequiredService<PayrollFeatureToggleService>());
+            services.AddScoped<IPayrollFeatureToggleUseCase>(provider => provider.GetRequiredService<PayrollFeatureToggleService>());
+            services.AddScoped<IPayrollLegalPolicyResolver, PayrollLegalPolicyResolver>();
             services.AddScoped<IPayrollSourceResolver, PayrollSourceResolver>();
             services.AddScoped<IPayrollFormulaValidator, PayrollFormulaValidator>();
             services.AddScoped<IPayrollCalculationEngine, PayrollCalculationEngine>();
             services.AddScoped<IPayrollSnapshotWriter, PayrollSnapshotWriter>();
             services.AddScoped<IPayrollCalculationUseCase, PayrollCalculationUseCase>();
             services.AddScoped<IPayrollAccessUseCase, PayrollAccessUseCase>();
+            services.AddScoped<IProjectBonusImportUseCase, ProjectBonusImportUseCase>();
+            services.AddScoped<IPayrollSourceRegistry, PayrollSourceRegistry>();
+            services.AddScoped<IPayrollSourceProvider, ContractPayrollSourceProvider>();
+            services.AddScoped<IPayrollSourceProvider, AttendancePayrollSourceProvider>();
+            services.AddScoped<IPayrollSourceProvider, OvertimePayrollSourceProvider>();
+            services.AddScoped<IPayrollSourceProvider, PerformancePayrollSourceProvider>();
+            services.AddScoped<IPayrollSourceProvider, ProjectBonusPayrollSourceProvider>();
+            services.AddScoped<IPayrollSourceProvider, TaxInsurancePayrollSourceProvider>();
+            services.AddScoped<IPayrollSourceProvider, AdjustmentPayrollSourceProvider>();
+            services.AddScoped<IPayrollSourceProvider, SeniorityPayrollSourceProvider>();
 
             // Module: Profile
             services.AddScoped<IManageProfileUseCase, ManageProfileUseCase>();
@@ -94,6 +119,7 @@ namespace HRM.backend.src.HRM.Infrastructure.Configurations
             services.AddScoped<IOnboardingUseCase, OnboardingUseCase>();
             services.AddScoped<IContractUseCase, ContractUseCase>();
             services.AddScoped<IContractAddendumUseCase, ContractAddendumUseCase>();
+            services.AddScoped<IContractChangeFlowClassifier, ContractChangeFlowClassifier>();
 
             // Module: Personnel Changes
             services.AddScoped<IPersonnelChangeUseCase, PersonnelChangeUseCase>();
@@ -103,6 +129,7 @@ namespace HRM.backend.src.HRM.Infrastructure.Configurations
             services.AddScoped<IDismissalDisciplinaryUseCase, DismissalDisciplinaryUseCase>();
             services.AddScoped<IInternalTransferUseCase, InternalTransferUseCase>();
             services.AddScoped<PersonnelChangeRiskSummaryBuilder>();
+            services.AddScoped<IPersonnelChangeAccessGuard, PersonnelChangeAccessGuard>();
             services.AddScoped<IPersonnelChangeContractFlowService, PersonnelChangeContractFlowService>();
 
             // Các service có trạng thái nội bộ liên quan đến request -> Scoped

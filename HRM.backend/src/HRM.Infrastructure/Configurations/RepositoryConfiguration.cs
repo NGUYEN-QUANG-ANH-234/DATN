@@ -63,6 +63,7 @@ namespace HRM.backend.src.HRM.Infrastructure.Configurations
             // Attendence
             services.AddScoped<IWorkShiftRepository, WorkShiftRepository>();
             services.AddScoped<IWorkCalendarConfigRepository, WorkCalendarConfigRepository>();
+            services.AddScoped<ICompanyCalendarRepository, CompanyCalendarRepository>();
             services.AddScoped<IAttendanceRepository, AttendanceRepository>();
             services.AddScoped<IAttendanceSummaryRepository, AttendanceSummaryRepository>();
             services.AddScoped<IOvertimeRequestRepository, OvertimeRequestRepository>();
@@ -94,6 +95,7 @@ namespace HRM.backend.src.HRM.Infrastructure.Configurations
 
             // Payroll
             services.AddScoped<IPayrollRepository, PayrollRepository>();
+            services.AddScoped<IProjectBonusImportRepository, ProjectBonusImportRepository>();
 
             // Personnel Changes
             services.AddScoped<IPersonnelChangeRepository, PersonnelChangeRepository>();
