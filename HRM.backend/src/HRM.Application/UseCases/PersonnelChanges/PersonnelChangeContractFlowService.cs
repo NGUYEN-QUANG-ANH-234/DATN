@@ -1,5 +1,6 @@
 using System.Text.Json;
 using HRM.backend.src.HRM.Application.DTOs.Events;
+using HRM.backend.src.HRM.Application.Interfaces.EmployeeProfile.Services;
 using HRM.backend.src.HRM.Application.Interfaces.PersonnelChanges.Services;
 using HRM.backend.src.HRM.Core.Entities.EmployeeProfile;
 using HRM.backend.src.HRM.Core.Entities.PersonnelChanges;
@@ -16,6 +17,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
         private readonly IPersonnelChangeRepository _personnelChangeRepo;
         private readonly IContractRepository _contractRepo;
         private readonly IContractAddendumRepository _contractAddendumRepo;
+        private readonly IContractChangeFlowClassifier _contractChangeFlowClassifier;
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMediator _mediator;
 
@@ -29,12 +31,14 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
             IPersonnelChangeRepository personnelChangeRepo,
             IContractRepository contractRepo,
             IContractAddendumRepository contractAddendumRepo,
+            IContractChangeFlowClassifier contractChangeFlowClassifier,
             IUnitOfWork unitOfWork,
             IMediator mediator)
         {
             _personnelChangeRepo = personnelChangeRepo;
             _contractRepo = contractRepo;
             _contractAddendumRepo = contractAddendumRepo;
+            _contractChangeFlowClassifier = contractChangeFlowClassifier;
             _unitOfWork = unitOfWork;
             _mediator = mediator;
         }
@@ -120,11 +124,20 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
 
         public async Task MarkContractFlowNegotiatingAsync(int contractId, string? note, CancellationToken ct)
         {
-            var requests = await _personnelChangeRepo.GetByContractFlowReferenceAsync(contractId, null, ct);
+            await MarkContractFlowNegotiatingAsync(contractId, null, note, ct);
+        }
+
+        public async Task MarkContractFlowNegotiatingAsync(int? contractId, int? contractAddendumId, string? note, CancellationToken ct)
+        {
+            if (!contractId.HasValue && !contractAddendumId.HasValue)
+                return;
+
+            var requests = await _personnelChangeRepo.GetByContractFlowReferenceAsync(contractId, contractAddendumId, ct);
 
             foreach (var request in requests)
             {
                 if (request.Status != PersonnelChangeStatus.PendingContractFlow &&
+                    request.Status != PersonnelChangeStatus.ContractNegotiating &&
                     request.Status != PersonnelChangeStatus.Escalated)
                     continue;
 
@@ -134,7 +147,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
                 request.UpdatedAt = DateTime.UtcNow;
 
                 foreach (var link in request.ContractLinks.Where(l =>
-                             l.ContractId == contractId || l.ContractRequestId == contractId))
+                             IsContractFlowReferenceMatch(l, contractId, contractAddendumId)))
                 {
                     link.Status = "Negotiating";
                 }
@@ -188,9 +201,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
                     request.RelatedContractAddendumId = contractAddendumId.Value;
 
                 foreach (var link in request.ContractLinks.Where(l =>
-                             (contractId.HasValue &&
-                              (l.ContractId == contractId.Value || l.ContractRequestId == contractId.Value)) ||
-                             (contractAddendumId.HasValue && l.ContractAddendumId == contractAddendumId.Value)))
+                             IsContractFlowReferenceMatch(l, contractId, contractAddendumId)))
                 {
                     link.Status = "Accepted";
                     link.CompletedAt = DateTime.UtcNow;
@@ -205,6 +216,56 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
                     Note = contractAddendumId.HasValue
                         ? $"Contract addendum flow completed: {contractAddendumId.Value}."
                         : $"Contract flow completed: {contractId!.Value}.",
+                    CreatedAt = DateTime.UtcNow
+                }, ct);
+
+                _personnelChangeRepo.Update(request);
+            }
+
+            await _unitOfWork.CommitAsync(ct);
+        }
+
+        public async Task MarkContractFlowRevisionClosedAsync(int? contractId, int? contractAddendumId, string? reason, CancellationToken ct)
+        {
+            if (!contractId.HasValue && !contractAddendumId.HasValue)
+                return;
+
+            var requests = await _personnelChangeRepo.GetByContractFlowReferenceAsync(contractId, contractAddendumId, ct);
+            var note = string.IsNullOrWhiteSpace(reason)
+                ? "Contract revision was closed without agreement."
+                : reason.Trim();
+
+            foreach (var request in requests)
+            {
+                if (request.Status != PersonnelChangeStatus.PendingContractFlow &&
+                    request.Status != PersonnelChangeStatus.ContractNegotiating &&
+                    request.Status != PersonnelChangeStatus.Escalated)
+                    continue;
+
+                var oldStatus = request.Status;
+                request.ContractFlowStatus = "NotAgreed";
+                request.Status = PersonnelChangeStatus.ContractRevisionClosed;
+                request.UpdatedAt = DateTime.UtcNow;
+
+                if (contractId.HasValue && !request.RelatedContractId.HasValue)
+                    request.RelatedContractId = contractId.Value;
+                if (contractAddendumId.HasValue && !request.RelatedContractAddendumId.HasValue)
+                    request.RelatedContractAddendumId = contractAddendumId.Value;
+
+                foreach (var link in request.ContractLinks.Where(l =>
+                             IsContractFlowReferenceMatch(l, contractId, contractAddendumId)))
+                {
+                    link.Status = "NotAgreed";
+                    link.CompletedAt = DateTime.UtcNow;
+                }
+
+                await _personnelChangeRepo.AddHistoryAsync(new PersonnelChangeHistory
+                {
+                    RequestId = request.Id,
+                    Action = "ContractFlowRevisionClosed",
+                    OldStatus = oldStatus,
+                    NewStatus = request.Status,
+                    Note = note,
                     CreatedAt = DateTime.UtcNow
                 }, ct);
 
@@ -245,9 +306,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
                     request.RelatedContractAddendumId = contractAddendumId.Value;
 
                 foreach (var link in request.ContractLinks.Where(l =>
-                             (contractId.HasValue &&
-                              (l.ContractId == contractId.Value || l.ContractRequestId == contractId.Value)) ||
-                             (contractAddendumId.HasValue && l.ContractAddendumId == contractAddendumId.Value)))
+                             IsContractFlowReferenceMatch(l, contractId, contractAddendumId)))
                 {
                     link.Status = "Rejected";
                     link.CompletedAt = DateTime.UtcNow;
@@ -302,13 +361,17 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
 
         private async Task<PersonnelChangeContractLink> CreateAddendumFlowAsync(PersonnelChangeRequest request, CancellationToken ct)
         {
+            _contractChangeFlowClassifier.EnsureAllowedForAddendum(ResolveContractChangeTypes(request));
+
+            var employeeId = GetRequiredEmployeeId(request);
             var contract = request.RelatedContractId.HasValue
                 ? await _contractRepo.GetByIdAsync(request.RelatedContractId.Value, ct)
-                : (await _contractRepo.GetByEmployeeIdAsync(GetRequiredEmployeeId(request), ct))
+                : (await _contractRepo.GetByEmployeeIdAsync(employeeId, ct))
                     .FirstOrDefault(c => c.Status == ContractStatus.Active);
 
             if (contract == null)
                 throw new InvalidOperationException("No active or related contract was found for contract addendum flow.");
+            EnsureContractBelongsToRequestEmployee(contract, employeeId);
 
             var addendum = new ContractAddendum
             {
@@ -339,13 +402,15 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
 
         private async Task<PersonnelChangeContractLink> CreateContractTerminationFlowAsync(PersonnelChangeRequest request, CancellationToken ct)
         {
+            var employeeId = GetRequiredEmployeeId(request);
             var contract = request.RelatedContractId.HasValue
                 ? await _contractRepo.GetByIdAsync(request.RelatedContractId.Value, ct)
-                : (await _contractRepo.GetByEmployeeIdAsync(GetRequiredEmployeeId(request), ct))
+                : (await _contractRepo.GetByEmployeeIdAsync(employeeId, ct))
                     .FirstOrDefault(c => c.Status == ContractStatus.Active);
 
             if (contract == null)
                 throw new InvalidOperationException("No active or related contract was found for contract termination flow.");
+            EnsureContractBelongsToRequestEmployee(contract, employeeId);
 
             request.RelatedContractId = contract.Id;
 
@@ -373,10 +438,34 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
             return JsonSerializer.Serialize(payload, new JsonSerializerOptions(JsonSerializerDefaults.Web));
         }
 
+        private static IEnumerable<ContractChangeType> ResolveContractChangeTypes(PersonnelChangeRequest request)
+        {
+            if (request.NewDepartmentId.HasValue) yield return ContractChangeType.DepartmentChangePermanent;
+            if (request.NewPositionId.HasValue) yield return ContractChangeType.PositionChangePermanent;
+            if (request.NewJobLevelId.HasValue) yield return ContractChangeType.JobLevelChangePermanent;
+            if (request.NewEmployeeType.HasValue) yield return ContractChangeType.EmployeeTypeChangePermanent;
+        }
+
         private static int GetRequiredEmployeeId(PersonnelChangeRequest request)
         {
             return request.EmployeeId
                 ?? throw new InvalidOperationException("Contract flow requires a selected employee.");
+        }
+
+        private static void EnsureContractBelongsToRequestEmployee(Contract contract, int employeeId)
+        {
+            if (contract.EmployeeId != employeeId)
+                throw new InvalidOperationException("Related contract does not belong to the selected employee.");
+        }
+
+        private static bool IsContractFlowReferenceMatch(
+            PersonnelChangeContractLink link,
+            int? contractId,
+            int? contractAddendumId)
+        {
+            return (contractId.HasValue &&
+                    (link.ContractId == contractId.Value || link.ContractRequestId == contractId.Value)) ||
+                   (contractAddendumId.HasValue && link.ContractAddendumId == contractAddendumId.Value);
         }
     }
 }

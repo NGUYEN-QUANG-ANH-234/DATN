@@ -22,6 +22,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
         private readonly IUnitOfWork _unitOfWork;
         private readonly ILockService _lockService;
         private readonly PersonnelChangeRiskSummaryBuilder _riskSummaryBuilder;
+        private readonly IPersonnelChangeAccessGuard _accessGuard;
         private readonly IPersonnelChangeContractFlowService _contractFlowService;
         private readonly IPersonnelChangeUseCase _personnelChangeUseCase;
 
@@ -33,6 +34,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
             IUnitOfWork unitOfWork,
             ILockService lockService,
             PersonnelChangeRiskSummaryBuilder riskSummaryBuilder,
+            IPersonnelChangeAccessGuard accessGuard,
             IPersonnelChangeContractFlowService contractFlowService,
             IPersonnelChangeUseCase personnelChangeUseCase)
         {
@@ -43,6 +45,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
             _unitOfWork = unitOfWork;
             _lockService = lockService;
             _riskSummaryBuilder = riskSummaryBuilder;
+            _accessGuard = accessGuard;
             _contractFlowService = contractFlowService;
             _personnelChangeUseCase = personnelChangeUseCase;
         }
@@ -57,8 +60,15 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
             if (dto.NewPositionId <= 0)
                 throw new ArgumentException("New position is required.");
 
-            var employee = await _employeeRepo.GetByIdAsync(dto.EmployeeId, ct)
-                ?? throw new KeyNotFoundException("Employee was not found.");
+            var employee = await _accessGuard.EnsureCanAccessEmployeeAsync(dto.EmployeeId, actorAccountId, ct);
+            await _accessGuard.EnsurePlacementReferencesAsync(
+                dto.NewDepartmentId,
+                dto.NewPositionId,
+                dto.IsDepartmentManager ? null : dto.ReportsToManagerId,
+                dto.NewJobLevelId,
+                actorAccountId,
+                ct);
+            await _accessGuard.EnsureContractBelongsToEmployeeAsync(dto.RelatedContractId, employee.Id, ct);
 
             var request = new PersonnelChangeRequest
             {
@@ -164,6 +174,11 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
                 var oldStatus = request.Status;
                 request.RequiresContractFlow = true;
                 request.ContractFlowType = dto.ContractFlowType;
+                if (request.EmployeeId.HasValue)
+                    await _accessGuard.EnsureContractBelongsToEmployeeAsync(
+                        dto.RelatedContractId,
+                        request.EmployeeId.Value,
+                        innerCt);
                 request.RelatedContractId = dto.RelatedContractId ?? request.RelatedContractId;
                 request.ContractFlowStatus = "Pending";
                 request.HRAssignedAccountId = actorAccountId;

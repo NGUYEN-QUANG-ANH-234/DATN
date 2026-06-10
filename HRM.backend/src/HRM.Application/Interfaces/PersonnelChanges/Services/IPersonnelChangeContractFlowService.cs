@@ -10,8 +10,10 @@ namespace HRM.backend.src.HRM.Application.Interfaces.PersonnelChanges.Services
         void EnsureCanExecute(PersonnelChangeRequest request);
         Task CreateContractFlowAsync(PersonnelChangeRequest request, CancellationToken ct);
         Task MarkContractFlowNegotiatingAsync(int contractId, string? note, CancellationToken ct);
+        Task MarkContractFlowNegotiatingAsync(int? contractId, int? contractAddendumId, string? note, CancellationToken ct);
         Task MarkContractFlowCompletedAsync(int contractFlowReferenceId, CancellationToken ct);
         Task MarkContractFlowCompletedAsync(int? contractId, int? contractAddendumId, CancellationToken ct);
+        Task MarkContractFlowRevisionClosedAsync(int? contractId, int? contractAddendumId, string? reason, CancellationToken ct);
         Task MarkContractFlowRejectedAsync(int? contractId, int? contractAddendumId, string? reason, CancellationToken ct);
     }
 }

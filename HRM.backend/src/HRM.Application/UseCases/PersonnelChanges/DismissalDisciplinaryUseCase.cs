@@ -26,6 +26,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
         private readonly IUnitOfWork _unitOfWork;
         private readonly ILockService _lockService;
         private readonly PersonnelChangeRiskSummaryBuilder _riskSummaryBuilder;
+        private readonly IPersonnelChangeAccessGuard _accessGuard;
         private readonly IPersonnelChangeContractFlowService _contractFlowService;
         private readonly IPersonnelChangeUseCase _personnelChangeUseCase;
 
@@ -39,6 +40,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
             IUnitOfWork unitOfWork,
             ILockService lockService,
             PersonnelChangeRiskSummaryBuilder riskSummaryBuilder,
+            IPersonnelChangeAccessGuard accessGuard,
             IPersonnelChangeContractFlowService contractFlowService,
             IPersonnelChangeUseCase personnelChangeUseCase)
         {
@@ -51,6 +53,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
             _unitOfWork = unitOfWork;
             _lockService = lockService;
             _riskSummaryBuilder = riskSummaryBuilder;
+            _accessGuard = accessGuard;
             _contractFlowService = contractFlowService;
             _personnelChangeUseCase = personnelChangeUseCase;
         }
@@ -65,13 +68,15 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
             if (dto.SourcePenaltyRecordId <= 0)
                 throw new ArgumentException("Penalty record is required.");
 
-            var employee = await _employeeRepo.GetByIdAsync(dto.EmployeeId, ct)
-                ?? throw new KeyNotFoundException("Employee was not found.");
+            _accessGuard.EnsurePersonnelChangeEvidencePath(dto.EvidenceFilePath);
+
+            var employee = await _accessGuard.EnsureCanAccessEmployeeAsync(dto.EmployeeId, actorAccountId, ct);
             var penalty = await _penaltyRecordRepo.GetByIdAsync(dto.SourcePenaltyRecordId, ct)
                 ?? throw new KeyNotFoundException("Penalty record was not found.");
 
             if (penalty.EmployeeId != employee.Id)
                 throw new InvalidOperationException("Penalty record does not belong to the selected employee.");
+            await _accessGuard.EnsureContractBelongsToEmployeeAsync(dto.RelatedContractId, employee.Id, ct);
 
             var reason = FirstNonEmpty(dto.Reason, penalty.Reason);
             var evidenceFilePath = FirstNonEmpty(dto.EvidenceFilePath, penalty.EvidenceFilePath);
@@ -144,6 +149,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
             {
                 EnsureStatus(request, PersonnelChangeStatus.PendingHRReview, PersonnelChangeStatus.PendingEmployeeNotification);
 
+                _accessGuard.EnsurePersonnelChangeEvidencePath(dto.EvidenceFilePath);
                 request.HRNote = FirstNonEmpty(dto.HRNote, request.HRNote);
                 request.EvidenceFilePath = FirstNonEmpty(dto.EvidenceFilePath, request.EvidenceFilePath);
                 request.ResponseDeadlineAt = dto.ResponseDeadlineAt ?? request.ResponseDeadlineAt;
@@ -181,6 +187,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
                 EnsureStatus(request, PersonnelChangeStatus.PendingEmployeeExplanation);
                 await EnsureSelectedEmployeeCanExplainAsync(request, actorAccountId, innerCt);
 
+                _accessGuard.EnsurePersonnelChangeEvidencePath(dto.EvidenceFilePath);
                 var oldStatus = request.Status;
                 request.EmployeeExplanation = dto.Explanation.Trim();
                 request.EmployeeExplanationAt = DateTime.UtcNow;

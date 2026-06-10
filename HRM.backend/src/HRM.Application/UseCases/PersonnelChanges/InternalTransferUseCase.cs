@@ -20,6 +20,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
         private readonly IUnitOfWork _unitOfWork;
         private readonly ILockService _lockService;
         private readonly PersonnelChangeRiskSummaryBuilder _riskSummaryBuilder;
+        private readonly IPersonnelChangeAccessGuard _accessGuard;
         private readonly IPersonnelChangeContractFlowService _contractFlowService;
         private readonly IPersonnelChangeUseCase _personnelChangeUseCase;
 
@@ -30,6 +31,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
             IUnitOfWork unitOfWork,
             ILockService lockService,
             PersonnelChangeRiskSummaryBuilder riskSummaryBuilder,
+            IPersonnelChangeAccessGuard accessGuard,
             IPersonnelChangeContractFlowService contractFlowService,
             IPersonnelChangeUseCase personnelChangeUseCase)
         {
@@ -39,6 +41,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
             _unitOfWork = unitOfWork;
             _lockService = lockService;
             _riskSummaryBuilder = riskSummaryBuilder;
+            _accessGuard = accessGuard;
             _contractFlowService = contractFlowService;
             _personnelChangeUseCase = personnelChangeUseCase;
         }
@@ -50,6 +53,14 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
         {
             if (dto.RequestedDepartmentId <= 0)
                 throw new ArgumentException("Requested department is required.");
+
+            await _accessGuard.EnsurePlacementReferencesAsync(
+                dto.RequestedDepartmentId,
+                dto.RequestedPositionId,
+                dto.RequestedManagerId,
+                null,
+                actorAccountId,
+                ct);
 
             var request = new PersonnelChangeRequest
             {
@@ -101,8 +112,14 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
             {
                 EnsureStatus(request, PersonnelChangeStatus.PendingHRReview);
 
-                var employee = await _employeeRepo.GetByIdAsync(dto.EmployeeId, innerCt)
-                    ?? throw new KeyNotFoundException("Employee was not found.");
+                var employee = await _accessGuard.EnsureCanAccessEmployeeAsync(dto.EmployeeId, actorAccountId, innerCt);
+                await _accessGuard.EnsurePlacementReferencesAsync(
+                    dto.NewDepartmentId ?? request.NewDepartmentId,
+                    dto.NewPositionId ?? request.NewPositionId,
+                    dto.NewManagerId ?? request.NewManagerId,
+                    dto.NewJobLevelId ?? request.NewJobLevelId,
+                    actorAccountId,
+                    innerCt);
 
                 var oldStatus = request.Status;
                 request.EmployeeId = employee.Id;

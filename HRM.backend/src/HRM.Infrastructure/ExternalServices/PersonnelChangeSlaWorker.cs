@@ -1,4 +1,6 @@
+using HRM.backend.src.HRM.Application.DTOs.System;
 using HRM.backend.src.HRM.Application.Interfaces.System.Services;
+using HRM.backend.src.HRM.Application.Interfaces.System.UseCases;
 using HRM.backend.src.HRM.Application.UseCases.PersonnelChanges;
 using HRM.backend.src.HRM.Core.Entities.PersonnelChanges;
 using HRM.backend.src.HRM.Core.Entities.System;
@@ -49,10 +51,13 @@ namespace HRM.backend.src.HRM.Infrastructure.ExternalServices
                     var personnelChangeRepo = scope.ServiceProvider.GetRequiredService<IPersonnelChangeRepository>();
                     var auditLogRepo = scope.ServiceProvider.GetRequiredService<IAuditLogRepository>();
                     var emailService = scope.ServiceProvider.GetRequiredService<IEmailService>();
+                    var slaUseCase = scope.ServiceProvider.GetRequiredService<ISlaManagementUseCase>();
                     var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
 
                     var now = DateTime.UtcNow;
                     var roleEmails = await LoadRoleEmailsAsync(dbContext, stoppingToken);
+                    var slaConfigs = (await slaUseCase.GetSLAConfigsAsync(stoppingToken))
+                        .ToDictionary(config => config.ModuleCode, StringComparer.OrdinalIgnoreCase);
                     var overdueRequests = await dbContext.PersonnelChangeRequests
                         .Include(request => request.Employee)
                             .ThenInclude(employee => employee!.Account)
@@ -69,17 +74,20 @@ namespace HRM.backend.src.HRM.Infrastructure.ExternalServices
                             continue;
 
                         var statusEnteredAt = ResolveStatusEnteredAt(request);
-                        var thresholdHours = options.GetThresholdHours(request.Status);
-                        if (statusEnteredAt.AddHours(thresholdHours) > now)
+                        var thresholdHours = ResolveThresholdHours(options, slaConfigs, request.Status);
+                        if (!thresholdHours.HasValue)
                             continue;
 
-                        await NotifyAsync(emailService, request, roleEmails, statusEnteredAt, thresholdHours);
+                        if (statusEnteredAt.AddHours(thresholdHours.Value) > now)
+                            continue;
+
+                        await NotifyAsync(emailService, request, roleEmails, statusEnteredAt, thresholdHours.Value);
                         await EscalateAsync(
                             personnelChangeRepo,
                             auditLogRepo,
                             request,
                             statusEnteredAt,
-                            thresholdHours,
+                            thresholdHours.Value,
                             options.SetStatusEscalated,
                             stoppingToken);
                         changed = true;
@@ -240,6 +248,40 @@ namespace HRM.backend.src.HRM.Infrastructure.ExternalServices
             return request.Status == PersonnelChangeStatus.PendingHRReview
                 ? request.RequestedAt
                 : request.UpdatedAt;
+        }
+
+        private static int? ResolveThresholdHours(
+            PersonnelChangeSlaOptions options,
+            IReadOnlyDictionary<string, SlaDto> configs,
+            PersonnelChangeStatus status)
+        {
+            var code = ResolveSlaCode(status);
+            if (code != null && configs.TryGetValue(code, out var config))
+            {
+                if (!config.IsActive)
+                    return null;
+
+                if (int.TryParse(config.Value, out var value) && value > 0)
+                    return string.Equals(config.Unit, "DAYS", StringComparison.OrdinalIgnoreCase)
+                        ? value * 24
+                        : value;
+            }
+
+            return options.GetThresholdHours(status);
+        }
+
+        private static string? ResolveSlaCode(PersonnelChangeStatus status)
+        {
+            return status switch
+            {
+                PersonnelChangeStatus.PendingHRReview => "PersonnelChangeHrReview",
+                PersonnelChangeStatus.PendingDirectorApproval => "PersonnelChangeDirectorApproval",
+                PersonnelChangeStatus.PendingEmployeeConsent => "PersonnelChangeEmployeeConsent",
+                PersonnelChangeStatus.PendingContractFlow => "PersonnelChangeContractFlow",
+                PersonnelChangeStatus.ContractNegotiating => "PersonnelChangeContractFlow",
+                PersonnelChangeStatus.PendingDecisionIssuance => "PersonnelChangeDecisionIssuance",
+                _ => null
+            };
         }
 
         private static string BuildEscalationNote(

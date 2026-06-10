@@ -73,10 +73,13 @@ namespace HRM.backend.src.HRM.Application.DTOs.PersonnelChanges
         public decimal? ActualValue { get; set; }
         public string? Unit { get; set; }
         public decimal AchievedPercent { get; set; }
+        public decimal EmployeeSelfPercent { get; set; }
         public decimal ManagerScore { get; set; }
         public decimal FinalPoint { get; set; }
         public decimal PenaltyPoint { get; set; }
         public string? PenaltyReason { get; set; }
+        public string? EmployeeComment { get; set; }
+        public string? ManagerComment { get; set; }
     }
 
     public class PersonnelChangePenaltySummaryDto

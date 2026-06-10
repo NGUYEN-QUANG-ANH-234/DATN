@@ -213,10 +213,13 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
                         ActualValue = d.ActualValue,
                         Unit = d.Unit,
                         AchievedPercent = d.AchievedPercent,
+                        EmployeeSelfPercent = d.EmployeeSelfPercent,
                         ManagerScore = d.ManagerScore,
                         FinalPoint = d.FinalPoint,
                         PenaltyPoint = d.PenaltyPoint,
-                        PenaltyReason = d.PenaltyReason
+                        PenaltyReason = d.PenaltyReason,
+                        EmployeeComment = d.EmployeeComment,
+                        ManagerComment = d.ManagerComment
                     })
                     .ToList()
             };

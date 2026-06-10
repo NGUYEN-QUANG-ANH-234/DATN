@@ -9,7 +9,6 @@ using HRM.backend.src.HRM.Core.Enums;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.EmployeeProfile;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.PersonnelChanges;
-using HRM.backend.src.HRM.Core.Interfaces.Repositories.TasksTraining;
 
 namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
 {
@@ -17,35 +16,35 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
     {
         private readonly IPersonnelChangeRepository _personnelChangeRepo;
         private readonly IEmployeeRepository _employeeRepo;
-        private readonly IPerformanceReviewRepository _performanceReviewRepo;
         private readonly IBaseRepository<EmploymentHistory> _historyRepo;
         private readonly IBaseRepository<EmploymentServicePeriod> _servicePeriodRepo;
         private readonly IUnitOfWork _unitOfWork;
         private readonly ILockService _lockService;
         private readonly PersonnelChangeRiskSummaryBuilder _riskSummaryBuilder;
+        private readonly IPersonnelChangeAccessGuard _accessGuard;
         private readonly IPersonnelChangeContractFlowService _contractFlowService;
         private readonly IPersonnelChangeUseCase _personnelChangeUseCase;
 
         public PromotionOfficialUseCase(
             IPersonnelChangeRepository personnelChangeRepo,
             IEmployeeRepository employeeRepo,
-            IPerformanceReviewRepository performanceReviewRepo,
             IBaseRepository<EmploymentHistory> historyRepo,
             IBaseRepository<EmploymentServicePeriod> servicePeriodRepo,
             IUnitOfWork unitOfWork,
             ILockService lockService,
             PersonnelChangeRiskSummaryBuilder riskSummaryBuilder,
+            IPersonnelChangeAccessGuard accessGuard,
             IPersonnelChangeContractFlowService contractFlowService,
             IPersonnelChangeUseCase personnelChangeUseCase)
         {
             _personnelChangeRepo = personnelChangeRepo;
             _employeeRepo = employeeRepo;
-            _performanceReviewRepo = performanceReviewRepo;
             _historyRepo = historyRepo;
             _servicePeriodRepo = servicePeriodRepo;
             _unitOfWork = unitOfWork;
             _lockService = lockService;
             _riskSummaryBuilder = riskSummaryBuilder;
+            _accessGuard = accessGuard;
             _contractFlowService = contractFlowService;
             _personnelChangeUseCase = personnelChangeUseCase;
         }
@@ -114,7 +113,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
                 request.HRAssignedAccountId = dto.HRAssignedAccountId ?? request.HRAssignedAccountId ?? actorAccountId;
                 request.HRNote = dto.Note;
                 request.HRProcessedAt = DateTime.UtcNow;
-                ApplyContractFlowOverrides(request, dto);
+                await ApplyContractFlowOverridesAsync(request, dto, innerCt);
 
                 if (dto.IsApproved)
                 {
@@ -145,7 +144,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
                 request.DirectorApprovedByAccountId = dto.IsApproved ? actorAccountId : null;
                 request.DirectorApprovedAt = dto.IsApproved ? DateTime.UtcNow : null;
                 request.DirectorNote = dto.Note;
-                ApplyContractFlowOverrides(request, dto);
+                await ApplyContractFlowOverridesAsync(request, dto, innerCt);
 
                 if (dto.IsApproved)
                 {
@@ -233,16 +232,16 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
             if (employeeId <= 0)
                 throw new ArgumentException("Employee is required.");
 
-            var employee = await _employeeRepo.GetByIdAsync(employeeId, ct)
-                ?? throw new KeyNotFoundException("Employee was not found.");
-
-            if (sourcePerformanceReviewId.HasValue)
-            {
-                var review = await _performanceReviewRepo.GetDetailAsync(sourcePerformanceReviewId.Value, ct)
-                    ?? throw new KeyNotFoundException("Performance review was not found.");
-                if (review.EmployeeId != employee.Id)
-                    throw new InvalidOperationException("Performance review does not belong to the selected employee.");
-            }
+            var employee = await _accessGuard.EnsureCanAccessEmployeeAsync(employeeId, actorAccountId, ct);
+            await _accessGuard.EnsurePlacementReferencesAsync(
+                null,
+                newPositionId,
+                null,
+                newJobLevelId,
+                actorAccountId,
+                ct);
+            await _accessGuard.EnsurePerformanceReviewBelongsToEmployeeAsync(sourcePerformanceReviewId, employee.Id, ct);
+            await _accessGuard.EnsureContractBelongsToEmployeeAsync(relatedContractId, employee.Id, ct);
 
             var request = new PersonnelChangeRequest
             {
@@ -510,7 +509,10 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
             }, ct);
         }
 
-        private static void ApplyContractFlowOverrides(PersonnelChangeRequest request, ApprovePromotionDto dto)
+        private async Task ApplyContractFlowOverridesAsync(
+            PersonnelChangeRequest request,
+            ApprovePromotionDto dto,
+            CancellationToken ct)
         {
             if (dto.RequiresContractFlow.HasValue)
             {
@@ -528,6 +530,11 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
                 if (request.ContractFlowType == PersonnelChangeContractFlowType.None)
                     request.ContractFlowType = PersonnelChangeContractFlowType.ContractAddendum;
                 request.ContractFlowStatus ??= "NotStarted";
+                if (request.EmployeeId.HasValue)
+                    await _accessGuard.EnsureContractBelongsToEmployeeAsync(
+                        dto.RelatedContractId,
+                        request.EmployeeId.Value,
+                        ct);
                 request.RelatedContractId = dto.RelatedContractId ?? request.RelatedContractId;
             }
         }

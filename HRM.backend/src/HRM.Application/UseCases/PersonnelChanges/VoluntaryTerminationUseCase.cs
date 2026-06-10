@@ -24,6 +24,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
         private readonly IUnitOfWork _unitOfWork;
         private readonly ILockService _lockService;
         private readonly PersonnelChangeRiskSummaryBuilder _riskSummaryBuilder;
+        private readonly IPersonnelChangeAccessGuard _accessGuard;
         private readonly IPersonnelChangeContractFlowService _contractFlowService;
         private readonly IPersonnelChangeUseCase _personnelChangeUseCase;
 
@@ -37,6 +38,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
             IUnitOfWork unitOfWork,
             ILockService lockService,
             PersonnelChangeRiskSummaryBuilder riskSummaryBuilder,
+            IPersonnelChangeAccessGuard accessGuard,
             IPersonnelChangeContractFlowService contractFlowService,
             IPersonnelChangeUseCase personnelChangeUseCase)
         {
@@ -49,6 +51,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
             _unitOfWork = unitOfWork;
             _lockService = lockService;
             _riskSummaryBuilder = riskSummaryBuilder;
+            _accessGuard = accessGuard;
             _contractFlowService = contractFlowService;
             _personnelChangeUseCase = personnelChangeUseCase;
         }
@@ -63,8 +66,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
             if (dto.ExpectedLastWorkingDate == default)
                 throw new ArgumentException("Expected last working date is required.");
 
-            var employee = await _employeeRepo.GetByIdAsync(dto.EmployeeId, ct)
-                ?? throw new KeyNotFoundException("Employee was not found.");
+            var employee = await _accessGuard.EnsureCanAccessEmployeeAsync(dto.EmployeeId, actorAccountId, ct);
 
             var request = new PersonnelChangeRequest
             {
@@ -124,6 +126,9 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
             return MutateResignationAsync(id, actorAccountId, async (request, innerCt) =>
             {
                 EnsureStatus(request, PersonnelChangeStatus.PendingManagerReview);
+                if (!request.EmployeeId.HasValue)
+                    throw new InvalidOperationException("Resignation requires an employee before manager review.");
+                await _accessGuard.EnsureCanAccessEmployeeAsync(request.EmployeeId.Value, actorAccountId, innerCt);
 
                 var oldStatus = request.Status;
                 request.ManagerNote = TrimOrNull(dto.Note);
@@ -152,6 +157,11 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
                 request.HRAssignedAccountId = actorAccountId;
                 request.HRNote = TrimOrNull(dto.Note);
                 request.HRProcessedAt = DateTime.UtcNow;
+                if (request.EmployeeId.HasValue)
+                    await _accessGuard.EnsureContractBelongsToEmployeeAsync(
+                        dto.RelatedContractId,
+                        request.EmployeeId.Value,
+                        innerCt);
                 request.RelatedContractId = dto.RelatedContractId ?? request.RelatedContractId;
                 request.RequiresFinalSettlement = dto.RequiresFinalSettlement;
                 request.LockAccountOnExecution = dto.LockAccountAfterEffectiveDate;
