@@ -63,8 +63,8 @@ export const useKpiImport = () => {
       setResult(response.data);
       triggerAlert(
         "success",
-        "Import KPI thành công",
-        response.message || "Dữ liệu KPI đầu kỳ đã được ghi nhận.",
+        "Đã nhập KPI",
+        response.message || "Dữ liệu KPI đầu kỳ đã được ghi nhận hoặc cập nhật.",
       );
     } catch (error) {
       const payload = (error as { response?: { data?: { errors?: KpiImportError[] } } })
@@ -73,7 +73,7 @@ export const useKpiImport = () => {
 
       triggerAlert(
         "error",
-        "Import KPI thất bại",
+        "Không thể nhập KPI",
         error instanceof Error ? error.message : "File KPI chưa hợp lệ.",
       );
     } finally {
@@ -118,7 +118,7 @@ const downloadTemplate = () => {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = "mau-import-kpi.csv";
+  link.download = "mau-nhap-kpi.csv";
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);

@@ -35,22 +35,22 @@ export const TrainingEvaluationPage = () => {
       managerEvaluation: selected.managerEvaluation || undefined,
       createPromotionRequest: true,
     });
-    triggerAlert("success", "Da cap nhat dao tao", isApproved ? "Da de xuat chuyen trang thai nhan su." : "Da yeu cau bo sung dao tao.");
+    triggerAlert("success", "Đã cập nhật đào tạo", isApproved ? "Đã đề xuất chuyển trạng thái nhân sự." : "Đã yêu cầu bổ sung đào tạo.");
     setSelected(null);
     await loadData();
   };
 
   return (
-    <FeaturePage title="Danh gia dao tao" description="Tong hop task dao tao cua thuc tap sinh/nhan su thu viec va de xuat bien dong nhan su khi dat." width="wide">
-      <FeatureCard title="Ho so cho danh gia">
+    <FeaturePage title="Đánh giá đào tạo" description="Tổng hợp kết quả đào tạo của thực tập sinh và nhân sự thử việc trước khi đề xuất thay đổi trạng thái." width="wide">
+      <FeatureCard title="Hồ sơ chờ đánh giá">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[760px] text-left text-sm">
             <thead className="border-b bg-gray-50 text-xs uppercase text-gray-500">
               <tr>
-                <th className="px-3 py-2">Nhan su</th>
-                <th className="px-3 py-2">Khoa dao tao</th>
-                <th className="px-3 py-2">Trang thai</th>
-                <th className="px-3 py-2">Han danh gia</th>
+                <th className="px-3 py-2">Nhân sự</th>
+                <th className="px-3 py-2">Khóa đào tạo</th>
+                <th className="px-3 py-2">Trạng thái</th>
+                <th className="px-3 py-2">Hạn đánh giá</th>
                 <th className="px-3 py-2"></th>
               </tr>
             </thead>
@@ -62,7 +62,7 @@ export const TrainingEvaluationPage = () => {
                   <td className="px-3 py-2">{item.status}</td>
                   <td className="px-3 py-2">{item.evaluationDeadline?.slice(0, 10) || "-"}</td>
                   <td className="px-3 py-2 text-right">
-                    <button className={secondaryButtonClass} onClick={() => openSummary(item.id)}>Danh gia</button>
+                    <button className={secondaryButtonClass} onClick={() => openSummary(item.id)}>Đánh giá</button>
                   </td>
                 </tr>
               ))}
@@ -72,21 +72,21 @@ export const TrainingEvaluationPage = () => {
       </FeatureCard>
 
       {selected && (
-        <FeatureCard title={`Tong hop dao tao: ${selected.employeeName}`}>
+        <FeatureCard title={`Tổng hợp đào tạo: ${selected.employeeName}`}>
           <div className="space-y-4">
             <div className="grid gap-3 md:grid-cols-3">
-              <input className={fieldClass} type="number" value={selected.finalScore || ""} onChange={(e) => setSelected({ ...selected, finalScore: Number(e.target.value) })} placeholder="Diem tong ket" />
-              <input className={fieldClass} value={selected.managerEvaluation || ""} onChange={(e) => setSelected({ ...selected, managerEvaluation: e.target.value })} placeholder="Nhan xet quan ly" />
-              <div className="text-sm text-gray-600">So task: {selected.tasks.length}</div>
+              <input className={fieldClass} type="number" value={selected.finalScore || ""} onChange={(e) => setSelected({ ...selected, finalScore: Number(e.target.value) })} placeholder="Điểm tổng kết" />
+              <input className={fieldClass} value={selected.managerEvaluation || ""} onChange={(e) => setSelected({ ...selected, managerEvaluation: e.target.value })} placeholder="Nhận xét quản lý" />
+              <div className="text-sm text-gray-600">Số công việc: {selected.tasks.length}</div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[680px] text-left text-sm">
                 <thead className="border-b bg-gray-50 text-xs uppercase text-gray-500">
                   <tr>
-                    <th className="px-3 py-2">Task</th>
-                    <th className="px-3 py-2">Tien do</th>
-                    <th className="px-3 py-2">Trang thai</th>
-                    <th className="px-3 py-2">Han</th>
+                    <th className="px-3 py-2">Công việc</th>
+                    <th className="px-3 py-2">Tiến độ</th>
+                    <th className="px-3 py-2">Trạng thái</th>
+                    <th className="px-3 py-2">Hạn</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -102,8 +102,8 @@ export const TrainingEvaluationPage = () => {
               </table>
             </div>
             <div className="flex justify-end gap-2">
-              <button className={secondaryButtonClass} onClick={() => evaluate(false)}><RotateCcw size={16} /> Bo sung dao tao</button>
-              <button className={primaryButtonClass} onClick={() => evaluate(true)}><Check size={16} /> Dat va de xuat</button>
+              <button className={secondaryButtonClass} onClick={() => evaluate(false)}><RotateCcw size={16} /> Bổ sung đào tạo</button>
+              <button className={primaryButtonClass} onClick={() => evaluate(true)}><Check size={16} /> Đạt và đề xuất</button>
             </div>
           </div>
         </FeatureCard>

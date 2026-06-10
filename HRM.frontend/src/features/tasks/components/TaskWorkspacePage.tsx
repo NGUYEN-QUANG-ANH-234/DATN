@@ -1,9 +1,83 @@
 import { useEffect, useState } from "react";
 import { Check, RotateCcw, Upload } from "lucide-react";
-import { FeatureCard, FeaturePage, fieldClass, primaryButtonClass, secondaryButtonClass } from "../../../core/components/FeatureShell";
+import {
+  FeatureCard,
+  FeaturePage,
+  fieldClass,
+  primaryButtonClass,
+  secondaryButtonClass,
+  textareaClass,
+} from "../../../core/components/FeatureShell";
 import { useNotification } from "../../../core/context/NotificationContext";
 import { performanceApi, type PerformanceEvaluation } from "../api/performanceApi";
 import { taskApi, type TaskItem } from "../api/taskApi";
+
+type KpiRowState = {
+  employeeSelfPercent: number;
+  actualValue: string;
+  employeeComment: string;
+};
+
+const formatValue = (value?: number | null, unit?: string | null) =>
+  value == null ? "-" : `${value}${unit ? ` ${unit}` : ""}`;
+
+const formatPercent = (value?: number | null) =>
+  value == null ? "-" : `${Number(value).toFixed(2).replace(/\.00$/, "")}%`;
+
+const parseOptionalNumber = (value?: string) => {
+  if (!value?.trim()) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const previewAchievedPercent = (
+  detail: PerformanceEvaluation["details"][number],
+  row?: KpiRowState,
+) => {
+  const actualValue = parseOptionalNumber(row?.actualValue);
+  const selfPercent = Math.max(0, Math.min(100, Number(row?.employeeSelfPercent ?? 0)));
+
+  if (detail.targetValue && detail.targetValue > 0 && actualValue != null) {
+    return Math.min(999.99, Math.max(0, (actualValue / detail.targetValue) * 100));
+  }
+
+  return selfPercent;
+};
+
+const achievedPreviewNote = (
+  detail: PerformanceEvaluation["details"][number],
+  row?: KpiRowState,
+) => {
+  const actualValue = parseOptionalNumber(row?.actualValue);
+  if (detail.targetValue && detail.targetValue > 0 && actualValue != null) {
+    return "Tự tính từ thực tế / mục tiêu";
+  }
+  return "Dùng % tự đánh giá";
+};
+
+const statusLabel = (status?: string | null) => {
+  const map: Record<string, string> = {
+    Draft: "Nháp",
+    PendingEmployeeUpdate: "Chờ cập nhật",
+    ReworkRequired: "Cần cập nhật lại",
+    PendingEvaluation: "Đã gửi chấm điểm",
+    Evaluated: "Đã chốt",
+    AutoEvaluated: "Tự động chốt",
+    Approved: "Đã duyệt",
+    Rejected: "Từ chối",
+    Cancelled: "Đã hủy",
+  };
+  return status ? map[status] || status : "-";
+};
+
+const canUpdateKpi = (review: PerformanceEvaluation) =>
+  review.status === "PendingEmployeeUpdate" || review.status === "ReworkRequired";
+
+const kpiActionLabel = (review: PerformanceEvaluation) => {
+  if (review.status === "PendingEvaluation") return "Đã gửi";
+  if (canUpdateKpi(review)) return "Cập nhật";
+  return "Xem";
+};
 
 export const TaskWorkspacePage = () => {
   const { triggerAlert } = useNotification();
@@ -12,7 +86,7 @@ export const TaskWorkspacePage = () => {
   const [pending, setPending] = useState<TaskItem[]>([]);
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
   const [selectedKpi, setSelectedKpi] = useState<PerformanceEvaluation | null>(null);
-  const [kpiRows, setKpiRows] = useState<Record<number, { employeeSelfPercent: number; actualValue: string; employeeComment: string }>>({});
+  const [kpiRows, setKpiRows] = useState<Record<number, KpiRowState>>({});
   const [progressPercent, setProgressPercent] = useState(100);
   const [note, setNote] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -38,7 +112,11 @@ export const TaskWorkspacePage = () => {
   const submitProgress = async () => {
     if (!selectedTaskId) return;
     await taskApi.updateProgress(selectedTaskId, { progressPercent, note, evidenceFile: file });
-    triggerAlert("success", "Da cap nhat tien do", "Cong viec da duoc gui cho truong phong duyet.");
+    triggerAlert(
+      "success",
+      "Đã cập nhật tiến độ",
+      "Công việc đã được gửi cho trưởng phòng duyệt.",
+    );
     setSelectedTaskId(null);
     setNote("");
     setFile(null);
@@ -59,10 +137,7 @@ export const TaskWorkspacePage = () => {
     ));
   };
 
-  const updateKpiRow = (
-    detailId: number,
-    patch: Partial<{ employeeSelfPercent: number; actualValue: string; employeeComment: string }>,
-  ) => {
+  const updateKpiRow = (detailId: number, patch: Partial<KpiRowState>) => {
     setKpiRows((prev) => ({
       ...prev,
       [detailId]: {
@@ -89,7 +164,11 @@ export const TaskWorkspacePage = () => {
       }),
     });
 
-    triggerAlert("success", "Da gui tien do KPI", "Ket qua KPI da duoc chuyen cho truong phong danh gia.");
+    triggerAlert(
+      "success",
+      "Đã gửi kết quả KPI",
+      "Kết quả thực tế và tự đánh giá đã được chuyển cho trưởng phòng chốt điểm.",
+    );
     setSelectedKpi(null);
     setKpiRows({});
     await loadData();
@@ -97,139 +176,228 @@ export const TaskWorkspacePage = () => {
 
   const approve = async (id: number) => {
     await taskApi.approve(id);
-    triggerAlert("success", "Da duyet cong viec", "Ket qua cong viec da duoc chap nhan.");
+    triggerAlert("success", "Đã duyệt công việc", "Kết quả công việc đã được chấp nhận.");
     await loadData();
   };
 
   const feedback = async (id: number) => {
-    const content = window.prompt("Nhap noi dung yeu cau dieu chinh") || "";
+    const content = window.prompt("Nhập nội dung yêu cầu điều chỉnh") || "";
     if (!content.trim()) return;
     await taskApi.provideFeedback(id, content);
-    triggerAlert("success", "Da gui phan hoi", "Nhan vien se cap nhat lai tien do.");
+    triggerAlert("success", "Đã gửi phản hồi", "Nhân viên sẽ cập nhật lại tiến độ.");
     await loadData();
   };
 
   return (
-    <FeaturePage title="Cong viec va tien do" description="Nhan vien cap nhat tien do, truong phong duyet hoac yeu cau dieu chinh." width="wide">
-      <FeatureCard title="KPI cua toi">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[860px] text-left text-sm">
-            <thead className="border-b bg-gray-50 text-xs uppercase text-gray-500">
-              <tr>
-                <th className="px-3 py-2">Ky KPI</th>
-                <th className="px-3 py-2">So chi tieu</th>
-                <th className="px-3 py-2">Tong trong so</th>
-                <th className="px-3 py-2">Trang thai</th>
-                <th className="px-3 py-2">Xep loai</th>
-                <th className="px-3 py-2"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {myKpis.map((review) => (
-                <tr key={review.id} className="border-b">
-                  <td className="px-3 py-2 font-medium">{review.period}</td>
-                  <td className="px-3 py-2">{review.details.length}</td>
-                  <td className="px-3 py-2">{review.totalWeight}%</td>
-                  <td className="px-3 py-2">{review.status}</td>
-                  <td className="px-3 py-2">{review.finalRating || "-"}</td>
-                  <td className="px-3 py-2 text-right">
-                    <button
-                      className={secondaryButtonClass}
-                      disabled={review.status !== "PendingEmployeeUpdate" && review.status !== "ReworkRequired"}
-                      onClick={() => openKpiUpdate(review)}
-                    >
-                      <Upload size={16} /> {review.status === "PendingEvaluation" ? "Da gui" : "Cap nhat KPI"}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {myKpis.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-3 py-6 text-center text-gray-500">
-                    Chua co KPI nao duoc giao cho tai khoan nay.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+    <FeaturePage
+      title="Công việc và KPI"
+      description="Cập nhật kết quả thực tế, tự đánh giá KPI và xử lý công việc cần duyệt."
+      width="wide"
+    >
+      <FeatureCard title="KPI của tôi" description="Chọn kỳ cần cập nhật kết quả thực tế và tự đánh giá.">
+        {myKpis.length === 0 ? (
+          <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--hicas-border)] bg-white px-4 py-8 text-center text-sm text-[var(--hicas-text-secondary)]">
+            Chưa có KPI nào được giao cho tài khoản này.
+          </div>
+        ) : (
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {myKpis.map((review) => {
+              const updatable = canUpdateKpi(review);
+              const completed = review.status === "Evaluated" || review.status === "Approved" || review.status === "AutoEvaluated";
+
+              return (
+                <article
+                  key={review.id}
+                  className="rounded-[var(--radius-md)] border border-[var(--hicas-border)] bg-white p-4 shadow-sm"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase text-[var(--hicas-text-secondary)]">Kỳ KPI</p>
+                      <h3 className="mt-1 text-xl font-bold text-[var(--hicas-text-main)]">{review.period}</h3>
+                    </div>
+                    <span className={`rounded-md px-2 py-1 text-xs font-bold ${
+                      updatable
+                        ? "bg-orange-50 text-orange-700"
+                        : completed
+                          ? "bg-emerald-50 text-emerald-700"
+                          : "bg-slate-100 text-slate-700"
+                    }`}>
+                      {statusLabel(review.status)}
+                    </span>
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-3 gap-2 text-sm">
+                    <div className="rounded-lg bg-[var(--hicas-bg-soft)] px-3 py-2">
+                      <p className="text-xs text-[var(--hicas-text-secondary)]">Chỉ tiêu</p>
+                      <p className="font-bold text-[var(--hicas-text-main)]">{review.details.length}</p>
+                    </div>
+                    <div className="rounded-lg bg-[var(--hicas-bg-soft)] px-3 py-2">
+                      <p className="text-xs text-[var(--hicas-text-secondary)]">Trọng số</p>
+                      <p className="font-bold text-[var(--hicas-text-main)]">{review.totalWeight}%</p>
+                    </div>
+                    <div className="rounded-lg bg-[var(--hicas-bg-soft)] px-3 py-2">
+                      <p className="text-xs text-[var(--hicas-text-secondary)]">Điểm</p>
+                      <p className="font-bold text-[var(--hicas-text-main)]">{completed ? review.totalScore || "-" : "-"}</p>
+                    </div>
+                  </div>
+
+                  {review.finalRating && (
+                    <p className="mt-3 text-sm font-semibold text-[var(--hicas-text-secondary)]">
+                      Xếp loại: <span className="text-[var(--hicas-text-main)]">{review.finalRating}</span>
+                    </p>
+                  )}
+
+                  <button
+                    className={`mt-4 w-full ${updatable ? primaryButtonClass : secondaryButtonClass}`}
+                    disabled={review.status === "PendingEvaluation"}
+                    onClick={() => openKpiUpdate(review)}
+                  >
+                    <Upload size={16} /> {kpiActionLabel(review)}
+                  </button>
+                </article>
+              );
+            })}
+          </div>
+        )}
       </FeatureCard>
 
       {selectedKpi && (
-        <FeatureCard title={`Cap nhat tien do KPI ky ${selectedKpi.period}`}>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[960px] text-left text-sm">
-              <thead className="border-b bg-gray-50 text-xs uppercase text-gray-500">
-                <tr>
-                  <th className="px-3 py-2">Ma KPI</th>
-                  <th className="px-3 py-2">Chi tieu</th>
-                  <th className="px-3 py-2">Trong so</th>
-                  <th className="px-3 py-2">Muc tieu</th>
-                  <th className="px-3 py-2">Thuc te</th>
-                  <th className="px-3 py-2">Tu danh gia</th>
-                  <th className="px-3 py-2">Ghi chu</th>
-                </tr>
-              </thead>
-              <tbody>
-                {selectedKpi.details.map((detail) => (
-                  <tr key={detail.id} className="border-b align-top">
-                    <td className="px-3 py-2 font-mono">{detail.kpiCode}</td>
-                    <td className="px-3 py-2 font-medium">{detail.kpiName}</td>
-                    <td className="px-3 py-2">{detail.weightPercent}%</td>
-                    <td className="px-3 py-2">
-                      {detail.targetValue ?? "-"} {detail.unit || ""}
-                    </td>
-                    <td className="px-3 py-2">
+        <FeatureCard
+          title={`Cập nhật KPI kỳ ${selectedKpi.period}`}
+          description={
+            canUpdateKpi(selectedKpi)
+              ? "Nhập kết quả thực tế và tự đánh giá cho từng chỉ tiêu."
+              : "Kỳ KPI này đã được gửi hoặc đã chốt, chỉ hiển thị để đối chiếu."
+          }
+        >
+          <div className="mb-4 grid gap-3 rounded-[var(--radius-md)] border border-[var(--hicas-border)] bg-[var(--hicas-bg-soft)] p-4 text-sm md:grid-cols-4">
+            <div>
+              <p className="text-xs font-semibold text-[var(--hicas-text-secondary)]">Trạng thái</p>
+              <p className="mt-1 font-bold text-[var(--hicas-text-main)]">{statusLabel(selectedKpi.status)}</p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-[var(--hicas-text-secondary)]">Số chỉ tiêu</p>
+              <p className="mt-1 font-bold text-[var(--hicas-text-main)]">{selectedKpi.details.length}</p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-[var(--hicas-text-secondary)]">Tổng trọng số</p>
+              <p className="mt-1 font-bold text-[var(--hicas-text-main)]">{selectedKpi.totalWeight}%</p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-[var(--hicas-text-secondary)]">Điểm chính thức</p>
+              <p className="mt-1 font-bold text-[var(--hicas-text-main)]">{selectedKpi.totalScore || "-"}</p>
+            </div>
+          </div>
+
+          <div className="grid gap-4">
+            {selectedKpi.details.map((detail) => {
+              const row = kpiRows[detail.id];
+              const readonly = !canUpdateKpi(selectedKpi);
+
+              return (
+                <section
+                  key={detail.id}
+                  className="rounded-[var(--radius-md)] border border-[var(--hicas-border)] bg-white p-4 shadow-sm"
+                >
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="min-w-0">
+                      <p className="font-mono text-xs font-bold uppercase text-[var(--hicas-orange-dark)]">
+                        {detail.kpiCode}
+                      </p>
+                      <h3 className="mt-1 break-words text-lg font-bold text-[var(--hicas-text-main)]">
+                        {detail.kpiName}
+                      </h3>
+                    </div>
+                    <div className="flex flex-wrap gap-2 text-xs font-bold">
+                      <span className="rounded-md bg-[var(--hicas-orange-lighter)] px-2 py-1 text-[var(--hicas-orange-dark)]">
+                        Trọng số {detail.weightPercent}%
+                      </span>
+                      <span className="rounded-md bg-[var(--hicas-bg-soft)] px-2 py-1 text-[var(--hicas-text-secondary)]">
+                        Mục tiêu {formatValue(detail.targetValue, detail.unit)}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_1fr_180px]">
+                    <label className="block">
+                      <span className="mb-1 block text-sm font-semibold text-[var(--hicas-text-main)]">
+                        Kết quả thực tế
+                      </span>
                       <input
                         className={fieldClass}
                         type="number"
-                        value={kpiRows[detail.id]?.actualValue ?? ""}
+                        min={0}
+                        disabled={readonly}
+                        value={row?.actualValue ?? ""}
                         onChange={(event) => updateKpiRow(detail.id, { actualValue: event.target.value })}
+                        placeholder="Nhập kết quả"
                       />
-                    </td>
-                    <td className="px-3 py-2">
+                    </label>
+
+                    <label className="block">
+                      <span className="mb-1 block text-sm font-semibold text-[var(--hicas-text-main)]">
+                        Tự đánh giá (%)
+                      </span>
                       <input
                         className={fieldClass}
                         type="number"
                         min={0}
                         max={100}
-                        value={kpiRows[detail.id]?.employeeSelfPercent ?? 0}
+                        disabled={readonly}
+                        value={row?.employeeSelfPercent ?? 0}
                         onChange={(event) => updateKpiRow(detail.id, { employeeSelfPercent: Number(event.target.value) })}
                       />
-                    </td>
-                    <td className="px-3 py-2">
-                      <input
-                        className={fieldClass}
-                        value={kpiRows[detail.id]?.employeeComment ?? ""}
-                        onChange={(event) => updateKpiRow(detail.id, { employeeComment: event.target.value })}
-                        placeholder="Ghi chu"
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </label>
+
+                    <div className="rounded-lg border border-[var(--hicas-border-soft)] bg-[var(--hicas-bg-soft)] px-3 py-2">
+                      <p className="text-xs font-semibold text-[var(--hicas-text-secondary)]">Hệ thống tính</p>
+                      <p className="mt-1 text-xl font-bold text-[var(--hicas-text-main)]">
+                        {formatPercent(previewAchievedPercent(detail, row))}
+                      </p>
+                      <p className="mt-1 text-xs text-[var(--hicas-text-secondary)]">
+                        {achievedPreviewNote(detail, row)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <label className="mt-3 block">
+                    <span className="mb-1 block text-sm font-semibold text-[var(--hicas-text-main)]">
+                      Giải trình
+                    </span>
+                    <textarea
+                      className={textareaClass}
+                      disabled={readonly}
+                      value={row?.employeeComment ?? ""}
+                      onChange={(event) => updateKpiRow(detail.id, { employeeComment: event.target.value })}
+                      placeholder="Ghi chú ngắn về kết quả đã đạt được"
+                    />
+                  </label>
+                </section>
+              );
+            })}
           </div>
           <div className="mt-4 flex justify-end gap-2">
             <button className={secondaryButtonClass} onClick={() => setSelectedKpi(null)}>
-              Huy
+              Hủy
             </button>
-            <button className={primaryButtonClass} onClick={submitKpiProgress}>
-              Gui tien do KPI
-            </button>
+            {canUpdateKpi(selectedKpi) && (
+              <button className={primaryButtonClass} onClick={submitKpiProgress}>
+                Gửi kết quả KPI
+              </button>
+            )}
           </div>
         </FeatureCard>
       )}
 
-      <FeatureCard title="Cong viec cua toi">
+      <FeatureCard title="Công việc của tôi">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[760px] text-left text-sm">
             <thead className="border-b bg-gray-50 text-xs uppercase text-gray-500">
               <tr>
-                <th className="px-3 py-2">Cong viec</th>
-                <th className="px-3 py-2">Tien do</th>
-                <th className="px-3 py-2">Trang thai</th>
-                <th className="px-3 py-2">Han nop</th>
+                <th className="px-3 py-2">Công việc</th>
+                <th className="px-3 py-2">Tiến độ</th>
+                <th className="px-3 py-2">Trạng thái</th>
+                <th className="px-3 py-2">Hạn nộp</th>
                 <th className="px-3 py-2"></th>
               </tr>
             </thead>
@@ -242,7 +410,7 @@ export const TaskWorkspacePage = () => {
                   <td className="px-3 py-2">{task.deadline?.slice(0, 10) || "-"}</td>
                   <td className="px-3 py-2 text-right">
                     <button className={secondaryButtonClass} onClick={() => setSelectedTaskId(task.id)}>
-                      <Upload size={16} /> Cap nhat
+                      <Upload size={16} /> Cập nhật
                     </button>
                   </td>
                 </tr>
@@ -253,25 +421,41 @@ export const TaskWorkspacePage = () => {
       </FeatureCard>
 
       {selectedTaskId && (
-        <FeatureCard title="Cap nhat tien do">
+        <FeatureCard title="Cập nhật tiến độ">
           <div className="grid gap-3 md:grid-cols-[160px_1fr_1fr_auto] md:items-end">
-            <input className={fieldClass} type="number" min={0} max={100} value={progressPercent} onChange={(e) => setProgressPercent(Number(e.target.value))} />
-            <input className={fieldClass} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ghi chu tien do" />
-            <input className={fieldClass} type="file" onChange={(e) => setFile(e.target.files?.[0] || null)} />
-            <button className={primaryButtonClass} onClick={submitProgress}>Gui</button>
+            <input
+              className={fieldClass}
+              type="number"
+              min={0}
+              max={100}
+              value={progressPercent}
+              onChange={(event) => setProgressPercent(Number(event.target.value))}
+            />
+            <input
+              className={fieldClass}
+              value={note}
+              onChange={(event) => setNote(event.target.value)}
+              placeholder="Ghi chú tiến độ"
+            />
+            <input
+              className={fieldClass}
+              type="file"
+              onChange={(event) => setFile(event.target.files?.[0] || null)}
+            />
+            <button className={primaryButtonClass} onClick={submitProgress}>Gửi</button>
           </div>
         </FeatureCard>
       )}
 
-      <FeatureCard title="Cho truong phong duyet">
+      <FeatureCard title="Chờ trưởng phòng duyệt">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[760px] text-left text-sm">
             <thead className="border-b bg-gray-50 text-xs uppercase text-gray-500">
               <tr>
-                <th className="px-3 py-2">Nhan vien</th>
-                <th className="px-3 py-2">Cong viec</th>
-                <th className="px-3 py-2">Tien do</th>
-                <th className="px-3 py-2">Han duyet</th>
+                <th className="px-3 py-2">Nhân viên</th>
+                <th className="px-3 py-2">Công việc</th>
+                <th className="px-3 py-2">Tiến độ</th>
+                <th className="px-3 py-2">Hạn duyệt</th>
                 <th className="px-3 py-2"></th>
               </tr>
             </thead>
@@ -284,8 +468,12 @@ export const TaskWorkspacePage = () => {
                   <td className="px-3 py-2">{task.reviewDeadline?.slice(0, 10) || "-"}</td>
                   <td className="px-3 py-2">
                     <div className="flex justify-end gap-2">
-                      <button className={secondaryButtonClass} onClick={() => feedback(task.id)}><RotateCcw size={16} /> Sua</button>
-                      <button className={primaryButtonClass} onClick={() => approve(task.id)}><Check size={16} /> Duyet</button>
+                      <button className={secondaryButtonClass} onClick={() => feedback(task.id)}>
+                        <RotateCcw size={16} /> Sửa
+                      </button>
+                      <button className={primaryButtonClass} onClick={() => approve(task.id)}>
+                        <Check size={16} /> Duyệt
+                      </button>
                     </div>
                   </td>
                 </tr>

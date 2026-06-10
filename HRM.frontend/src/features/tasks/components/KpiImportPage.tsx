@@ -27,7 +27,7 @@ export const KpiImportPage = () => {
   return (
     <FeaturePage
       title="Thiết lập KPI đầu kỳ"
-      description="Import chỉ tiêu KPI cho nhân viên trong phòng ban. Điểm trừ không nhập ở bước giao KPI mà sẽ phát sinh từ hệ thống hoặc bước trưởng phòng đánh giá."
+      description="Nhập hoặc cập nhật KPI đầu kỳ cho nhân viên theo phòng ban."
       width="wide"
       actions={
         <button
@@ -40,7 +40,10 @@ export const KpiImportPage = () => {
         </button>
       }
     >
-      <FeatureCard title="Import file KPI" description="File cần có các cột: MaNV, TenChiTieu, TrongSo. Các cột MaKPI, MucTieu, DonVi, MoTa là tùy chọn.">
+      <FeatureCard
+        title="Chọn file KPI"
+        description="Mỗi nhân viên phải có tổng trọng số đúng 100%. Import lại cùng kỳ sẽ thay thế KPI cũ nếu chưa đồng bộ lương."
+      >
         <form onSubmit={handleSubmit} className="grid gap-4 lg:grid-cols-[180px_220px_1fr_auto] lg:items-end">
           <label className="block">
             <span className="mb-1 block text-xs font-semibold uppercase text-gray-500">
@@ -92,13 +95,13 @@ export const KpiImportPage = () => {
 
           <button type="submit" disabled={loading} className={primaryButtonClass}>
             <Upload size={16} />
-            {loading ? "Đang import..." : "Import KPI"}
+            {loading ? "Đang nhập..." : "Nhập KPI"}
           </button>
         </form>
       </FeatureCard>
 
       {result && (
-        <FeatureCard title="Kết quả import">
+        <FeatureCard title="Kết quả nhập file">
           <div className="grid gap-3 text-sm md:grid-cols-3 lg:grid-cols-5">
             <SummaryItem label="Kỳ KPI" value={result.period} />
             <SummaryItem label="Số dòng" value={result.totalRows} />

@@ -32,6 +32,7 @@ export interface PerformanceEvaluation {
   totalWeight: number;
   systemPenaltyPoint: number;
   totalScore: number;
+  scoringVersion?: string | null;
   finalRating?: string | null;
   finalComment?: string | null;
   status: string;
