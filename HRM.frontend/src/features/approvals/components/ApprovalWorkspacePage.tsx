@@ -1,5 +1,15 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import {
+  Building2,
+  CalendarDays,
+  CheckCircle2,
+  Clock3,
+  Eye,
+  RefreshCw,
+  UserRound,
+  XCircle,
+} from "lucide-react";
 import {
   FeatureCard,
   FeaturePage,
@@ -9,6 +19,7 @@ import {
   fieldClass,
   EmptyState,
 } from "../../../core/components/FeatureShell";
+import { DrawerForm } from "../../../components/ui";
 import { useCurrentUser } from "../../../core/auth/hooks/useCurrentUser";
 import { useNotification } from "../../../core/context/NotificationContext";
 import { recruitmentApi } from "../../recruitment/api/recruitmentApi";
@@ -20,6 +31,9 @@ import { contractAddendumApi } from "../../employees/api/contractAddendumApi";
 import { overtimeApi } from "../../attendance/api/overtimeApi";
 import { leaveRequestApi } from "../../attendance/api/leaveRequestApi";
 import { accountApi } from "../../system/api/accountApi";
+import { payrollApi } from "../../payroll/api/payrollApi";
+import { formatMoney } from "../../payroll/utils";
+import { personnelChangeApi } from "../../personnel-change/api/personnelChangeApi";
 import type { PendingProfileRequest } from "../../employees/types/profileRequest";
 import type { PendingDependentRequest } from "../../employees/types/dependent";
 import type { PendingOnboardingRequest } from "../../employees/types/onboarding";
@@ -27,6 +41,19 @@ import type { ContractDto } from "../../employees/api/contractApi";
 import type { ContractAddendumDto } from "../../employees/api/contractAddendumApi";
 import type { OvertimeRequest } from "../../attendance/api/overtimeApi";
 import type { LeaveRequest } from "../../attendance/api/leaveRequestApi";
+import type {
+  PayrollAdjustment,
+  ProjectBonusImportBatch,
+  SalarySlip,
+} from "../../payroll/types/payroll";
+import {
+  getPersonnelChangeStatusLabel,
+  PersonnelChangeStatus,
+  PersonnelChangeType,
+  type PersonnelChangeListItem,
+  type PersonnelChangeStatus as PersonnelChangeStatusValue,
+  type PersonnelChangeWorkflowKind,
+} from "../../personnel-change/types/personnelChange";
 import type {
   ApprovalItem,
   ApprovalModule,
@@ -42,32 +69,143 @@ import {
   isApprovalRole,
   moduleTone,
   normalizeText,
+  roleLabel,
   statusLabel,
   unwrapData,
 } from "../utils";
 
 const defaultFilters: ApprovalWorkspaceFilters = {
   module: "ALL",
+  status: "ALL",
+  owner: "",
+  deadline: "ALL",
   query: "",
   fromDate: "",
   toDate: "",
 };
 
+const approvalModuleValues = new Set(
+  APPROVAL_MODULES.map((item) => item.value).filter(
+    (value): value is ApprovalModule => value !== "ALL",
+  ),
+);
+
+const resolveModuleFilter = (
+  value: string | null,
+): ApprovalWorkspaceFilters["module"] =>
+  value && approvalModuleValues.has(value as ApprovalModule)
+    ? (value as ApprovalModule)
+    : "ALL";
+
+const isValidDate = (date: Date) => !Number.isNaN(date.getTime());
+
+const startOfDay = (date: Date) => {
+  const next = new Date(date);
+  next.setHours(0, 0, 0, 0);
+  return next;
+};
+
+const getDeadlineBucket = (
+  value?: string | null,
+): ApprovalWorkspaceFilters["deadline"] => {
+  if (!value) return "NO_DEADLINE";
+
+  const deadline = startOfDay(new Date(value));
+  if (!isValidDate(deadline)) return "NO_DEADLINE";
+
+  const today = startOfDay(new Date());
+  const nextSevenDays = new Date(today);
+  nextSevenDays.setDate(today.getDate() + 7);
+
+  if (deadline < today) return "OVERDUE";
+  if (deadline.getTime() === today.getTime()) return "TODAY";
+  if (deadline <= nextSevenDays) return "NEXT_7_DAYS";
+  return "ALL";
+};
+
+const deadlineLabel = (
+  value: ApprovalWorkspaceFilters["deadline"],
+) => {
+  const map: Record<ApprovalWorkspaceFilters["deadline"], string> = {
+    ALL: "Tất cả hạn xử lý",
+    OVERDUE: "Quá hạn",
+    TODAY: "Đến hạn hôm nay",
+    NEXT_7_DAYS: "Trong 7 ngày tới",
+    NO_DEADLINE: "Chưa có hạn",
+  };
+
+  return map[value];
+};
+
+const readableDeadlineLabel = (
+  value: ApprovalWorkspaceFilters["deadline"],
+) => {
+  const map: Record<ApprovalWorkspaceFilters["deadline"], string> = {
+    ALL: "Tất cả hạn xử lý",
+    OVERDUE: "Quá hạn",
+    TODAY: "Đến hạn hôm nay",
+    NEXT_7_DAYS: "Trong 7 ngày tới",
+    NO_DEADLINE: "Chưa có hạn",
+  };
+
+  return map[value];
+};
+
 const includeOvertimeReconcileInApprovalInbox = false;
+
+const currentPayrollPeriod = () => {
+  const now = new Date();
+  return {
+    month: now.getMonth() + 1,
+    year: now.getFullYear(),
+    period: `${String(now.getMonth() + 1).padStart(2, "0")}/${now.getFullYear()}`,
+  };
+};
 
 export const ApprovalWorkspacePage = () => {
   const { user } = useCurrentUser();
   const role = getRole(user?.role);
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { triggerAlert } = useNotification();
+  const moduleFromQuery = useMemo(
+    () => resolveModuleFilter(searchParams.get("module")),
+    [searchParams],
+  );
 
   const [items, setItems] = useState<ApprovalItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [filters, setFilters] = useState<ApprovalWorkspaceFilters>(defaultFilters);
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<{
+    item: ApprovalItem;
+    action: ApprovalAction;
+  } | null>(null);
+  const [actionNote, setActionNote] = useState("");
+  const [actionSubmitting, setActionSubmitting] = useState(false);
+  const [filters, setFiltersState] = useState<ApprovalWorkspaceFilters>(() => ({
+    ...defaultFilters,
+    module: moduleFromQuery,
+  }));
   const [roleOptions, setRoleOptions] = useState<RoleOption[]>([]);
   const [onboardingRoleById, setOnboardingRoleById] = useState<
     Record<number, number>
   >({});
+
+  const setFilters = useCallback(
+    (next: ApprovalWorkspaceFilters) => {
+      setFiltersState(next);
+
+      const nextParams = new URLSearchParams(searchParams);
+      if (next.module === "ALL") {
+        nextParams.delete("module");
+      } else {
+        nextParams.set("module", next.module);
+      }
+
+      setSearchParams(nextParams, { replace: true });
+    },
+    [searchParams, setSearchParams],
+  );
 
   const fetchItems = useCallback(async () => {
     if (!isApprovalRole(role)) {
@@ -88,6 +226,8 @@ export const ApprovalWorkspacePage = () => {
         loadAddendumApprovals(next),
         loadOvertimeApprovals(next),
         loadLeaveApprovals(next),
+        loadPayrollWorkItems(next),
+        loadPersonnelChangeApprovals(next),
       ]);
 
       setItems(next);
@@ -106,6 +246,8 @@ export const ApprovalWorkspacePage = () => {
       const approvals = unwrapData<PendingApprovalDto>(res);
 
       approvals.forEach((item) => {
+        if (item.moduleCode.startsWith("CONTRACT")) return;
+
         const module = mapCentralModule(item.moduleCode);
         target.push({
           id: `central-${item.moduleCode}-${item.referenceId}`,
@@ -120,6 +262,18 @@ export const ApprovalWorkspacePage = () => {
           statusLabel: `Cấp duyệt ${item.level}`,
           date: item.createdAt,
           deadline: item.deadline,
+          details: (
+            <DetailFieldGrid
+              fields={[
+                ["Mã tham chiếu", `#${item.referenceId}`],
+                ["Cấp duyệt", String(item.level)],
+                ["Vị trí", item.positionName],
+                ["Phòng ban", item.departmentName],
+                ["Số lượng", item.quantity ? `${item.quantity} nhân sự` : undefined],
+                ["Mô tả", item.description],
+              ]}
+            />
+          ),
           actions: [
             centralAction(item, true),
             centralAction(item, false),
@@ -229,7 +383,7 @@ export const ApprovalWorkspacePage = () => {
         target.push({
           id: `onboarding-${item.id}`,
           module: "ONBOARDING",
-          moduleLabel: "Onboarding",
+          moduleLabel: "Tiếp nhận hồ sơ",
           source: "ONBOARDING",
           title: `Thiết lập hồ sơ mới #${item.id}`,
           subtitle: `Ứng viên #${item.candidateId}`,
@@ -292,6 +446,28 @@ export const ApprovalWorkspacePage = () => {
   };
 
   const loadContractWorkItems = async (target: ApprovalItem[]) => {
+    if (["Admin", "Manager"].includes(role)) {
+      try {
+        const res = await contractApi.getPendingRequests();
+        unwrapData<ContractDto>(res).forEach((item) => {
+          target.push(mapContractItem(item, "dept"));
+        });
+      } catch {
+        // Bỏ qua nếu không được phép.
+      }
+    }
+
+    if (["Admin", "Director"].includes(role)) {
+      try {
+        const res = await contractApi.getDirectorPending();
+        unwrapData<ContractDto>(res).forEach((item) => {
+          target.push(mapContractItem(item, "director"));
+        });
+      } catch {
+        // Bỏ qua nếu không được phép.
+      }
+    }
+
     if (!["Admin", "HR"].includes(role)) return;
 
     try {
@@ -308,6 +484,17 @@ export const ApprovalWorkspacePage = () => {
           status: item.status,
           statusLabel: statusLabel(item.status),
           date: item.startDate,
+          deadline: item.endDate,
+          details: (
+            <DetailFieldGrid
+              fields={[
+                ["Nhân sự", item.employeeName || `#${item.employeeId}`],
+                ["Ngày bắt đầu", formatDate(item.startDate)],
+                ["Ngày kết thúc", formatDate(item.endDate)],
+                ["Ghi chú thương lượng", item.negotiationNote],
+              ]}
+            />
+          ),
           actions: [
             {
               kind: "open",
@@ -441,6 +628,73 @@ export const ApprovalWorkspacePage = () => {
     }
   };
 
+  const loadPayrollWorkItems = async (target: ApprovalItem[]) => {
+    if (!["Admin", "HR", "Director"].includes(role)) return;
+
+    const { month, year, period } = currentPayrollPeriod();
+
+    try {
+      const slipsRes = await payrollApi.getSalarySlips(period);
+      const slips = (slipsRes.data ?? []).filter((item) =>
+        ["PendingApproval", "HRReviewed"].includes(item.status),
+      );
+
+      slips.forEach((item) => {
+        target.push(mapPayrollSlipItem(item, period));
+      });
+    } catch {
+      // Skip salary items when the current role cannot view them.
+    }
+
+    if (["Admin", "Director"].includes(role)) {
+      try {
+        const projectBonusRes = await payrollApi.getPendingProjectBonusImports();
+        (projectBonusRes.data ?? []).forEach((item) => {
+          target.push(mapProjectBonusImportItem(item));
+        });
+      } catch {
+        // Skip project bonus imports when the current role cannot approve payroll inputs.
+      }
+    }
+
+    if (!["Admin", "HR"].includes(role)) return;
+
+    try {
+      const adjustmentsRes = await payrollApi.getAdjustments(month, year);
+      const adjustments = (adjustmentsRes.data ?? []).filter((item) =>
+        ["Draft", "PendingApproval"].includes(item.status),
+      );
+
+      adjustments.forEach((item) => {
+        target.push(mapPayrollAdjustmentItem(item, period));
+      });
+    } catch {
+      // Some adjustment workflows do not require manual approval.
+    }
+  };
+
+  const loadPersonnelChangeApprovals = async (target: ApprovalItem[]) => {
+    const statuses = getPersonnelChangeStatusesForRole(role);
+    if (statuses.length === 0) return;
+
+    const seen = new Set<number>();
+
+    await Promise.all(
+      statuses.map(async (status) => {
+        try {
+          const res = await personnelChangeApi.getList({ status });
+          (res.data ?? []).forEach((item) => {
+            if (seen.has(item.id)) return;
+            seen.add(item.id);
+            target.push(mapPersonnelChangeItem(item));
+          });
+        } catch {
+          // Some roles cannot read every personnel-change status; other adapters still load.
+        }
+      }),
+    );
+  };
+
   const normalizedRoleOptions = useMemo(() => {
     if (roleOptions.length === 0) {
       return [{ id: 5, name: "Employee" }];
@@ -448,7 +702,7 @@ export const ApprovalWorkspacePage = () => {
 
     return roleOptions.map((role) => ({
       id: role.id,
-      name: role.name || role.roleName || `Role #${role.id}`,
+      name: role.name || role.roleName || `Vai trò #${role.id}`,
     }));
   }, [roleOptions]);
 
@@ -465,6 +719,12 @@ export const ApprovalWorkspacePage = () => {
     void fetchItems();
   }, [fetchItems]);
 
+  useEffect(() => {
+    setFiltersState((prev) =>
+      prev.module === moduleFromQuery ? prev : { ...prev, module: moduleFromQuery },
+    );
+  }, [moduleFromQuery]);
+
   const defaultEmployeeRoleId = useMemo(() => {
     const found = normalizedRoleOptions.find((item) =>
       ["Employee", "Nhân viên"].includes(item.name),
@@ -472,14 +732,48 @@ export const ApprovalWorkspacePage = () => {
     return found?.id || normalizedRoleOptions[0]?.id || 5;
   }, [normalizedRoleOptions]);
 
+  const selectedItem = useMemo(
+    () => items.find((item) => item.id === selectedItemId) || null,
+    [items, selectedItemId],
+  );
+
+  const statusOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    items.forEach((item) => {
+      if (!item.status) return;
+      map.set(item.status, item.statusLabel || statusLabel(item.status));
+    });
+
+    return Array.from(map.entries())
+      .map(([value, label]) => ({ value, label }))
+      .sort((a, b) => a.label.localeCompare(b.label, "vi"));
+  }, [items]);
+
   const filteredItems = useMemo(() => {
     const query = normalizeText(filters.query);
+    const owner = normalizeText(filters.owner);
     const from = filters.fromDate ? new Date(filters.fromDate) : null;
     const to = filters.toDate ? new Date(filters.toDate) : null;
 
     return items.filter((item) => {
       if (filters.module !== "ALL" && item.module !== filters.module) {
         return false;
+      }
+
+      if (filters.status !== "ALL" && item.status !== filters.status) {
+        return false;
+      }
+
+      if (
+        filters.deadline !== "ALL" &&
+        getDeadlineBucket(item.deadline) !== filters.deadline
+      ) {
+        return false;
+      }
+
+      if (owner) {
+        const ownerText = normalizeText(`${item.owner} ${item.title}`);
+        if (!ownerText.includes(owner)) return false;
       }
 
       if (query) {
@@ -491,7 +785,7 @@ export const ApprovalWorkspacePage = () => {
 
       if (from || to) {
         const date = item.date ? new Date(item.date) : null;
-        if (!date || Number.isNaN(date.getTime())) return false;
+        if (!date || !isValidDate(date)) return false;
         if (from && date < from) return false;
         if (to && date > to) return false;
       }
@@ -500,16 +794,40 @@ export const ApprovalWorkspacePage = () => {
     });
   }, [filters, items]);
 
+  const metrics = useMemo(() => {
+    const base =
+      filters.module === "ALL"
+        ? items
+        : items.filter((item) => item.module === filters.module);
+
+    return {
+      total: base.length,
+      overdue: base.filter((item) => getDeadlineBucket(item.deadline) === "OVERDUE").length,
+      today: base.filter((item) => getDeadlineBucket(item.deadline) === "TODAY").length,
+      visible: filteredItems.length,
+    };
+  }, [filteredItems.length, filters.module, items]);
+
   const executeAction = (item: ApprovalItem, action: ApprovalAction) => {
+    if (action.kind === "open") {
+      void action.run();
+      return;
+    }
+
     triggerAlert(
       "confirm",
-      action.kind === "reject" ? "Xác nhận từ chối" : "Xác nhận xử lý",
+      action.kind === "reject"
+        ? "Xác nhận từ chối"
+        : action.kind === "revision"
+          ? "Yêu cầu chỉnh sửa"
+          : "Xác nhận xử lý",
       `Bạn muốn ${action.label.toLowerCase()} yêu cầu "${item.title}"?`,
       async () => {
         try {
           await action.run();
           triggerAlert("success", "Đã xử lý", "Yêu cầu đã được cập nhật.");
           await fetchItems();
+          setSelectedItemId(null);
         } catch (error) {
           triggerAlert("error", "Không thể xử lý", getErrorMessage(error));
         }
@@ -517,18 +835,79 @@ export const ApprovalWorkspacePage = () => {
     );
   };
 
+  const handleApprovalAction = (item: ApprovalItem, action: ApprovalAction) => {
+    if (action.kind === "open") {
+      void action.run();
+      return;
+    }
+
+    if (action.kind === "reconcile") {
+      void Promise.resolve(action.run())
+        .then(async () => {
+          triggerAlert("success", "Đã cập nhật", "Yêu cầu đã được xử lý.");
+          await fetchItems();
+          setSelectedItemId(null);
+        })
+        .catch((error) => {
+          triggerAlert("error", "Không thể xử lý", getErrorMessage(error));
+        });
+      return;
+    }
+
+    setPendingAction({ item, action });
+    setActionNote("");
+  };
+
+  const submitPendingAction = async () => {
+    if (!pendingAction) return;
+
+    const note = actionNote.trim();
+    if ((pendingAction.action.kind === "reject" || pendingAction.action.kind === "revision") && !note) {
+      triggerAlert(
+        "error",
+        "Thiếu ghi chú",
+        pendingAction.action.kind === "revision"
+          ? "Vui lòng nhập nội dung cần chỉnh sửa trước khi gửi."
+          : "Vui lòng nhập lý do từ chối trước khi gửi.",
+      );
+      return;
+    }
+
+    setActionSubmitting(true);
+    try {
+      await pendingAction.action.run(note);
+      triggerAlert("success", "Đã xử lý", "Yêu cầu đã được cập nhật.");
+      setPendingAction(null);
+      setActionNote("");
+      await fetchItems();
+      setSelectedItemId(null);
+    } catch (error) {
+      triggerAlert("error", "Không thể xử lý", getErrorMessage(error));
+    } finally {
+      setActionSubmitting(false);
+    }
+  };
+
+  void executeAction;
+
   return (
     <FeaturePage
-      title={`Phê duyệt của ${role || "người dùng"}`}
-      description="Một inbox chung theo vai trò, gom tất cả yêu cầu cần xử lý và cho phép lọc theo module, thời gian hoặc nội dung."
+      title="Phê duyệt"
+      description={`Xử lý các yêu cầu đang chờ theo vai trò ${roleLabel(role)}.`}
       actions={
         <button className={secondaryButtonClass} onClick={() => fetchItems()}>
+          <RefreshCw size={16} />
           Làm mới
         </button>
       }
       width="wide"
     >
-      <FilterPanel filters={filters} setFilters={setFilters} />
+      <CleanFilterPanel
+        filters={filters}
+        setFilters={setFilters}
+        statusOptions={statusOptions}
+      />
+      <CleanApprovalSummaryStrip metrics={metrics} />
 
       {!isApprovalRole(role) ? (
         <FeatureCard>
@@ -544,23 +923,43 @@ export const ApprovalWorkspacePage = () => {
         >
           {loading ? (
             <div className="py-10 text-center text-sm text-gray-500">
-              Đang tải dữ liệu phê duyệt...
+              Đang tải dữ liệu...
             </div>
           ) : filteredItems.length === 0 ? (
-            <EmptyState title="Không có yêu cầu phù hợp bộ lọc" />
+            <EmptyState title="Chưa có yêu cầu phù hợp" />
           ) : (
             <div className="space-y-3">
               {filteredItems.map((item) => (
-                <ApprovalRow
+                <CleanApprovalRow
                   key={item.id}
                   item={item}
-                  onAction={executeAction}
+                  onAction={handleApprovalAction}
+                  onOpenDetail={() => setSelectedItemId(item.id)}
                 />
               ))}
             </div>
           )}
         </FeatureCard>
       )}
+
+      <CleanApprovalDetailDrawer
+        item={selectedItem}
+        open={Boolean(selectedItem)}
+        onClose={() => setSelectedItemId(null)}
+        onAction={handleApprovalAction}
+      />
+      <ApprovalActionNoteDialog
+        pendingAction={pendingAction}
+        note={actionNote}
+        submitting={actionSubmitting}
+        onChangeNote={setActionNote}
+        onCancel={() => {
+          if (actionSubmitting) return;
+          setPendingAction(null);
+          setActionNote("");
+        }}
+        onSubmit={submitPendingAction}
+      />
     </FeaturePage>
   );
 
@@ -572,12 +971,12 @@ export const ApprovalWorkspacePage = () => {
       kind: isApproved ? "approve" : "reject",
       label: isApproved ? "Duyệt" : "Từ chối",
       tone: isApproved ? "primary" : "danger",
-      run: () =>
+      run: (note) =>
         recruitmentApi.reviewRequest({
           moduleCode: item.moduleCode,
           referenceId: item.referenceId,
           isApproved,
-          note: "",
+          note: note || "",
         }),
     };
   }
@@ -595,23 +994,23 @@ export const ApprovalWorkspacePage = () => {
           kind: "approve",
           label: scope === "manager" ? "Duyệt nghiệp vụ" : "HR xác nhận",
           tone: "primary",
-          run: () =>
+          run: (note) =>
             scope === "manager"
-              ? overtimeApi.managerReview(item.id, { isApproved: true })
+              ? overtimeApi.managerReview(item.id, { isApproved: true, note })
               : scope === "hr"
-                ? overtimeApi.hrConfirm(item.id, { isApproved: true })
-                : overtimeApi.directorReview(item.id, { isApproved: true }),
+                ? overtimeApi.hrConfirm(item.id, { isApproved: true, note })
+                : overtimeApi.directorReview(item.id, { isApproved: true, note }),
         },
         {
           kind: "reject",
           label: "Từ chối",
           tone: "danger",
-          run: () =>
+          run: (note) =>
             scope === "manager"
-              ? overtimeApi.managerReview(item.id, { isApproved: false })
+              ? overtimeApi.managerReview(item.id, { isApproved: false, note })
               : scope === "hr"
-                ? overtimeApi.hrConfirm(item.id, { isApproved: false })
-                : overtimeApi.directorReview(item.id, { isApproved: false }),
+                ? overtimeApi.hrConfirm(item.id, { isApproved: false, note })
+                : overtimeApi.directorReview(item.id, { isApproved: false, note }),
         },
       ],
     };
@@ -621,7 +1020,7 @@ export const ApprovalWorkspacePage = () => {
     return {
       id: `ot-${item.id}`,
       module: "OVERTIME",
-      moduleLabel: "OT",
+      moduleLabel: "Làm thêm giờ",
       source: "OVERTIME",
       title: `${item.employeeName} - ${item.workDate}`,
       subtitle: `${item.startTime} - ${item.endTime}`,
@@ -630,7 +1029,17 @@ export const ApprovalWorkspacePage = () => {
       status: item.status,
       statusLabel: statusLabel(item.status),
       date: item.workDate,
-      details: <p className="text-sm text-gray-600">{item.reason}</p>,
+      details: (
+        <DetailFieldGrid
+          fields={[
+            ["Nhân sự", item.employeeName],
+            ["Phòng ban", item.departmentName],
+            ["Ngày làm thêm", formatDate(item.workDate)],
+            ["Khung giờ", `${item.startTime || "-"} - ${item.endTime || "-"}`],
+            ["Lý do", item.reason],
+          ]}
+        />
+      ),
       actions: [],
     };
   }
@@ -652,7 +1061,18 @@ export const ApprovalWorkspacePage = () => {
       statusLabel: statusLabel(item.status),
       date: item.startDate,
       deadline: item.deadlineAt,
-      details: <p className="text-sm text-gray-600">{item.reason}</p>,
+      details: (
+        <DetailFieldGrid
+          fields={[
+            ["Nhân sự", item.employeeName],
+            ["Phòng ban", item.departmentName],
+            ["Loại nghỉ", item.leaveTypeName],
+            ["Thời gian", `${formatDate(item.startDate)} - ${formatDate(item.endDate)}`],
+            ["Số ngày", `${item.requestedDays} ngày`],
+            ["Lý do", item.reason],
+          ]}
+        />
+      ),
       actions: [
         {
           kind: "approve",
@@ -704,6 +1124,17 @@ export const ApprovalWorkspacePage = () => {
       statusLabel: statusLabel(item.status),
       date: item.createdAt,
       deadline: item.effectiveDate,
+      details: (
+        <DetailFieldGrid
+          fields={[
+            ["Số phụ lục", item.addendumNumber],
+            ["Hợp đồng", item.contractNumber],
+            ["Nhân sự", item.employeeName],
+            ["Ngày hiệu lực", formatDate(item.effectiveDate)],
+            ["Nội dung", item.content],
+          ]}
+        />
+      ),
       actions: [
         {
           kind: "approve",
@@ -717,42 +1148,558 @@ export const ApprovalWorkspacePage = () => {
                 : contractAddendumApi.approve(item.id),
         },
         {
-          kind: "reject",
-          label: "Từ chối",
-          tone: "danger",
-          run: () =>
-            scope === "dept"
-              ? contractAddendumApi.deptReview(item.id, {
-                  isApproved: false,
-                  rejectReason: "Trưởng phòng từ chối phụ lục hợp đồng.",
-                })
-              : scope === "hr"
-                ? contractAddendumApi.hrConfirm(item.id, {
-                    isApproved: false,
-                    rejectReason: "HR từ chối phụ lục hợp đồng.",
-                  })
-                : contractAddendumApi.reject(
-                    item.id,
-                    "Giám đốc từ chối phụ lục hợp đồng.",
-                  ),
+          kind: "revision",
+          label: "Yêu cầu chỉnh sửa",
+          tone: "secondary",
+          run: (note) =>
+            contractAddendumApi.requestRevision(item.id, {
+              reason: note || "Yêu cầu HR chỉnh sửa phụ lục hợp đồng.",
+            }),
         },
       ],
     };
   }
+
+  function mapContractItem(
+    item: ContractDto,
+    scope: "dept" | "director",
+  ): ApprovalItem {
+    const isDept = scope === "dept";
+    const isRevisionFlow = !isDept || item.status === "PendingManagerContentReview";
+
+    return {
+      id: `contract-${scope}-${item.id}`,
+      module: "CONTRACT",
+      moduleLabel: "Hợp đồng",
+      source: isDept ? "CONTRACT_DEPT" : "CONTRACT_DIRECTOR",
+      title: isDept
+        ? `Xác nhận yêu cầu hợp đồng: ${item.employeeName || `#${item.employeeId}`}`
+        : `Duyệt hợp đồng: ${item.employeeName || `#${item.employeeId}`}`,
+      subtitle: item.negotiationNote || item.contractNumber,
+      owner: item.employeeName || undefined,
+      status: item.status,
+      statusLabel: statusLabel(item.status),
+      date: item.startDate,
+      deadline: item.endDate,
+      details: (
+        <DetailFieldGrid
+          fields={[
+            ["Nhân sự", item.employeeName || `#${item.employeeId}`],
+            ["Số hợp đồng", item.contractNumber],
+            ["Loại hợp đồng", item.contractType],
+            ["Ngày bắt đầu", formatDate(item.startDate)],
+            ["Ngày kết thúc", formatDate(item.endDate)],
+            ["Lương cơ bản", formatMoney(item.basicSalary)],
+            ["Lương bảo hiểm", formatMoney(item.insuranceSalary)],
+            ["Ghi chú thương lượng", item.negotiationNote],
+          ]}
+        />
+      ),
+      actions: [
+        {
+          kind: "approve",
+          label: isDept ? "Trưởng phòng xác nhận" : "Giám đốc duyệt",
+          tone: "primary",
+          run: () =>
+            isDept
+              ? contractApi.deptReview(item.id, { isApproved: true })
+              : contractApi.directorApprove(item.id, { isApproved: true }),
+        },
+        {
+          kind: isRevisionFlow ? "revision" : "reject",
+          label: isRevisionFlow ? "Yêu cầu chỉnh sửa" : "Từ chối",
+          tone: isRevisionFlow ? "secondary" : "danger",
+          run: (note) =>
+            isRevisionFlow
+              ? contractApi.requestRevision(item.id, {
+                  reason: note || "Yêu cầu HR chỉnh sửa hợp đồng.",
+                })
+              : contractApi.deptReview(item.id, {
+                  isApproved: false,
+                  rejectReason: note || "Trưởng phòng từ chối yêu cầu hợp đồng.",
+                }),
+        },
+      ],
+    };
+  }
+
+  function mapPayrollSlipItem(item: SalarySlip, period: string): ApprovalItem {
+    return {
+      id: `payroll-slip-${item.id}`,
+      module: "PAYROLL",
+      moduleLabel: "Lương",
+      source: "PAYROLL_RUN",
+      title: `Bảng lương ${period}: ${item.employeeName}`,
+      subtitle: `${item.employeeCode} - ${formatMoney(item.netSalary)} thực nhận`,
+      owner: item.employeeName,
+      department: item.departmentName,
+      status: item.status,
+      statusLabel: statusLabel(item.status),
+      date: item.calculatedAt,
+      details: (
+        <DetailFieldGrid
+          fields={[
+            ["Kỳ lương", item.period],
+            ["Nhân sự", item.employeeName],
+            ["Phòng ban", item.departmentName],
+            ["Chức danh", item.positionName],
+            ["Tổng thu nhập", formatMoney(item.grossIncome)],
+            ["Thực nhận", formatMoney(item.netSalary)],
+            ["Trạng thái", statusLabel(item.status)],
+          ]}
+        />
+      ),
+      actions: [
+        {
+          kind: "open",
+          label: "Mở bảng lương",
+          tone: "secondary",
+          run: () => navigate("/payroll/payroll-aggregation"),
+        },
+      ],
+    };
+  }
+
+  function mapPayrollAdjustmentItem(item: PayrollAdjustment, period: string): ApprovalItem {
+    return {
+      id: `payroll-adjustment-${item.id}`,
+      module: "PAYROLL",
+      moduleLabel: "Lương",
+      source: "PAYROLL_ADJUSTMENT",
+      title: `Điều chỉnh lương ${period}: ${item.employeeName || `#${item.employeeId}`}`,
+      subtitle: `${formatMoney(item.amount)} - ${item.adjustmentType}`,
+      owner: item.employeeName || undefined,
+      status: item.status,
+      statusLabel: statusLabel(item.status),
+      date: item.createdAt,
+      details: (
+        <DetailFieldGrid
+          fields={[
+            ["Kỳ ghi nhận", `${item.recognizedMonth}/${item.recognizedYear}`],
+            ["Nhân sự", item.employeeName || item.employeeCode],
+            ["Loại điều chỉnh", item.adjustmentType],
+            ["Số tiền", formatMoney(item.amount)],
+            ["Tính thuế", item.isTaxable ? "Có" : "Không"],
+            ["Tính bảo hiểm", item.isInsuranceBased ? "Có" : "Không"],
+            ["Khoản khấu trừ", item.isDeduction ? "Có" : "Không"],
+            ["Lý do", item.reason],
+          ]}
+        />
+      ),
+      actions: [
+        {
+          kind: "open",
+          label: "Mở điều chỉnh",
+          tone: "secondary",
+          run: () => navigate("/payroll/adjustments"),
+        },
+      ],
+    };
+  }
+
+  function mapProjectBonusImportItem(item: ProjectBonusImportBatch): ApprovalItem {
+    const previewLines = item.lines?.slice(0, 6) ?? [];
+
+    return {
+      id: `project-bonus-import-${item.id}`,
+      module: "PAYROLL",
+      moduleLabel: "Lương",
+      source: "PROJECT_BONUS_IMPORT",
+      title: `Thưởng dự án ${item.payrollPeriod}`,
+      subtitle: `${item.validRows} dòng hợp lệ - ${formatMoney(item.totalAmount)}`,
+      owner: item.uploadedByName || `Tài khoản #${item.uploadedByAccountId}`,
+      status: item.status,
+      statusLabel: item.statusText || statusLabel(item.status),
+      date: item.createdAt,
+      details: (
+        <div className="space-y-4">
+          <DetailFieldGrid
+            fields={[
+              ["Kỳ lương", item.payrollPeriod],
+              ["File import", item.fileName],
+              ["Người import", item.uploadedByName || `#${item.uploadedByAccountId}`],
+              ["Số dòng hợp lệ", item.validRows],
+              ["Dòng lỗi", item.errorRows],
+              ["Tổng thưởng", formatMoney(item.totalAmount)],
+              ["Trạng thái", item.statusText || statusLabel(item.status)],
+              ["Ghi chú", item.note],
+            ]}
+          />
+
+          {previewLines.length > 0 ? (
+            <div className="rounded-[var(--radius-lg)] border border-[var(--hicas-border)] bg-white">
+              <div className="border-b border-[var(--hicas-border)] px-4 py-3 text-sm font-semibold text-[var(--hicas-text-main)]">
+                Dòng thưởng trong batch
+              </div>
+              <div className="divide-y divide-[var(--hicas-border)]">
+                {previewLines.map((line) => (
+                  <div
+                    key={`${line.rowNumber}-${line.employeeCode}-${line.projectCode}`}
+                    className="grid gap-2 px-4 py-3 text-sm md:grid-cols-[1.2fr_1fr_auto]"
+                  >
+                    <div>
+                      <p className="font-semibold text-[var(--hicas-text-main)]">
+                        {line.employeeName || line.employeeCode}
+                      </p>
+                      <p className="text-[var(--hicas-text-secondary)]">{line.employeeCode}</p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-[var(--hicas-text-main)]">{line.projectName}</p>
+                      <p className="text-[var(--hicas-text-secondary)]">{line.projectCode}</p>
+                    </div>
+                    <div className="text-right font-semibold text-[var(--hicas-orange)]">
+                      {formatMoney(line.bonusAmount)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ),
+      actions: [
+        {
+          kind: "approve",
+          label: "Duyệt",
+          tone: "primary",
+          run: (note) =>
+            payrollApi.reviewProjectBonusImport(item.id, {
+              isApproved: true,
+              note: note || "",
+            }),
+        },
+        {
+          kind: "reject",
+          label: "Từ chối",
+          tone: "danger",
+          run: (note) =>
+            payrollApi.reviewProjectBonusImport(item.id, {
+              isApproved: false,
+              note: note || "",
+            }),
+        },
+        {
+          kind: "open",
+          label: "Mở khu vực lương",
+          tone: "secondary",
+          run: () => navigate("/payroll/payroll-aggregation"),
+        },
+      ],
+    };
+  }
+
+  function mapPersonnelChangeItem(item: PersonnelChangeListItem): ApprovalItem {
+    const workflow = resolvePersonnelChangeWorkflow(item);
+    const typeLabel = personnelChangeTypeLabel(item.changeType);
+
+    return {
+      id: `personnel-change-${item.id}`,
+      module: "PERSONNEL_CHANGE",
+      moduleLabel: "Biến động nhân sự",
+      source: `PERSONNEL_CHANGE_${getPersonnelChangeStatusLabel(item.status)}`,
+      title: `${typeLabel}: ${item.employeeName || `#${item.employeeId}`}`,
+      subtitle: item.reason || item.employeeCode || undefined,
+      owner: item.employeeName || item.requestedByName || undefined,
+      status: String(item.status),
+      statusLabel: personnelChangeStatusLabel(item.status),
+      date: item.requestedAt,
+      deadline: item.effectiveDate,
+      details: (
+        <DetailFieldGrid
+          fields={[
+            ["Loại biến động", typeLabel],
+            ["Nhân sự", item.employeeName || item.employeeCode],
+            ["Người tạo", item.requestedByName],
+            ["Ngày yêu cầu", formatDate(item.requestedAt)],
+            ["Ngày hiệu lực", formatDate(item.effectiveDate)],
+            ["Trạng thái", personnelChangeStatusLabel(item.status)],
+            ["Cần nhân viên xác nhận", item.requiresEmployeeConsent ? "Có" : "Không"],
+            ["Cần hợp đồng/phụ lục", item.requiresContractFlow ? "Có" : "Không"],
+            ["Cần giám đốc duyệt", item.requiresDirectorApproval ? "Có" : "Không"],
+            ["Lý do", item.reason],
+          ]}
+        />
+      ),
+      actions: personnelChangeActionsWithNotes(item, workflow),
+    };
+  }
+
+  function personnelChangeActions(
+    item: PersonnelChangeListItem,
+    workflow: PersonnelChangeWorkflowKind,
+  ): ApprovalAction[] {
+    const openAction: ApprovalAction = {
+      kind: "open",
+      label: "Mở hồ sơ",
+      tone: "secondary",
+      run: () => navigate(personnelChangeRoute(workflow)),
+    };
+
+    if (item.status === PersonnelChangeStatus.PendingManagerReview && workflow === "termination") {
+      return [
+        personnelChangeDecision("Duyệt", true, () =>
+          personnelChangeApi.managerReviewResignation(item.id, { isApproved: true, note: "" }),
+        ),
+        personnelChangeDecision("Từ chối", false, () =>
+          personnelChangeApi.managerReviewResignation(item.id, { isApproved: false, note: "" }),
+        ),
+        openAction,
+      ];
+    }
+
+    if (
+      item.status === PersonnelChangeStatus.PendingCurrentManagerOpinion &&
+      workflow === "internal-transfer"
+    ) {
+      return [
+        personnelChangeDecision("Đồng ý", true, () =>
+          personnelChangeApi.submitCurrentManagerOpinion(item.id, {
+            isApproved: true,
+            opinion: "",
+          }),
+        ),
+        personnelChangeDecision("Từ chối", false, () =>
+          personnelChangeApi.submitCurrentManagerOpinion(item.id, {
+            isApproved: false,
+            opinion: "",
+          }),
+        ),
+        openAction,
+      ];
+    }
+
+    if (item.status === PersonnelChangeStatus.PendingEmployeeConsent) {
+      if (workflow === "internal-transfer" || workflow === "senior-appointment") {
+        return [
+          personnelChangeDecision("Đồng ý", true, () =>
+            personnelChangeApi.employeeConsent(item.id, { isAccepted: true, note: "" }, workflow),
+          ),
+          personnelChangeDecision("Từ chối", false, () =>
+            personnelChangeApi.employeeConsent(item.id, { isAccepted: false, note: "" }, workflow),
+          ),
+          openAction,
+        ];
+      }
+    }
+
+    if (item.status === PersonnelChangeStatus.PendingHRReview && workflow === "promotion") {
+      return [
+        personnelChangeDecision("HR duyệt", true, () =>
+          personnelChangeApi.hrReviewPromotion(item.id, { isApproved: true, note: "" }),
+        ),
+        personnelChangeDecision("Từ chối", false, () =>
+          personnelChangeApi.hrReviewPromotion(item.id, { isApproved: false, note: "" }),
+        ),
+        openAction,
+      ];
+    }
+
+    if (item.status === PersonnelChangeStatus.PendingDirectorApproval) {
+      const approve = () => personnelChangeDirectorAction(item, workflow, true);
+      const reject = () => personnelChangeDirectorAction(item, workflow, false);
+      return [
+        personnelChangeDecision("Giám đốc duyệt", true, approve),
+        personnelChangeDecision("Từ chối", false, reject),
+        openAction,
+      ];
+    }
+
+    return [openAction];
+  }
+
+  function personnelChangeDecision(
+    label: string,
+    isApproved: boolean,
+    run: () => Promise<unknown> | unknown,
+  ): ApprovalAction {
+    return {
+      kind: isApproved ? "approve" : "reject",
+      label,
+      tone: isApproved ? "primary" : "danger",
+      run,
+    };
+  }
+
+  function personnelChangeDirectorAction(
+    item: PersonnelChangeListItem,
+    workflow: PersonnelChangeWorkflowKind,
+    isApproved: boolean,
+  ) {
+    if (workflow === "promotion") {
+      return personnelChangeApi.directorApprovePromotion(item.id, { isApproved, note: "" });
+    }
+    if (workflow === "internal-transfer") {
+      return personnelChangeApi.directorApproveTransfer(item.id, { isApproved, note: "" });
+    }
+    if (workflow === "dismissal") {
+      return personnelChangeApi.directorApproveDismissal(item.id, { isApproved, note: "" });
+    }
+    if (workflow === "termination") {
+      return personnelChangeApi.directorApproveResignation(item.id, { isApproved, note: "" });
+    }
+
+    return Promise.reject(new Error("Luồng này cần xử lý tại trang nghiệp vụ."));
+  }
+  function personnelChangeActionsWithNotes(
+    item: PersonnelChangeListItem,
+    workflow: PersonnelChangeWorkflowKind,
+  ): ApprovalAction[] {
+    const openAction: ApprovalAction = {
+      kind: "open",
+      label: "Mở hồ sơ",
+      tone: "secondary",
+      run: () => navigate(personnelChangeRoute(workflow)),
+    };
+
+    const decision = (
+      label: string,
+      isApproved: boolean,
+      run: (note?: string) => Promise<unknown> | unknown,
+    ): ApprovalAction => ({
+      kind: isApproved ? "approve" : "reject",
+      label,
+      tone: isApproved ? "primary" : "danger",
+      run,
+    });
+
+    if (item.status === PersonnelChangeStatus.PendingManagerReview && workflow === "termination") {
+      return [
+        decision("Duyệt", true, (note) =>
+          personnelChangeApi.managerReviewResignation(item.id, {
+            isApproved: true,
+            note: note || "",
+          }),
+        ),
+        decision("Từ chối", false, (note) =>
+          personnelChangeApi.managerReviewResignation(item.id, {
+            isApproved: false,
+            note: note || "",
+          }),
+        ),
+        openAction,
+      ];
+    }
+
+    if (
+      item.status === PersonnelChangeStatus.PendingCurrentManagerOpinion &&
+      workflow === "internal-transfer"
+    ) {
+      return [
+        decision("Đồng ý", true, (note) =>
+          personnelChangeApi.submitCurrentManagerOpinion(item.id, {
+            isApproved: true,
+            opinion: note || "",
+          }),
+        ),
+        decision("Từ chối", false, (note) =>
+          personnelChangeApi.submitCurrentManagerOpinion(item.id, {
+            isApproved: false,
+            opinion: note || "",
+          }),
+        ),
+        openAction,
+      ];
+    }
+
+    if (
+      item.status === PersonnelChangeStatus.PendingEmployeeConsent &&
+      (workflow === "internal-transfer" || workflow === "senior-appointment")
+    ) {
+      return [
+        decision("Đồng ý", true, (note) =>
+          personnelChangeApi.employeeConsent(
+            item.id,
+            { isAccepted: true, note: note || "" },
+            workflow,
+          ),
+        ),
+        decision("Từ chối", false, (note) =>
+          personnelChangeApi.employeeConsent(
+            item.id,
+            { isAccepted: false, note: note || "" },
+            workflow,
+          ),
+        ),
+        openAction,
+      ];
+    }
+
+    if (item.status === PersonnelChangeStatus.PendingHRReview && workflow === "promotion") {
+      return [
+        decision("HR duyệt", true, (note) =>
+          personnelChangeApi.hrReviewPromotion(item.id, {
+            isApproved: true,
+            note: note || "",
+          }),
+        ),
+        decision("Từ chối", false, (note) =>
+          personnelChangeApi.hrReviewPromotion(item.id, {
+            isApproved: false,
+            note: note || "",
+          }),
+        ),
+        openAction,
+      ];
+    }
+
+    if (item.status === PersonnelChangeStatus.PendingDirectorApproval) {
+      return [
+        decision("Giám đốc duyệt", true, (note) =>
+          personnelChangeDirectorActionWithNote(item, workflow, true, note),
+        ),
+        decision("Từ chối", false, (note) =>
+          personnelChangeDirectorActionWithNote(item, workflow, false, note),
+        ),
+        openAction,
+      ];
+    }
+
+    return [openAction];
+  }
+
+  function personnelChangeDirectorActionWithNote(
+    item: PersonnelChangeListItem,
+    workflow: PersonnelChangeWorkflowKind,
+    isApproved: boolean,
+    note?: string,
+  ) {
+    const payload = { isApproved, note: note || "" };
+
+    if (workflow === "promotion") {
+      return personnelChangeApi.directorApprovePromotion(item.id, payload);
+    }
+    if (workflow === "internal-transfer") {
+      return personnelChangeApi.directorApproveTransfer(item.id, payload);
+    }
+    if (workflow === "dismissal") {
+      return personnelChangeApi.directorApproveDismissal(item.id, payload);
+    }
+    if (workflow === "termination") {
+      return personnelChangeApi.directorApproveResignation(item.id, payload);
+    }
+
+    return Promise.reject(new Error("Luồng này cần xử lý tại trang nghiệp vụ."));
+  }
+  void personnelChangeActions;
 };
 
-const FilterPanel = ({
+const CleanFilterPanel = ({
   filters,
   setFilters,
+  statusOptions,
 }: {
   filters: ApprovalWorkspaceFilters;
   setFilters: (value: ApprovalWorkspaceFilters) => void;
+  statusOptions: Array<{ value: string; label: string }>;
 }) => (
-  <FeatureCard title="Bộ lọc">
-    <div className="grid gap-4 md:grid-cols-4">
+  <FeatureCard
+    title="Bộ lọc"
+    description="Lọc theo phân hệ, trạng thái, người gửi, phòng ban hoặc hạn xử lý."
+  >
+    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
       <label>
         <span className="mb-1 block text-xs font-semibold uppercase text-gray-500">
-          Module
+          Phân hệ
         </span>
         <select
           className={fieldClass}
@@ -770,53 +1717,143 @@ const FilterPanel = ({
       </label>
       <label>
         <span className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+          Trạng thái
+        </span>
+        <select
+          className={fieldClass}
+          value={filters.status}
+          onChange={(event) => setFilters({ ...filters, status: event.target.value })}
+        >
+          <option value="ALL">Tất cả trạng thái</option>
+          {statusOptions.map((status) => (
+            <option key={status.value} value={status.value}>
+              {status.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        <span className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+          Người gửi
+        </span>
+        <input
+          className={fieldClass}
+          value={filters.owner}
+          onChange={(event) => setFilters({ ...filters, owner: event.target.value })}
+          placeholder="Nhập tên người gửi"
+        />
+      </label>
+      <label>
+        <span className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+          Hạn xử lý
+        </span>
+        <select
+          className={fieldClass}
+          value={filters.deadline}
+          onChange={(event) =>
+            setFilters({
+              ...filters,
+              deadline: event.target.value as ApprovalWorkspaceFilters["deadline"],
+            })
+          }
+        >
+          {(["ALL", "OVERDUE", "TODAY", "NEXT_7_DAYS", "NO_DEADLINE"] as const).map(
+            (value) => (
+              <option key={value} value={value}>
+                {readableDeadlineLabel(value)}
+              </option>
+            ),
+          )}
+        </select>
+      </label>
+      <label>
+        <span className="mb-1 block text-xs font-semibold uppercase text-gray-500">
           Tìm kiếm
         </span>
         <input
           className={fieldClass}
           value={filters.query}
           onChange={(event) => setFilters({ ...filters, query: event.target.value })}
-          placeholder="Tên nhân viên, phòng ban, nội dung..."
+          placeholder="Tên nhân sự, phòng ban, nội dung"
         />
       </label>
       <label>
         <span className="mb-1 block text-xs font-semibold uppercase text-gray-500">
-          Từ ngày
+          Từ ngày tạo
         </span>
         <input
           type="date"
           className={fieldClass}
           value={filters.fromDate}
-          onChange={(event) =>
-            setFilters({ ...filters, fromDate: event.target.value })
-          }
+          onChange={(event) => setFilters({ ...filters, fromDate: event.target.value })}
         />
       </label>
       <label>
         <span className="mb-1 block text-xs font-semibold uppercase text-gray-500">
-          Đến ngày
+          Đến ngày tạo
         </span>
         <input
           type="date"
           className={fieldClass}
           value={filters.toDate}
-          onChange={(event) =>
-            setFilters({ ...filters, toDate: event.target.value })
-          }
+          onChange={(event) => setFilters({ ...filters, toDate: event.target.value })}
         />
       </label>
     </div>
   </FeatureCard>
 );
 
-const ApprovalRow = ({
+const CleanApprovalSummaryStrip = ({
+  metrics,
+}: {
+  metrics: {
+    total: number;
+    visible: number;
+    overdue: number;
+    today: number;
+  };
+}) => (
+  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <SummaryTile
+      label="Đang chờ"
+      value={metrics.total}
+      detail={`${metrics.visible} yêu cầu đang hiển thị`}
+      icon={<Clock3 size={18} />}
+    />
+    <SummaryTile
+      label="Quá hạn"
+      value={metrics.overdue}
+      detail="Cần ưu tiên xử lý"
+      tone="danger"
+      icon={<CalendarDays size={18} />}
+    />
+    <SummaryTile
+      label="Đến hạn hôm nay"
+      value={metrics.today}
+      detail="Nên hoàn tất trong ngày"
+      tone="warning"
+      icon={<CalendarDays size={18} />}
+    />
+    <SummaryTile
+      label="Kết quả lọc"
+      value={metrics.visible}
+      detail="Số yêu cầu phù hợp"
+      tone="info"
+      icon={<Eye size={18} />}
+    />
+  </div>
+);
+
+const CleanApprovalRow = ({
   item,
   onAction,
+  onOpenDetail,
 }: {
   item: ApprovalItem;
   onAction: (item: ApprovalItem, action: ApprovalAction) => void;
+  onOpenDetail: () => void;
 }) => (
-  <div className="rounded-lg border border-gray-200 bg-white p-4">
+  <div className="rounded-[var(--radius-md)] border border-[var(--hicas-border)] bg-white p-4 transition hover:border-[var(--hicas-primary)]/40 hover:shadow-sm">
     <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
       <div className="min-w-0 flex-1">
         <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -834,15 +1871,33 @@ const ApprovalRow = ({
           <p className="mt-1 text-sm text-gray-600">{item.subtitle}</p>
         )}
         <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
-          {item.owner && <span>Người liên quan: {item.owner}</span>}
-          {item.department && <span>Phòng ban: {item.department}</span>}
-          <span>Ngày: {formatDate(item.date)}</span>
-          {item.deadline && <span>Hạn/SLA: {formatDate(item.deadline)}</span>}
-          <span>Nguồn: {item.source}</span>
+          {item.owner && (
+            <span className="inline-flex items-center gap-1">
+              <UserRound size={13} /> {item.owner}
+            </span>
+          )}
+          {item.department && (
+            <span className="inline-flex items-center gap-1">
+              <Building2 size={13} /> {item.department}
+            </span>
+          )}
+          <span className="inline-flex items-center gap-1">
+            <CalendarDays size={13} /> Ngày tạo: {formatDate(item.date)}
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <Clock3 size={13} /> Hạn/SLA: {formatDate(item.deadline)}
+          </span>
         </div>
-        {item.details && <div className="mt-3">{item.details}</div>}
       </div>
       <div className="flex flex-wrap justify-end gap-2">
+        <button
+          type="button"
+          onClick={onOpenDetail}
+          className={secondaryButtonClass}
+        >
+          <Eye size={16} />
+          Chi tiết
+        </button>
         {item.actions.map((action) => (
           <button
             key={`${item.id}-${action.label}`}
@@ -856,6 +1911,7 @@ const ApprovalRow = ({
                   : primaryButtonClass
             }
           >
+            <ActionIcon kind={action.kind} />
             {action.label}
           </button>
         ))}
@@ -863,6 +1919,581 @@ const ApprovalRow = ({
     </div>
   </div>
 );
+
+const CleanApprovalDetailDrawer = ({
+  item,
+  open,
+  onClose,
+  onAction,
+}: {
+  item: ApprovalItem | null;
+  open: boolean;
+  onClose: () => void;
+  onAction: (item: ApprovalItem, action: ApprovalAction) => void;
+}) => (
+  <DrawerForm
+    open={open}
+    title={item?.title || "Chi tiết phê duyệt"}
+    description={item?.subtitle || "Kiểm tra thông tin trước khi xử lý yêu cầu."}
+    width="xl"
+    onClose={onClose}
+    footer={
+      item ? (
+        <div className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
+          <button type="button" className={secondaryButtonClass} onClick={onClose}>
+            Đóng
+          </button>
+          {item.actions.map((action) => (
+            <button
+              key={`${item.id}-drawer-${action.label}`}
+              type="button"
+              onClick={() => onAction(item, action)}
+              className={
+                action.tone === "danger"
+                  ? dangerButtonClass
+                  : action.tone === "secondary"
+                    ? secondaryButtonClass
+                    : primaryButtonClass
+              }
+            >
+              <ActionIcon kind={action.kind} />
+              {action.label}
+            </button>
+          ))}
+        </div>
+      ) : null
+    }
+  >
+    {!item ? (
+      <p className="text-sm text-[var(--hicas-text-secondary)]">
+        Chưa có yêu cầu được chọn.
+      </p>
+    ) : (
+      <div className="space-y-5">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <DetailInfo label="Phân hệ" value={item.moduleLabel} />
+          <DetailInfo label="Trạng thái" value={item.statusLabel} />
+          <DetailInfo label="Người liên quan" value={item.owner || "-"} />
+          <DetailInfo label="Phòng ban" value={item.department || "-"} />
+          <DetailInfo label="Ngày tạo" value={formatDate(item.date)} />
+          <DetailInfo label="Hạn/SLA" value={formatDate(item.deadline)} />
+          <DetailInfo label="Nguồn xử lý" value={item.source || "-"} />
+          <DetailInfo label="Mã yêu cầu" value={item.id} />
+        </div>
+
+        <div className="rounded-[var(--radius-md)] border border-[var(--hicas-border)] bg-white p-4">
+          <p className="text-sm font-semibold text-[var(--hicas-text-main)]">
+            Nội dung cần kiểm tra
+          </p>
+          {item.details ? (
+            <div className="mt-3">{item.details}</div>
+          ) : (
+            <p className="mt-2 text-sm leading-6 text-[var(--hicas-text-secondary)]">
+              Chưa có dữ liệu chi tiết bổ sung cho yêu cầu này.
+            </p>
+          )}
+        </div>
+      </div>
+    )}
+  </DrawerForm>
+);
+
+const FilterPanel = ({
+  filters,
+  setFilters,
+  statusOptions,
+}: {
+  filters: ApprovalWorkspaceFilters;
+  setFilters: (value: ApprovalWorkspaceFilters) => void;
+  statusOptions: Array<{ value: string; label: string }>;
+}) => (
+  <FeatureCard title="Bộ lọc" description="Thu hẹp danh sách theo phân hệ, trạng thái, người gửi hoặc hạn xử lý.">
+    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+      <label>
+        <span className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+          Phân hệ
+        </span>
+        <select
+          className={fieldClass}
+          value={filters.module}
+          onChange={(event) =>
+            setFilters({ ...filters, module: event.target.value as ApprovalWorkspaceFilters["module"] })
+          }
+        >
+          {APPROVAL_MODULES.map((module) => (
+            <option key={module.value} value={module.value}>
+              {module.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        <span className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+          Trạng thái
+        </span>
+        <select
+          className={fieldClass}
+          value={filters.status}
+          onChange={(event) =>
+            setFilters({ ...filters, status: event.target.value })
+          }
+        >
+          <option value="ALL">Tất cả trạng thái</option>
+          {statusOptions.map((status) => (
+            <option key={status.value} value={status.value}>
+              {status.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        <span className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+          Người gửi
+        </span>
+        <input
+          className={fieldClass}
+          value={filters.owner}
+          onChange={(event) => setFilters({ ...filters, owner: event.target.value })}
+          placeholder="Tên người gửi..."
+        />
+      </label>
+      <label>
+        <span className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+          Hạn xử lý
+        </span>
+        <select
+          className={fieldClass}
+          value={filters.deadline}
+          onChange={(event) =>
+            setFilters({
+              ...filters,
+              deadline: event.target.value as ApprovalWorkspaceFilters["deadline"],
+            })
+          }
+        >
+          {(["ALL", "OVERDUE", "TODAY", "NEXT_7_DAYS", "NO_DEADLINE"] as const).map(
+            (value) => (
+              <option key={value} value={value}>
+                {deadlineLabel(value)}
+              </option>
+            ),
+          )}
+        </select>
+      </label>
+      <label>
+        <span className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+          Tìm kiếm
+        </span>
+        <input
+          className={fieldClass}
+          value={filters.query}
+          onChange={(event) => setFilters({ ...filters, query: event.target.value })}
+          placeholder="Tên nhân viên, phòng ban, nội dung..."
+        />
+      </label>
+      <label>
+        <span className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+          Từ ngày tạo
+        </span>
+        <input
+          type="date"
+          className={fieldClass}
+          value={filters.fromDate}
+          onChange={(event) =>
+            setFilters({ ...filters, fromDate: event.target.value })
+          }
+        />
+      </label>
+      <label>
+        <span className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+          Đến ngày tạo
+        </span>
+        <input
+          type="date"
+          className={fieldClass}
+          value={filters.toDate}
+          onChange={(event) =>
+            setFilters({ ...filters, toDate: event.target.value })
+          }
+        />
+      </label>
+    </div>
+  </FeatureCard>
+);
+
+const ApprovalSummaryStrip = ({
+  metrics,
+}: {
+  metrics: {
+    total: number;
+    visible: number;
+    overdue: number;
+    today: number;
+  };
+}) => (
+  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <SummaryTile
+      label="Đang chờ"
+      value={metrics.total}
+      detail={`${metrics.visible} yêu cầu đang hiển thị`}
+      icon={<Clock3 size={18} />}
+    />
+    <SummaryTile
+      label="Quá hạn"
+      value={metrics.overdue}
+      detail="Cần ưu tiên xử lý"
+      tone="danger"
+      icon={<CalendarDays size={18} />}
+    />
+    <SummaryTile
+      label="Đến hạn hôm nay"
+      value={metrics.today}
+      detail="Nên hoàn tất trong ngày"
+      tone="warning"
+      icon={<CalendarDays size={18} />}
+    />
+    <SummaryTile
+      label="Bộ lọc hiện tại"
+      value={metrics.visible}
+      detail="Kết quả sau khi lọc"
+      tone="info"
+      icon={<Eye size={18} />}
+    />
+  </div>
+);
+
+const SummaryTile = ({
+  label,
+  value,
+  detail,
+  icon,
+  tone = "default",
+}: {
+  label: string;
+  value: number;
+  detail: string;
+  icon: ReactNode;
+  tone?: "default" | "danger" | "warning" | "info";
+}) => {
+  const toneClass = {
+    default: "bg-white text-[var(--hicas-text-main)]",
+    danger: "bg-red-50 text-red-700",
+    warning: "bg-amber-50 text-amber-700",
+    info: "bg-blue-50 text-blue-700",
+  }[tone];
+
+  return (
+    <div className="rounded-[var(--radius-md)] border border-[var(--hicas-border)] bg-white p-4 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-semibold text-[var(--hicas-text-secondary)]">
+          {label}
+        </p>
+        <span className={`inline-flex h-9 w-9 items-center justify-center rounded-lg ${toneClass}`}>
+          {icon}
+        </span>
+      </div>
+      <p className="mt-3 text-2xl font-bold text-[var(--hicas-text-main)]">{value}</p>
+      <p className="mt-1 text-sm text-[var(--hicas-text-secondary)]">{detail}</p>
+    </div>
+  );
+};
+
+const ApprovalRow = ({
+  item,
+  onAction,
+  onOpenDetail,
+}: {
+  item: ApprovalItem;
+  onAction: (item: ApprovalItem, action: ApprovalAction) => void;
+  onOpenDetail: () => void;
+}) => (
+  <div className="rounded-[var(--radius-md)] border border-[var(--hicas-border)] bg-white p-4 transition hover:border-[var(--hicas-primary)]/40 hover:shadow-sm">
+    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <div className="min-w-0 flex-1">
+        <div className="mb-2 flex flex-wrap items-center gap-2">
+          <span
+            className={`rounded-md border px-2 py-1 text-xs font-semibold ${moduleTone(item.module)}`}
+          >
+            {item.moduleLabel}
+          </span>
+          <span className="rounded-md bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-700">
+            {item.statusLabel}
+          </span>
+        </div>
+        <h3 className="text-base font-semibold text-gray-900">{item.title}</h3>
+        {item.subtitle && (
+          <p className="mt-1 text-sm text-gray-600">{item.subtitle}</p>
+        )}
+        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
+          {item.owner && (
+            <span className="inline-flex items-center gap-1">
+              <UserRound size={13} /> {item.owner}
+            </span>
+          )}
+          {item.department && (
+            <span className="inline-flex items-center gap-1">
+              <Building2 size={13} /> {item.department}
+            </span>
+          )}
+          <span className="inline-flex items-center gap-1">
+            <CalendarDays size={13} /> Ngày tạo: {formatDate(item.date)}
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <Clock3 size={13} /> Hạn/SLA: {formatDate(item.deadline)}
+          </span>
+        </div>
+      </div>
+      <div className="flex flex-wrap justify-end gap-2">
+        <button
+          type="button"
+          onClick={onOpenDetail}
+          className={secondaryButtonClass}
+        >
+          <Eye size={16} />
+          Chi tiết
+        </button>
+        {item.actions.map((action) => (
+          <button
+            key={`${item.id}-${action.label}`}
+            type="button"
+            onClick={() => onAction(item, action)}
+            className={
+              action.tone === "danger"
+                ? dangerButtonClass
+                : action.tone === "secondary"
+                  ? secondaryButtonClass
+                  : primaryButtonClass
+            }
+          >
+            <ActionIcon kind={action.kind} />
+            {action.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  </div>
+);
+
+const ApprovalDetailDrawer = ({
+  item,
+  open,
+  onClose,
+  onAction,
+}: {
+  item: ApprovalItem | null;
+  open: boolean;
+  onClose: () => void;
+  onAction: (item: ApprovalItem, action: ApprovalAction) => void;
+}) => (
+  <DrawerForm
+    open={open}
+    title={item?.title || "Chi tiết phê duyệt"}
+    description={item?.subtitle || "Kiểm tra thông tin trước khi xử lý yêu cầu."}
+    width="xl"
+    onClose={onClose}
+    footer={
+      item ? (
+        <div className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
+          <button type="button" className={secondaryButtonClass} onClick={onClose}>
+            Đóng
+          </button>
+          {item.actions.map((action) => (
+            <button
+              key={`${item.id}-drawer-${action.label}`}
+              type="button"
+              onClick={() => onAction(item, action)}
+              className={
+                action.tone === "danger"
+                  ? dangerButtonClass
+                  : action.tone === "secondary"
+                    ? secondaryButtonClass
+                    : primaryButtonClass
+              }
+            >
+              <ActionIcon kind={action.kind} />
+              {action.label}
+            </button>
+          ))}
+        </div>
+      ) : null
+    }
+  >
+    {!item ? (
+      <p className="text-sm text-[var(--hicas-text-secondary)]">
+        Chưa có yêu cầu được chọn.
+      </p>
+    ) : (
+      <div className="space-y-5">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <DetailInfo label="Phân hệ" value={item.moduleLabel} />
+          <DetailInfo label="Trạng thái" value={item.statusLabel} />
+          <DetailInfo label="Người liên quan" value={item.owner || "-"} />
+          <DetailInfo label="Phòng ban" value={item.department || "-"} />
+          <DetailInfo label="Ngày tạo" value={formatDate(item.date)} />
+          <DetailInfo label="Hạn/SLA" value={formatDate(item.deadline)} />
+          <DetailInfo label="Nguồn xử lý" value={item.source || "-"} />
+          <DetailInfo label="Mã yêu cầu" value={item.id} />
+        </div>
+
+        <div className="rounded-[var(--radius-md)] border border-[var(--hicas-border)] bg-white p-4">
+          <p className="text-sm font-semibold text-[var(--hicas-text-main)]">
+            Nội dung cần kiểm tra
+          </p>
+          {item.details ? (
+            <div className="mt-3">{item.details}</div>
+          ) : (
+            <p className="mt-2 text-sm leading-6 text-[var(--hicas-text-secondary)]">
+              Chưa có dữ liệu chi tiết bổ sung cho yêu cầu này. Vui lòng kiểm tra
+              thông tin tóm tắt trước khi xử lý.
+            </p>
+          )}
+        </div>
+      </div>
+    )}
+  </DrawerForm>
+);
+
+void FilterPanel;
+void ApprovalSummaryStrip;
+void ApprovalRow;
+void ApprovalDetailDrawer;
+
+const ApprovalActionNoteDialog = ({
+  pendingAction,
+  note,
+  submitting,
+  onChangeNote,
+  onCancel,
+  onSubmit,
+}: {
+  pendingAction: { item: ApprovalItem; action: ApprovalAction } | null;
+  note: string;
+  submitting: boolean;
+  onChangeNote: (value: string) => void;
+  onCancel: () => void;
+  onSubmit: () => void;
+}) => {
+  if (!pendingAction) return null;
+
+  const { item, action } = pendingAction;
+  const isReject = action.kind === "reject";
+  const isRevision = action.kind === "revision";
+  const requiresNote = isReject || isRevision;
+  const title = isReject ? "Từ chối yêu cầu" : isRevision ? "Yêu cầu chỉnh sửa" : "Xử lý phê duyệt";
+  const helper = isReject
+    ? "Nhập lý do từ chối để người gửi biết."
+    : isRevision
+      ? "Nhập nội dung cần chỉnh sửa để HR cập nhật lại hồ sơ."
+      : "Có thể ghi chú điều kiện hoặc nhận xét trước khi duyệt.";
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-xl rounded-[var(--radius-md)] border border-[var(--hicas-border)] bg-white p-5 shadow-xl">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-lg font-semibold text-[var(--hicas-text-main)]">
+              {title}
+            </p>
+            <p className="mt-1 text-sm text-[var(--hicas-text-secondary)]">
+              {item.title}
+            </p>
+          </div>
+          <span
+            className={`rounded-md border px-2 py-1 text-xs font-semibold ${moduleTone(item.module)}`}
+          >
+            {item.moduleLabel}
+          </span>
+        </div>
+
+        <label className="mt-5 block">
+          <span className="mb-2 block text-sm font-semibold text-[var(--hicas-text-main)]">
+            Ghi chú {requiresNote ? "*" : ""}
+          </span>
+          <textarea
+            className={`${fieldClass} min-h-32 resize-y`}
+            value={note}
+            onChange={(event) => onChangeNote(event.target.value)}
+            placeholder={helper}
+            disabled={submitting}
+          />
+        </label>
+
+        <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            className={secondaryButtonClass}
+            onClick={onCancel}
+            disabled={submitting}
+          >
+            Hủy
+          </button>
+          <button
+            type="button"
+            className={isReject ? dangerButtonClass : isRevision ? secondaryButtonClass : primaryButtonClass}
+            onClick={onSubmit}
+            disabled={submitting || (requiresNote && !note.trim())}
+          >
+            <ActionIcon kind={action.kind} />
+            {submitting ? "Đang xử lý..." : action.label}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const DetailInfo = ({ label, value }: { label: string; value: string }) => (
+  <div className="rounded-[var(--radius-md)] border border-[var(--hicas-border)] bg-white p-3">
+    <p className="text-xs font-semibold uppercase text-[var(--hicas-text-secondary)]">
+      {label}
+    </p>
+    <p className="mt-2 break-words text-sm font-semibold text-[var(--hicas-text-main)]">
+      {value || "-"}
+    </p>
+  </div>
+);
+
+const DetailFieldGrid = ({
+  fields,
+}: {
+  fields: Array<[string, string | number | null | undefined]>;
+}) => {
+  const visibleFields = fields.filter(([, value]) => value !== null && value !== undefined && value !== "");
+
+  if (visibleFields.length === 0) {
+    return (
+      <p className="text-sm text-[var(--hicas-text-secondary)]">
+        Chưa có dữ liệu chi tiết bổ sung.
+      </p>
+    );
+  }
+
+  return (
+    <div className="grid gap-2 text-sm sm:grid-cols-2">
+      {visibleFields.map(([label, value]) => (
+        <div
+          key={label}
+          className="rounded-[var(--radius-sm)] border border-[var(--hicas-border-soft)] bg-[var(--hicas-bg-soft)] px-3 py-2"
+        >
+          <p className="text-xs font-semibold uppercase text-[var(--hicas-text-secondary)]">
+            {label}
+          </p>
+          <p className="mt-1 break-words text-[var(--hicas-text-main)]">
+            {String(value)}
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+const ActionIcon = ({ kind }: { kind: ApprovalAction["kind"] }) => {
+  if (kind === "approve") return <CheckCircle2 size={16} />;
+  if (kind === "reject") return <XCircle size={16} />;
+  if (kind === "revision") return <RefreshCw size={16} />;
+  if (kind === "reconcile") return <RefreshCw size={16} />;
+  return <Eye size={16} />;
+};
 
 const JsonPreview = ({ value }: { value: string }) => {
   let data: Record<string, unknown> | null = null;
@@ -921,3 +2552,93 @@ const dependentActionLabel = (actionType: string) => {
 
 const getErrorMessage = (error: unknown) =>
   error instanceof Error ? error.message : "Đã có lỗi xảy ra.";
+
+const getPersonnelChangeStatusesForRole = (
+  role: string,
+): PersonnelChangeStatusValue[] => {
+  const statuses = new Set<PersonnelChangeStatusValue>();
+
+  if (["Admin", "HR"].includes(role)) {
+    statuses.add(PersonnelChangeStatus.PendingHRReview);
+    statuses.add(PersonnelChangeStatus.PendingEmployeeNotification);
+  }
+
+  if (["Admin", "Manager"].includes(role)) {
+    statuses.add(PersonnelChangeStatus.PendingManagerReview);
+    statuses.add(PersonnelChangeStatus.PendingCurrentManagerOpinion);
+  }
+
+  if (["Admin", "Director"].includes(role)) {
+    statuses.add(PersonnelChangeStatus.PendingDirectorApproval);
+  }
+
+  if (["Admin", "Employee"].includes(role)) {
+    statuses.add(PersonnelChangeStatus.PendingEmployeeConsent);
+    statuses.add(PersonnelChangeStatus.PendingEmployeeExplanation);
+  }
+
+  return Array.from(statuses);
+};
+
+const personnelChangeStatusLabel = (
+  status?: PersonnelChangeStatusValue | null,
+) => {
+  const map: Partial<Record<PersonnelChangeStatusValue, string>> = {
+    [PersonnelChangeStatus.PendingHRReview]: "Chờ HR xử lý",
+    [PersonnelChangeStatus.PendingEmployeeConsent]: "Chờ nhân viên xác nhận",
+    [PersonnelChangeStatus.PendingDirectorApproval]: "Chờ giám đốc duyệt",
+    [PersonnelChangeStatus.PendingCurrentManagerOpinion]: "Chờ quản lý hiện tại",
+    [PersonnelChangeStatus.PendingEmployeeNotification]: "Chờ thông báo nhân viên",
+    [PersonnelChangeStatus.PendingEmployeeExplanation]: "Chờ nhân viên giải trình",
+    [PersonnelChangeStatus.PendingManagerReview]: "Chờ quản lý duyệt",
+  };
+
+  if (status === null || status === undefined) return "Chưa có trạng thái";
+  return map[status] || getPersonnelChangeStatusLabel(status);
+};
+
+const personnelChangeTypeLabel = (type: PersonnelChangeType) => {
+  const map: Record<PersonnelChangeType, string> = {
+    [PersonnelChangeType.ConvertToOfficial]: "Chuyển chính thức",
+    [PersonnelChangeType.Promotion]: "Thăng tiến",
+    [PersonnelChangeType.SeniorAppointment]: "Bổ nhiệm cấp cao",
+    [PersonnelChangeType.VoluntaryTermination]: "Nghỉ việc chủ động",
+    [PersonnelChangeType.Dismissal]: "Kỷ luật/sa thải",
+    [PersonnelChangeType.InternalTransfer]: "Thuyên chuyển nội bộ",
+  };
+
+  return map[type] || "Biến động nhân sự";
+};
+
+const resolvePersonnelChangeWorkflow = (
+  item: PersonnelChangeListItem,
+): PersonnelChangeWorkflowKind => {
+  if (
+    item.changeType === PersonnelChangeType.Promotion ||
+    item.changeType === PersonnelChangeType.ConvertToOfficial
+  ) {
+    return "promotion";
+  }
+  if (item.changeType === PersonnelChangeType.SeniorAppointment) {
+    return "senior-appointment";
+  }
+  if (item.changeType === PersonnelChangeType.VoluntaryTermination) {
+    return "termination";
+  }
+  if (item.changeType === PersonnelChangeType.Dismissal) {
+    return "dismissal";
+  }
+  return "internal-transfer";
+};
+
+const personnelChangeRoute = (workflow: PersonnelChangeWorkflowKind) => {
+  const map: Record<PersonnelChangeWorkflowKind, string> = {
+    promotion: "/personnel-change/promotion",
+    "senior-appointment": "/personnel-change/senior-appointment",
+    termination: "/personnel-change/termination",
+    dismissal: "/personnel-change/dismissal",
+    "internal-transfer": "/personnel-change/internal-transfer",
+  };
+
+  return map[workflow];
+};

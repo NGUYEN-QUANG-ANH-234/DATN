@@ -96,7 +96,7 @@ export const ApprovalTrackingPage = () => {
   return (
     <FeaturePage
       title="Theo dõi trạng thái phê duyệt"
-      description="Theo dõi yêu cầu theo phạm vi dữ liệu của vai trò: cá nhân chỉ thấy dữ liệu của mình, Manager theo phòng ban, HR/Giám đốc/Admin xem tổng thể theo quyền API."
+      description="Tra cứu trạng thái các yêu cầu theo phạm vi quyền của bạn."
       actions={
         <button className={secondaryButtonClass} onClick={() => fetchItems()}>
           Làm mới
@@ -108,7 +108,7 @@ export const ApprovalTrackingPage = () => {
         <div className="grid gap-4 md:grid-cols-3">
           <label>
             <span className="mb-1 block text-xs font-semibold uppercase text-gray-500">
-              Module
+              Phân hệ
             </span>
             <select
               className={fieldClass}
@@ -168,16 +168,16 @@ export const ApprovalTrackingPage = () => {
       >
         {loading ? (
           <div className="py-10 text-center text-sm text-gray-500">
-            Đang tải dữ liệu theo dõi...
+            Đang tải dữ liệu...
           </div>
         ) : filteredItems.length === 0 ? (
-          <EmptyState title="Không có bản ghi phù hợp bộ lọc" />
+          <EmptyState title="Chưa có bản ghi phù hợp" />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[920px] text-left text-sm">
               <thead className="border-b bg-gray-50 text-xs uppercase text-gray-500">
                 <tr>
-                  <th className="px-3 py-2">Module</th>
+                  <th className="px-3 py-2">Phân hệ</th>
                   <th className="px-3 py-2">Nội dung</th>
                   <th className="px-3 py-2">Người liên quan</th>
                   <th className="px-3 py-2">Trạng thái</th>
@@ -338,7 +338,7 @@ export const ApprovalTrackingPage = () => {
         target.push({
           id: `overtime-${item.id}`,
           module: "OVERTIME",
-          moduleLabel: "OT",
+          moduleLabel: "Làm thêm giờ",
           title: `${item.startTime} - ${item.endTime}`,
           owner: item.employeeName,
           department: item.departmentName,

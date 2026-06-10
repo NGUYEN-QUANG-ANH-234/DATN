@@ -8,11 +8,14 @@ export type ApprovalModule =
   | "ONBOARDING"
   | "ADDENDUM"
   | "OVERTIME"
-  | "LEAVE";
+  | "LEAVE"
+  | "PAYROLL"
+  | "PERSONNEL_CHANGE";
 
 export type ApprovalActionKind =
   | "approve"
   | "reject"
+  | "revision"
   | "open"
   | "reconcile";
 
@@ -20,7 +23,7 @@ export interface ApprovalAction {
   kind: ApprovalActionKind;
   label: string;
   tone?: "primary" | "danger" | "secondary";
-  run: () => Promise<unknown> | unknown;
+  run: (note?: string) => Promise<unknown> | unknown;
 }
 
 export interface ApprovalItem {
@@ -75,6 +78,9 @@ export type RoleOption = {
 
 export type ApprovalWorkspaceFilters = {
   module: "ALL" | ApprovalModule;
+  status: "ALL" | string;
+  owner: string;
+  deadline: "ALL" | "OVERDUE" | "TODAY" | "NEXT_7_DAYS" | "NO_DEADLINE";
   query: string;
   fromDate: string;
   toDate: string;
@@ -90,13 +96,15 @@ export const APPROVAL_MODULES: Array<{
   value: "ALL" | ApprovalModule;
   label: string;
 }> = [
-  { value: "ALL", label: "Tất cả module" },
+  { value: "ALL", label: "Tất cả" },
   { value: "RECRUITMENT", label: "Tuyển dụng" },
   { value: "CANDIDATE", label: "Ứng viên" },
   { value: "CONTRACT", label: "Hợp đồng" },
   { value: "PROFILE", label: "Hồ sơ" },
-  { value: "ONBOARDING", label: "Onboarding" },
+  { value: "ONBOARDING", label: "Tiếp nhận hồ sơ" },
   { value: "ADDENDUM", label: "Phụ lục" },
-  { value: "OVERTIME", label: "OT" },
+  { value: "OVERTIME", label: "Làm thêm giờ" },
   { value: "LEAVE", label: "Nghỉ phép" },
+  { value: "PAYROLL", label: "Lương" },
+  { value: "PERSONNEL_CHANGE", label: "Biến động nhân sự" },
 ];
