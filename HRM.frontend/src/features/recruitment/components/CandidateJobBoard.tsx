@@ -1,12 +1,12 @@
 import React, { useRef, useState } from "react";
-import { useApplyJob } from "../hooks/useApplyJob";
-import { useActiveJobs } from "../hooks/useActiveJobs";
-import type { ApplyJobPayload } from "../types/candidate";
 import { useNotification } from "../../../core/context/NotificationContext";
 import {
   fieldClass,
   primaryButtonClass,
 } from "../../../core/components/FeatureShell";
+import { useApplyJob } from "../hooks/useApplyJob";
+import { useActiveJobs } from "../hooks/useActiveJobs";
+import type { ApplyJobPayload } from "../types/candidate";
 
 const MAX_CV_SIZE = 5 * 1024 * 1024;
 
@@ -22,8 +22,8 @@ export const CandidateJobBoard: React.FC = () => {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
     if (!file) return;
 
     if (file.size > MAX_CV_SIZE || file.type !== "application/pdf") {
@@ -32,7 +32,7 @@ export const CandidateJobBoard: React.FC = () => {
         "CV không hợp lệ",
         "Vui lòng chọn file PDF có dung lượng tối đa 5MB.",
       );
-      e.target.value = "";
+      event.target.value = "";
       setCvFile(null);
       return;
     }
@@ -40,8 +40,8 @@ export const CandidateJobBoard: React.FC = () => {
     setCvFile(file);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
 
     if (!selectedJobId) {
       triggerAlert("warning", "Thiếu vị trí", "Vui lòng chọn vị trí tuyển dụng.");
@@ -71,7 +71,7 @@ export const CandidateJobBoard: React.FC = () => {
   };
 
   if (loadingJobs) {
-    return <div className="p-10 text-center text-gray-500">Đang tải danh sách việc làm...</div>;
+    return <div className="p-10 text-center text-gray-500">Đang tải dữ liệu...</div>;
   }
 
   return (
@@ -90,14 +90,15 @@ export const CandidateJobBoard: React.FC = () => {
             required
             className={fieldClass}
             value={selectedJobId}
-            onChange={(e) =>
-              setSelectedJobId(e.target.value ? Number(e.target.value) : "")
+            onChange={(event) =>
+              setSelectedJobId(event.target.value ? Number(event.target.value) : "")
             }
           >
             <option value="">Chọn vị trí đang tuyển</option>
             {jobs.map((job) => (
               <option key={job.id} value={job.id}>
-                {job.positionName} - {job.departmentName} (Cần: {job.quantity})
+                {job.positionName} - {job.departmentName} (Còn:{" "}
+                {job.remainingSlots ?? job.quantity})
               </option>
             ))}
           </select>
@@ -110,10 +111,10 @@ export const CandidateJobBoard: React.FC = () => {
           <input
             type="text"
             required
-            placeholder="Nhập họ và tên..."
+            placeholder="Nhập họ và tên"
             className={fieldClass}
             value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
+            onChange={(event) => setFullName(event.target.value)}
           />
         </div>
 
@@ -127,7 +128,7 @@ export const CandidateJobBoard: React.FC = () => {
             placeholder="email@example.com"
             className={fieldClass}
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(event) => setEmail(event.target.value)}
           />
         </div>
 

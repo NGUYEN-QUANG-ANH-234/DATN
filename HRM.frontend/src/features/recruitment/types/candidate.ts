@@ -16,8 +16,12 @@ export interface ActiveJob {
   departmentName: string;
   positionName: string;
   quantity: number;
+  filledSlots?: number;
+  remainingSlots?: number;
+  canApply?: boolean;
   description: string;
   deadline: string;
+  status?: string;
 }
 
 export interface CandidateHistoryDto {

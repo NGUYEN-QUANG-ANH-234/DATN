@@ -1,6 +1,6 @@
 export { CandidateApplyForm } from "./components/CandidateApplyForm";
 export { CreateRecruitmentForm } from "./components/CreateRecruitmentForm";
-export { RecruitmentApprovalInbox } from "./components/RecruitmentApprovalInbox";
+export { RecruitmentDemandListPage } from "./components/RecruitmentDemandListPage";
 export { PublicCareersPage } from "./components/PublicCareersPage";
 export { CandidateHistory } from "./components/CandidateHistory";
 export { CandidateJobBoard } from "./components/CandidateJobBoard";

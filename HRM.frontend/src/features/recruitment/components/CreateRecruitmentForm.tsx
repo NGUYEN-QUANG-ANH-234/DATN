@@ -32,7 +32,6 @@ export const CreateRecruitmentForm: React.FC = () => {
       quantity,
       description,
       deadline: deadline ? new Date(deadline).toISOString() : undefined,
-      approverIds: [],
     };
 
     const isSuccess = await handleCreateRequest(payload);

@@ -3,8 +3,8 @@ import { candidateApi } from "../api/candidateApi";
 import type { ApplyJobPayload } from "../types/candidate";
 import { useNotification } from "../../../core/context/NotificationContext";
 
-// 1. Định nghĩa kiểu dữ liệu trả về rõ ràng thay vì dùng 'unknown'
 export interface ApplyJobResult {
+  candidateId?: number;
   trackingCode: string;
 }
 
@@ -12,7 +12,6 @@ export const useApplyJob = () => {
   const [loading, setLoading] = useState(false);
   const { triggerAlert } = useNotification();
 
-  // 2. Đổi Promise<unknown> thành Promise<ApplyJobResult | null>
   const handleApply = async (
     payload: ApplyJobPayload,
   ): Promise<ApplyJobResult | null> => {
@@ -20,27 +19,28 @@ export const useApplyJob = () => {
     try {
       const response = await candidateApi.applyForJob(payload);
 
+      const responseData =
+        typeof response.data === "object" && response.data !== null
+          ? (response.data as { candidateId?: number; trackingCode?: string })
+          : null;
+
+      const trackingCode = responseData?.trackingCode
+        ? String(responseData.trackingCode)
+        : response.data
+          ? String(response.data)
+          : "";
+
       triggerAlert(
         "success",
         "Nộp hồ sơ thành công",
-        response.message || "Đã gửi thông tin ứng tuyển.",
+        trackingCode
+          ? `Mã tra cứu hồ sơ: ${trackingCode}. HICAS cũng đã gửi mã này về email của bạn.`
+          : response.message || "Đã gửi thông tin ứng tuyển.",
       );
 
-      // 3. Backend đang trả về Data là ID ứng viên (số).
-      // Ta ghép thêm chữ "CAND-" để tạo thành trackingCode hợp lệ trả về cho UI.
-      const rawTrackingCode =
-        typeof response.data === "object" &&
-        response.data !== null &&
-        "trackingCode" in response.data
-          ? String((response.data as { trackingCode?: string }).trackingCode)
-          : response.data
-            ? String(response.data)
-            : "";
-
       return {
-        trackingCode: rawTrackingCode.startsWith("CAND-")
-          ? rawTrackingCode
-          : `CAND-${rawTrackingCode}`,
+        candidateId: responseData?.candidateId,
+        trackingCode,
       };
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };

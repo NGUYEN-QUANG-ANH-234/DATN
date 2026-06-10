@@ -1,5 +1,10 @@
 import axiosClient from "../../../core/api/axiosClient";
-import type { CreateRecruitmentPayload, ActiveJob } from "../types/recruitment";
+import type {
+  ActiveJob,
+  CloseRecruitmentPayload,
+  CreateRecruitmentPayload,
+  RecruitmentRequestListItem,
+} from "../types/recruitment";
 
 const ENDPOINT = "/recruitment";
 
@@ -22,6 +27,17 @@ export const recruitmentApi = {
   // Lấy danh sách Job đã duyệt (Public)
   getActiveJobs: async (): Promise<{ success: boolean; data: ActiveJob[] }> => {
     return await axiosClient.get(`${ENDPOINT}/active-jobs`);
+  },
+
+  getRequests: async (): Promise<{ success: boolean; data: RecruitmentRequestListItem[] }> => {
+    return await axiosClient.get(`${ENDPOINT}/requests`);
+  },
+
+  closeRequest: async (
+    id: number,
+    payload: CloseRecruitmentPayload = {},
+  ): Promise<{ success: boolean; data: RecruitmentRequestListItem; message?: string }> => {
+    return await axiosClient.patch(`${ENDPOINT}/requests/${id}/close`, payload);
   },
 
   getDepartmentsTree: async () => {

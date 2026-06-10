@@ -134,8 +134,8 @@ export const CandidateHistory: React.FC = () => {
         <input
           type="text"
           value={trackingCode}
-          onChange={(e) => setTrackingCode(e.target.value)}
-          placeholder="Nhập mã tra cứu (VD: 5F3B...)"
+          onChange={(e) => setTrackingCode(e.target.value.toUpperCase())}
+          placeholder="Nhập mã tra cứu (VD: CAND-5F3B2A1C)"
           className="flex-1 px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors font-mono"
           required
         />
