@@ -7,3 +7,8 @@ export interface DepartmentTree {
   status: string;
   children: DepartmentTree[];
 }
+
+export type UpdateDepartmentPayload = {
+  deptName: string;
+  parentDeptId: number | null;
+};

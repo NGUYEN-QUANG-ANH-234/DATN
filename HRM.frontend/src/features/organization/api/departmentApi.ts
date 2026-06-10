@@ -1,5 +1,5 @@
 import axiosClient from "../../../core/api/axiosClient";
-import type { DepartmentTree } from "../types/department";
+import type { DepartmentTree, UpdateDepartmentPayload } from "../types/department";
 
 const ENDPOINT = "/departments";
 
@@ -12,6 +12,10 @@ export const departmentApi = {
     return await axiosClient.put(`${ENDPOINT}/${id}/structure`, {
       newParentId,
     });
+  },
+
+  update: async (id: number, data: UpdateDepartmentPayload) => {
+    return await axiosClient.put(`${ENDPOINT}/${id}`, data);
   },
 
   deactivate: async (id: number) => {

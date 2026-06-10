@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { departmentApi } from "../api/departmentApi";
-import type { DepartmentTree } from "../types/department";
+import type { DepartmentTree, UpdateDepartmentPayload } from "../types/department";
 
 export const useDepartments = () => {
   const [treeData, setTreeData] = useState<DepartmentTree[]>([]);
@@ -40,6 +40,20 @@ export const useDepartments = () => {
     }
   };
 
+  const handleUpdateDepartment = async (
+    id: number,
+    data: UpdateDepartmentPayload,
+  ): Promise<boolean> => {
+    try {
+      await departmentApi.update(id, data);
+      await fetchTree();
+      return true;
+    } catch (error) {
+      console.error("Lỗi cập nhật thông tin phòng ban:", error);
+      return false;
+    }
+  };
+
   const handleCreate = async (data: {
     deptCode: string;
     deptName: string;
@@ -63,6 +77,7 @@ export const useDepartments = () => {
     treeData,
     loading,
     handleUpdateParent,
+    handleUpdateDepartment,
     handleDeactivate,
     handleCreate,
   };

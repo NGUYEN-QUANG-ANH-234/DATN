@@ -1,427 +1,527 @@
-import React, { useState, useEffect } from "react";
+import { useMemo, useState, type FormEvent } from "react";
+import {
+  Building2,
+  CheckCircle2,
+  GitBranch,
+  Pencil,
+  Plus,
+  Power,
+  RefreshCcw,
+  Save,
+  UsersRound,
+  X,
+} from "lucide-react";
+import { PageHeader } from "../../../components/layout";
+import {
+  Badge,
+  Button,
+  Card,
+  ConfirmDialog,
+  EmptyState,
+  LoadingState,
+} from "../../../components/ui";
+import { useNotification } from "../../../core/context/NotificationContext";
 import { useDepartments } from "../hooks/useDepartments";
-import type { DepartmentTree } from "../types/department";
+import type { DepartmentTree, UpdateDepartmentPayload } from "../types/department";
 
-// ==========================================
-// 1. COMPONENT THÔNG BÁO ĐỒNG NHẤT (TOAST & MODAL)
-// ==========================================
-interface UnifiedAlertProps {
-  type: "success" | "error" | "warning" | "confirm";
-  title: string;
-  message: string;
-  onClose: () => void;
-  onConfirm?: () => void;
-}
-
-const UnifiedAlert: React.FC<UnifiedAlertProps> = ({
-  type,
-  title,
-  message,
-  onClose,
-  onConfirm,
-}) => {
-  // Tự động đóng sau 3 giây nếu chỉ là thông báo dạng Toast (không phải Modal xác nhận)
-  useEffect(() => {
-    if (type !== "confirm") {
-      const timer = setTimeout(() => onClose(), 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [type, onClose]);
-
-  const styleMap = {
-    success: {
-      bg: "bg-green-50 border-green-200",
-      text: "text-green-800",
-      icon: "✅",
-    },
-    error: { bg: "bg-red-50 border-red-200", text: "text-red-800", icon: "❌" },
-    warning: {
-      bg: "bg-amber-50 border-amber-200",
-      text: "text-amber-800",
-      icon: "⚠️",
-    },
-    confirm: {
-      bg: "bg-white border-blue-200",
-      text: "text-gray-800",
-      icon: "❓",
-    },
-  };
-
-  const currentStyle = styleMap[type];
-
-  if (type === "confirm") {
-    // Giao diện Modal phủ toàn màn hình dành cho việc Xác nhận hành động nguy hiểm (Giải thể)
-    return (
-      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
-        <div className="bg-white rounded-xl shadow-xl max-w-md w-full border border-gray-100 p-6 transform transition-all scale-100">
-          <div className="flex items-start gap-4">
-            <span className="text-3xl">{currentStyle.icon}</span>
-            <div className="flex-1">
-              <h3 className="text-lg font-bold text-gray-900 mb-1">{title}</h3>
-              <p className="text-sm text-gray-600 leading-relaxed">{message}</p>
-            </div>
-          </div>
-          <div className="flex justify-end gap-3 mt-6">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-            >
-              Hủy bỏ
-            </button>
-            <button
-              onClick={() => {
-                if (onConfirm) onConfirm();
-                onClose();
-              }}
-              className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg shadow-sm transition-colors"
-            >
-              Xác nhận giải thể
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Giao diện Toast trượt ra ở góc phải màn hình cho các thông báo trạng thái nhanh
-  return (
-    <div
-      className={`fixed top-5 right-5 z-50 min-w-[320px] max-w-md p-4 rounded-xl shadow-lg border ${currentStyle.bg} ${currentStyle.text} flex items-start gap-3 animate-slide-in`}
-    >
-      <span className="text-xl">{currentStyle.icon}</span>
-      <div className="flex-1">
-        <h4 className="font-bold text-sm">{title}</h4>
-        <p className="text-xs opacity-90 mt-0.5">{message}</p>
-      </div>
-      <button
-        onClick={onClose}
-        className="text-gray-400 hover:text-gray-600 text-sm font-bold ml-2"
-      >
-        ✕
-      </button>
-    </div>
-  );
+type DepartmentOption = {
+  id: number;
+  name: string;
 };
 
-// ==========================================
-// 2. COMPONENT CON: RENDER NODE CÂY
-// ==========================================
-const DepartmentNode: React.FC<{
+type DepartmentForm = {
+  deptCode: string;
+  deptName: string;
+  parentDeptId: string;
+};
+
+type DepartmentEditForm = {
+  deptName: string;
+  parentDeptId: string;
+};
+
+const emptyForm: DepartmentForm = {
+  deptCode: "",
+  deptName: "",
+  parentDeptId: "",
+};
+
+const toEditForm = (node: DepartmentTree): DepartmentEditForm => ({
+  deptName: node.deptName,
+  parentDeptId: node.parentDeptId ? String(node.parentDeptId) : "",
+});
+
+const flattenDepartments = (
+  nodes: DepartmentTree[],
+  level = 0,
+): Array<DepartmentTree & { level: number }> =>
+  nodes.flatMap((node) => [
+    { ...node, level },
+    ...flattenDepartments(node.children || [], level + 1),
+  ]);
+
+const normalizeStatus = (status?: string | null) => status?.toLowerCase() ?? "";
+
+const isActiveDepartment = (status?: string | null) => {
+  const value = normalizeStatus(status);
+  return !value || value === "active" || value === "đang hoạt động";
+};
+
+const getStatusLabel = (status?: string | null) =>
+  isActiveDepartment(status) ? "Đang hoạt động" : "Tạm ngừng";
+
+const toParentOptions = (departments: Array<DepartmentTree & { level: number }>): DepartmentOption[] =>
+  departments.map((department) => ({
+    id: department.id,
+    name: `${"— ".repeat(department.level)}${department.deptName}`,
+  }));
+
+const DepartmentTreeRow = ({
+  node,
+  flatList,
+  onUpdateDepartment,
+  onDeactivate,
+}: {
   node: DepartmentTree;
-  flatList: { id: number; name: string }[];
-  onUpdateParent: (id: number, newParentId: number | null) => void;
+  flatList: DepartmentOption[];
+  onUpdateDepartment: (id: number, data: UpdateDepartmentPayload) => Promise<boolean>;
   onDeactivate: (id: number, name: string) => void;
-}> = ({ node, flatList, onUpdateParent, onDeactivate }) => {
+}) => {
+  const active = isActiveDepartment(node.status);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState<DepartmentEditForm>(() => toEditForm(node));
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  const startEditing = () => {
+    setEditForm(toEditForm(node));
+    setIsEditing(true);
+  };
+
+  const cancelEditing = () => {
+    setEditForm(toEditForm(node));
+    setIsEditing(false);
+  };
+
+  const handleParentChange = (value: string) => {
+    setEditForm((current) => ({ ...current, parentDeptId: value }));
+  };
+
+  const onSubmitEdit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!editForm.deptName.trim()) return;
+
+    setIsSavingEdit(true);
+    const success = await onUpdateDepartment(node.id, {
+      deptName: editForm.deptName.trim(),
+      parentDeptId: editForm.parentDeptId ? Number(editForm.parentDeptId) : null,
+    });
+    setIsSavingEdit(false);
+
+    if (success) {
+      setIsEditing(false);
+    }
+  };
+
   return (
-    <div className="ml-8 mt-3 border-l-2 border-gray-200 pl-4 relative">
-      <div className="absolute w-4 h-0.5 bg-gray-300 left-0 top-6 -translate-x-full"></div>
+    <div className="relative pl-4 sm:pl-6">
+      <div className="absolute bottom-0 left-1 top-0 w-px bg-[var(--hicas-border-soft)]" />
+      <div className="absolute left-1 top-7 h-px w-4 bg-[var(--hicas-border-soft)] sm:w-5" />
 
-      <div className="p-3 bg-white border border-gray-200 rounded shadow-sm flex flex-wrap justify-between items-center gap-4 hover:border-blue-300 transition-colors">
-        <div>
-          <span className="font-bold text-gray-800">{node.deptName}</span>
-          <span className="text-xs text-gray-500 ml-2">({node.deptCode})</span>
-        </div>
+      <div className="rounded-[var(--radius-lg)] border border-[var(--hicas-border)] bg-white p-4 shadow-sm transition hover:border-[var(--hicas-orange)] hover:shadow-[var(--shadow-card)]">
+        <form onSubmit={onSubmitEdit} className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 items-start gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[var(--hicas-orange-soft)] text-[var(--hicas-orange)]">
+              <Building2 size={20} />
+            </div>
+            <div className="min-w-0">
+              {isEditing ? (
+                <label className="block min-w-[240px] text-sm font-medium text-[var(--hicas-text-main)]">
+                  Tên phòng ban
+                  <input
+                    required
+                    value={editForm.deptName}
+                    onChange={(event) =>
+                      setEditForm((current) => ({ ...current, deptName: event.target.value }))
+                    }
+                    className="hicas-input mt-1 h-10 text-sm"
+                    placeholder="Nhập tên phòng ban"
+                    disabled={isSavingEdit}
+                  />
+                </label>
+              ) : (
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="truncate text-base font-semibold text-[var(--hicas-text-main)]">
+                    {node.deptName}
+                  </h3>
+                  <Badge variant={active ? "success" : "neutral"}>{getStatusLabel(node.status)}</Badge>
+                </div>
+              )}
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[var(--hicas-text-secondary)]">
+                <span className="rounded-full bg-[var(--hicas-bg-soft)] px-2 py-1 font-medium">
+                  {node.deptCode}
+                </span>
+                <span>{node.children?.length || 0} phòng ban trực thuộc</span>
+                {node.managerId ? <span>Quản lý #{node.managerId}</span> : <span>Chưa gán quản lý</span>}
+              </div>
+            </div>
+          </div>
 
-        <div className="flex items-center gap-2 text-sm">
-          <label className="text-gray-500 text-xs hidden sm:block">
-            Trực thuộc:
-          </label>
-          <select
-            className="border border-gray-300 p-1.5 rounded focus:ring-2 focus:ring-blue-400 focus:outline-none bg-white text-gray-700"
-            value={node.parentDeptId || ""}
-            onChange={(e) =>
-              onUpdateParent(
-                node.id,
-                e.target.value ? Number(e.target.value) : null,
-              )
-            }
-          >
-            <option value="">-- Cấp cao nhất (Root) --</option>
-            {flatList.map((d) => (
-              <option key={d.id} value={d.id} disabled={d.id === node.id}>
-                {d.name}
-              </option>
-            ))}
-          </select>
+          <div className="grid gap-3 sm:grid-cols-[minmax(220px,1fr)_auto] lg:min-w-[420px]">
+            <label className="block">
+              <span className="mb-1 block text-xs font-semibold text-[var(--hicas-text-secondary)]">
+                Trực thuộc
+              </span>
+              <select
+                className="hicas-select h-10 text-sm"
+                value={isEditing ? editForm.parentDeptId : node.parentDeptId || ""}
+                onChange={(event) => handleParentChange(event.target.value)}
+                disabled={!isEditing || isSavingEdit}
+              >
+                <option value="">Cấp cao nhất</option>
+                {flatList.map((department) => (
+                  <option
+                    key={department.id}
+                    value={department.id}
+                    disabled={department.id === node.id}
+                  >
+                    {department.name}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-          <button
-            onClick={() => onDeactivate(node.id, node.deptName)}
-            className="bg-red-50 text-red-600 border border-red-200 px-3 py-1.5 rounded hover:bg-red-600 hover:text-white transition-colors"
-          >
-            Giải thể
-          </button>
-        </div>
+            <div className="flex flex-wrap items-end gap-2">
+              {isEditing ? (
+                <>
+                  <Button
+                    type="submit"
+                    size="sm"
+                    iconLeft={<Save size={15} />}
+                    isLoading={isSavingEdit}
+                    disabled={!active || !editForm.deptName.trim()}
+                  >
+                    Lưu
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    iconLeft={<X size={15} />}
+                    onClick={cancelEditing}
+                    disabled={isSavingEdit}
+                  >
+                    Hủy
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    iconLeft={<Pencil size={15} />}
+                    onClick={startEditing}
+                    disabled={!active}
+                  >
+                    Sửa
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="danger"
+                    iconLeft={<Power size={15} />}
+                    onClick={() => onDeactivate(node.id, node.deptName)}
+                    disabled={!active}
+                  >
+                    Tạm ngừng
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+        </form>
       </div>
 
-      {node.children && node.children.length > 0 && (
-        <div className="mt-1">
+      {node.children?.length ? (
+        <div className="mt-3 space-y-3">
           {node.children.map((child) => (
-            <DepartmentNode
+            <DepartmentTreeRow
               key={child.id}
               node={child}
               flatList={flatList}
-              onUpdateParent={onUpdateParent}
+              onUpdateDepartment={onUpdateDepartment}
               onDeactivate={onDeactivate}
             />
           ))}
         </div>
-      )}
+      ) : null}
     </div>
   );
 };
 
-// ==========================================
-// 3. COMPONENT CHÍNH (QUẢN LÝ SƠ ĐỒ)
-// ==========================================
-export const DepartmentManagement: React.FC = () => {
+export const DepartmentManagement = () => {
   const {
     treeData,
     loading,
-    handleUpdateParent,
+    handleUpdateDepartment,
     handleDeactivate,
     handleCreate,
   } = useDepartments();
+  const { triggerAlert } = useNotification();
 
   const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState({
-    deptCode: "",
-    deptName: "",
-    parentDeptId: "",
-  });
+  const [formData, setFormData] = useState<DepartmentForm>(emptyForm);
+  const [pendingDeactivate, setPendingDeactivate] = useState<{
+    id: number;
+    name: string;
+  } | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [deactivating, setDeactivating] = useState(false);
 
-  // State Quản lý hệ thống Thông báo Đồng nhất
-  const [alertConfig, setAlertConfig] = useState<Omit<
-    UnifiedAlertProps,
-    "onClose"
-  > | null>(null);
+  const flatDepartments = useMemo(() => flattenDepartments(treeData), [treeData]);
+  const parentOptions = useMemo(() => toParentOptions(flatDepartments), [flatDepartments]);
 
-  const triggerAlert = (
-    type: UnifiedAlertProps["type"],
-    title: string,
-    message: string,
-    onConfirm?: () => void,
-  ) => {
-    setAlertConfig({ type, title, message, onConfirm });
-  };
+  const activeCount = flatDepartments.filter((department) =>
+    isActiveDepartment(department.status),
+  ).length;
+  const rootCount = flatDepartments.filter((department) => !department.parentDeptId).length;
 
-  const flattenTree = (
-    nodes: DepartmentTree[],
-  ): { id: number; name: string }[] => {
-    return nodes.reduce(
-      (acc, curr) => {
-        return [
-          ...acc,
-          { id: curr.id, name: curr.deptName },
-          ...flattenTree(curr.children),
-        ];
-      },
-      [] as { id: number; name: string }[],
-    );
-  };
+  const onSubmitCreate = async (event: FormEvent) => {
+    event.preventDefault();
+    setSaving(true);
 
-  const flatList = flattenTree(treeData);
-
-  // Điều phối: Xử lý Thêm phòng ban mới
-  const onSubmitCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
     const payload = {
-      deptCode: formData.deptCode,
-      deptName: formData.deptName,
-      parentDeptId: formData.parentDeptId
-        ? Number(formData.parentDeptId)
-        : null,
+      deptCode: formData.deptCode.trim().toUpperCase(),
+      deptName: formData.deptName.trim(),
+      parentDeptId: formData.parentDeptId ? Number(formData.parentDeptId) : null,
     };
 
-    try {
-      const success = await handleCreate(payload);
-      if (success) {
-        setShowForm(false);
-        setFormData({ deptCode: "", deptName: "", parentDeptId: "" });
-        triggerAlert(
-          "success",
-          "Thành công",
-          `Đã thiết lập phòng ban [${payload.deptName}] vào hệ thống.`,
-        );
-      } else {
-        triggerAlert(
-          "error",
-          "Thất bại",
-          "Mã phòng ban đã tồn tại hoặc dữ liệu không hợp lệ.",
-        );
-      }
-    } catch {
-      triggerAlert(
-        "error",
-        "Lỗi kết nối",
-        "Hệ thống không thể xử lý yêu cầu lúc này.",
-      );
-    }
-  };
+    const success = await handleCreate(payload);
+    setSaving(false);
 
-  // Điều phối: Thay đổi trực thuộc (Phòng ban cha)
-  const onInterceptUpdateParent = async (
-    id: number,
-    newParentId: number | null,
-  ) => {
-    try {
-      await handleUpdateParent(id, newParentId);
-      triggerAlert(
-        "success",
-        "Cập nhật thành công",
-        "Đã điều chỉnh sơ đồ trực thuộc trên cây tổ chức.",
-      );
-    } catch {
-      triggerAlert(
-        "error",
-        "Lỗi cấu trúc",
-        "Không thể di chuyển! Phát hiện nguy cơ lặp vòng vô hạn (Circular Dependency).",
-      );
+    if (success) {
+      setShowForm(false);
+      setFormData(emptyForm);
+      triggerAlert("success", "Đã tạo phòng ban", `${payload.deptName} đã sẵn sàng sử dụng.`);
+      return;
     }
-  };
 
-  // Điều phối: Cảnh báo giải thể an toàn (Tích hợp luồng F0.5)
-  const onInterceptDeactivate = (id: number, name: string) => {
     triggerAlert(
-      "confirm",
-      "Xác nhận giải thể",
-      `Bạn có chắc chắn muốn ngừng hoạt động phòng [${name}]? Hệ thống sẽ quét kiểm tra nhân sự trước khi thực thi.`,
-      async () => {
-        try {
-          const success = await handleDeactivate(id);
-          if (success) {
-            triggerAlert(
-              "success",
-              "Đã giải thể",
-              `Phòng ban [${name}] đã được gỡ khỏi sơ đồ cây.`,
-            );
-          } else {
-            triggerAlert(
-              "warning",
-              "Không thể thực thi",
-              "Giải thể thất bại! Vui lòng thuyên chuyển toàn bộ nhân sự (F8.5) ra khỏi phòng ban này trước.",
-            );
-          }
-        } catch {
-          triggerAlert(
-            "error",
-            "Lỗi hệ thống",
-            "Không thể kiểm tra hoặc tương tác với cơ sở dữ liệu.",
-          );
-        }
-      },
+      "error",
+      "Không thể tạo phòng ban",
+      "Vui lòng kiểm tra mã phòng ban hoặc dữ liệu vừa nhập.",
     );
   };
 
-  if (loading)
+  const onUpdateDepartment = async (
+    id: number,
+    data: UpdateDepartmentPayload,
+  ): Promise<boolean> => {
+    const success = await handleUpdateDepartment(id, data);
+
+    if (success) {
+      triggerAlert("success", "Đã lưu thay đổi", `${data.deptName} đã được cập nhật.`);
+      return true;
+    }
+
+    triggerAlert(
+      "error",
+      "Không thể lưu phòng ban",
+      "Vui lòng kiểm tra tên phòng ban hoặc quan hệ trực thuộc vừa chọn.",
+    );
+    return false;
+  };
+
+  const onConfirmDeactivate = async () => {
+    if (!pendingDeactivate) return;
+
+    setDeactivating(true);
+    const success = await handleDeactivate(pendingDeactivate.id);
+    setDeactivating(false);
+
+    if (success) {
+      triggerAlert("success", "Đã tạm ngừng", `${pendingDeactivate.name} đã được cập nhật trạng thái.`);
+      setPendingDeactivate(null);
+      return;
+    }
+
+    triggerAlert(
+      "warning",
+      "Chưa thể tạm ngừng",
+      "Hãy chuyển nhân sự ra khỏi phòng ban này trước khi tiếp tục.",
+    );
+  };
+
+  if (loading) {
     return (
-      <div className="p-8 text-center text-gray-500 animate-pulse font-medium">
-        Đang đồng bộ sơ đồ tổ chức HICAS...
+      <div className="space-y-5">
+        <PageHeader
+          title="Phòng ban"
+          description="Quản lý sơ đồ phòng ban và quan hệ trực thuộc trong công ty."
+          breadcrumb={[{ label: "Cấu hình hệ thống" }, { label: "Phòng ban" }]}
+        />
+        <LoadingState description="Đang tải sơ đồ phòng ban..." />
       </div>
     );
+  }
 
   return (
-    <div className="min-h-full rounded-lg bg-gray-50 px-4 py-6 sm:px-6 relative">
-      {/* KHÔNG GIAN HIỂN THỊ THÔNG BÁO ĐỒNG NHẤT */}
-      {alertConfig && (
-        <UnifiedAlert
-          type={alertConfig.type}
-          title={alertConfig.title}
-          message={alertConfig.message}
-          onConfirm={alertConfig.onConfirm}
-          onClose={() => setAlertConfig(null)}
-        />
-      )}
-
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-800">Cấu trúc Tổ chức</h2>
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="bg-blue-600 text-white px-4 py-2 rounded shadow hover:bg-blue-700 transition-colors font-medium"
-        >
-          {showForm ? "Đóng" : "+ Thêm phòng ban"}
-        </button>
-      </div>
-
-      {showForm && (
-        <form
-          onSubmit={onSubmitCreate}
-          className="mb-6 p-4 bg-white border border-blue-200 rounded-lg shadow-sm flex flex-wrap gap-4 items-end animate-fade-in"
-        >
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Mã PB (*)
-            </label>
-            <input
-              required
-              type="text"
-              placeholder="VD: IT"
-              className="border p-2 rounded w-32 focus:ring-2 focus:ring-blue-400 focus:outline-none"
-              value={formData.deptCode}
-              onChange={(e) =>
-                setFormData({ ...formData, deptCode: e.target.value })
-              }
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Tên phòng ban (*)
-            </label>
-            <input
-              required
-              type="text"
-              placeholder="VD: Phòng Công nghệ"
-              className="border p-2 rounded w-64 focus:ring-2 focus:ring-blue-400 focus:outline-none"
-              value={formData.deptName}
-              onChange={(e) =>
-                setFormData({ ...formData, deptName: e.target.value })
-              }
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Trực thuộc
-            </label>
-            <select
-              className="border p-2 rounded w-64 focus:ring-2 focus:ring-blue-400 focus:outline-none bg-white text-gray-700"
-              value={formData.parentDeptId}
-              onChange={(e) =>
-                setFormData({ ...formData, parentDeptId: e.target.value })
-              }
-            >
-              <option value="">-- Cấp cao nhất (Root) --</option>
-              {flatList.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <button
-            type="submit"
-            className="bg-green-600 text-white px-5 py-2 rounded font-medium hover:bg-green-700 transition-colors"
+    <div className="space-y-5">
+      <PageHeader
+        title="Phòng ban"
+        description="Quản lý sơ đồ phòng ban và quan hệ trực thuộc trong công ty."
+        breadcrumb={[{ label: "Cấu hình hệ thống" }, { label: "Phòng ban" }]}
+        actions={
+          <Button
+            iconLeft={showForm ? <RefreshCcw size={16} /> : <Plus size={16} />}
+            variant={showForm ? "secondary" : "primary"}
+            onClick={() => setShowForm((value) => !value)}
           >
-            Lưu mới
-          </button>
-        </form>
-      )}
+            {showForm ? "Ẩn biểu mẫu" : "Thêm phòng ban"}
+          </Button>
+        }
+      />
 
-      <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
-        {treeData.length === 0 ? (
-          <p className="text-center text-gray-400 py-8">
-            Chưa có dữ liệu phòng ban.
-          </p>
-        ) : (
-          treeData.map((rootNode) => (
-            <DepartmentNode
-              key={rootNode.id}
-              node={rootNode}
-              flatList={flatList}
-              onUpdateParent={onInterceptUpdateParent}
-              onDeactivate={onInterceptDeactivate}
-            />
-          ))
-        )}
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card className="bg-white" padded>
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-[var(--radius-md)] bg-[var(--hicas-orange-soft)] text-[var(--hicas-orange)]">
+              <Building2 size={20} />
+            </div>
+            <div>
+              <p className="text-sm text-[var(--hicas-text-secondary)]">Tổng phòng ban</p>
+              <p className="text-2xl font-bold text-[var(--hicas-text-main)]">{flatDepartments.length}</p>
+            </div>
+          </div>
+        </Card>
+        <Card className="bg-white" padded>
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-[var(--radius-md)] bg-[var(--hicas-success-soft)] text-[var(--hicas-success)]">
+              <CheckCircle2 size={20} />
+            </div>
+            <div>
+              <p className="text-sm text-[var(--hicas-text-secondary)]">Đang hoạt động</p>
+              <p className="text-2xl font-bold text-[var(--hicas-text-main)]">{activeCount}</p>
+            </div>
+          </div>
+        </Card>
+        <Card className="bg-white" padded>
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-[var(--radius-md)] bg-[var(--hicas-info-soft)] text-[var(--hicas-info)]">
+              <GitBranch size={20} />
+            </div>
+            <div>
+              <p className="text-sm text-[var(--hicas-text-secondary)]">Nhánh cấp cao nhất</p>
+              <p className="text-2xl font-bold text-[var(--hicas-text-main)]">{rootCount}</p>
+            </div>
+          </div>
+        </Card>
       </div>
+
+      {showForm ? (
+        <Card
+          title="Thêm phòng ban"
+          description="Nhập mã, tên và phòng ban trực thuộc nếu có."
+        >
+          <form onSubmit={onSubmitCreate} className="grid gap-4 lg:grid-cols-[180px_1fr_1fr_auto]">
+            <label className="block text-sm font-medium text-[var(--hicas-text-main)]">
+              Mã phòng ban
+              <input
+                required
+                value={formData.deptCode}
+                onChange={(event) =>
+                  setFormData((current) => ({ ...current, deptCode: event.target.value }))
+                }
+                className="hicas-input mt-1 uppercase"
+                placeholder="VD: HCNS"
+              />
+            </label>
+
+            <label className="block text-sm font-medium text-[var(--hicas-text-main)]">
+              Tên phòng ban
+              <input
+                required
+                value={formData.deptName}
+                onChange={(event) =>
+                  setFormData((current) => ({ ...current, deptName: event.target.value }))
+                }
+                className="hicas-input mt-1"
+                placeholder="VD: Phòng Hành chính Nhân sự"
+              />
+            </label>
+
+            <label className="block text-sm font-medium text-[var(--hicas-text-main)]">
+              Trực thuộc
+              <select
+                value={formData.parentDeptId}
+                onChange={(event) =>
+                  setFormData((current) => ({ ...current, parentDeptId: event.target.value }))
+                }
+                className="hicas-select mt-1"
+              >
+                <option value="">Cấp cao nhất</option>
+                {parentOptions.map((department) => (
+                  <option key={department.id} value={department.id}>
+                    {department.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <div className="flex items-end">
+              <Button type="submit" fullWidth iconLeft={<Save size={16} />} isLoading={saving}>
+                Lưu
+              </Button>
+            </div>
+          </form>
+        </Card>
+      ) : null}
+
+      <Card
+        title="Sơ đồ phòng ban"
+        description="Điều chỉnh phòng ban trực thuộc hoặc tạm ngừng phòng ban không còn sử dụng."
+      >
+        {treeData.length ? (
+          <div className="space-y-3">
+            {treeData.map((node) => (
+              <DepartmentTreeRow
+                key={node.id}
+                node={node}
+                flatList={parentOptions}
+                onUpdateDepartment={onUpdateDepartment}
+                onDeactivate={(id, name) => setPendingDeactivate({ id, name })}
+              />
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            icon={<UsersRound size={22} />}
+            title="Chưa có phòng ban"
+            description="Tạo phòng ban đầu tiên để bắt đầu xây dựng sơ đồ tổ chức."
+            action={
+              <Button iconLeft={<Plus size={16} />} onClick={() => setShowForm(true)}>
+                Thêm phòng ban
+              </Button>
+            }
+          />
+        )}
+      </Card>
+
+      <ConfirmDialog
+        open={Boolean(pendingDeactivate)}
+        title="Tạm ngừng phòng ban?"
+        description={
+          pendingDeactivate
+            ? `Phòng ban ${pendingDeactivate.name} sẽ không còn được sử dụng cho hồ sơ mới.`
+            : undefined
+        }
+        confirmLabel="Tạm ngừng"
+        cancelLabel="Hủy"
+        tone="danger"
+        isLoading={deactivating}
+        onConfirm={onConfirmDeactivate}
+        onClose={() => setPendingDeactivate(null)}
+      />
     </div>
   );
 };
