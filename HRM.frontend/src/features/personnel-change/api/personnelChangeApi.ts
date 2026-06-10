@@ -23,8 +23,16 @@ import type {
   IssueTransferDecisionRequest,
   ManagerReviewResignationRequest,
   NotifyEmployeeDismissalRequest,
+  PersonnelChangeContractOption,
+  PersonnelChangeDepartmentOption,
   PersonnelChangeDetail,
+  PersonnelChangeEmployeeOption,
+  PersonnelChangeEvidenceUploadResult,
+  PersonnelChangeJobLevelOption,
   PersonnelChangeListItem,
+  PersonnelChangePenaltyOption,
+  PersonnelChangePerformanceReviewOption,
+  PersonnelChangePositionOption,
   PersonnelChangeRiskSummary,
   PersonnelChangeTimelineItem,
   PersonnelChangeType,
@@ -38,6 +46,7 @@ const SENIOR_APPOINTMENT_ENDPOINT = `${ENDPOINT}/senior-appointments`;
 const DISMISSAL_ENDPOINT = `${ENDPOINT}/dismissals`;
 const PROMOTION_ENDPOINT = `${ENDPOINT}/promotions`;
 const VOLUNTARY_TERMINATION_ENDPOINT = `${ENDPOINT}/voluntary-terminations`;
+const LOOKUP_ENDPOINT = `${ENDPOINT}/lookups`;
 
 export const personnelChangeApi = {
   getList: async (params?: {
@@ -64,6 +73,60 @@ export const personnelChangeApi = {
     axiosClient.get<ApiResponse<PersonnelChangeTimelineItem[]>, ApiResponse<PersonnelChangeTimelineItem[]>>(
       `${ENDPOINT}/${id}/timeline`,
     ),
+
+  getEmployeeOptions: async (search?: string) =>
+    axiosClient.get<ApiResponse<PersonnelChangeEmployeeOption[]>, ApiResponse<PersonnelChangeEmployeeOption[]>>(
+      `${LOOKUP_ENDPOINT}/employees`,
+      { params: { search } },
+    ),
+
+  getDepartmentOptions: async () =>
+    axiosClient.get<ApiResponse<PersonnelChangeDepartmentOption[]>, ApiResponse<PersonnelChangeDepartmentOption[]>>(
+      `${LOOKUP_ENDPOINT}/departments`,
+    ),
+
+  getPositionOptions: async () =>
+    axiosClient.get<ApiResponse<PersonnelChangePositionOption[]>, ApiResponse<PersonnelChangePositionOption[]>>(
+      `${LOOKUP_ENDPOINT}/positions`,
+    ),
+
+  getJobLevelOptions: async () =>
+    axiosClient.get<ApiResponse<PersonnelChangeJobLevelOption[]>, ApiResponse<PersonnelChangeJobLevelOption[]>>(
+      `${LOOKUP_ENDPOINT}/job-levels`,
+    ),
+
+  getManagerOptions: async (search?: string) =>
+    axiosClient.get<ApiResponse<PersonnelChangeEmployeeOption[]>, ApiResponse<PersonnelChangeEmployeeOption[]>>(
+      `${LOOKUP_ENDPOINT}/managers`,
+      { params: { search } },
+    ),
+
+  getEmployeePenaltyOptions: async (employeeId: number) =>
+    axiosClient.get<ApiResponse<PersonnelChangePenaltyOption[]>, ApiResponse<PersonnelChangePenaltyOption[]>>(
+      `${LOOKUP_ENDPOINT}/employees/${employeeId}/penalties`,
+    ),
+
+  getEmployeePerformanceReviewOptions: async (employeeId: number) =>
+    axiosClient.get<ApiResponse<PersonnelChangePerformanceReviewOption[]>, ApiResponse<PersonnelChangePerformanceReviewOption[]>>(
+      `${LOOKUP_ENDPOINT}/employees/${employeeId}/performance-reviews`,
+    ),
+
+  getEmployeeContractOptions: async (employeeId: number) =>
+    axiosClient.get<ApiResponse<PersonnelChangeContractOption[]>, ApiResponse<PersonnelChangeContractOption[]>>(
+      `${LOOKUP_ENDPOINT}/employees/${employeeId}/contracts`,
+    ),
+
+  uploadEvidenceFile: async (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    return axiosClient.post<
+      ApiResponse<PersonnelChangeEvidenceUploadResult>,
+      ApiResponse<PersonnelChangeEvidenceUploadResult>
+    >(`${LOOKUP_ENDPOINT}/evidence-files`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
 
   cancel: async (id: number, payload: CancelPersonnelChangeRequest) =>
     axiosClient.patch<ApiResponse<PersonnelChangeDetail>, ApiResponse<PersonnelChangeDetail>>(

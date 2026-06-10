@@ -52,7 +52,7 @@ export const usePersonnelChanges = (
       setRecords(response.data ?? []);
     } catch (error) {
       console.error(error);
-      triggerAlert("error", "Khong tai duoc ho so bien dong", getErrorMessage(error));
+      triggerAlert("error", "Không tải được hồ sơ biến động", getErrorMessage(error));
     } finally {
       setLoading(false);
     }
@@ -72,7 +72,7 @@ export const usePersonnelChanges = (
       setRecords(combined);
     } catch (error) {
       console.error(error);
-      triggerAlert("error", "Khong tai duoc ho so thang tien", getErrorMessage(error));
+      triggerAlert("error", "Không tải được hồ sơ thăng tiến", getErrorMessage(error));
     } finally {
       setLoading(false);
     }
@@ -91,7 +91,7 @@ export const usePersonnelChanges = (
       setTimeline(timelineRes.data ?? []);
     } catch (error) {
       console.error(error);
-      triggerAlert("error", "Khong tai duoc chi tiet", getErrorMessage(error));
+      triggerAlert("error", "Không tải được chi tiết hồ sơ", getErrorMessage(error));
     } finally {
       setLoading(false);
     }
@@ -145,178 +145,178 @@ export const usePersonnelChanges = (
     createInternalTransferDemand: (payload: InternalTransferDemandRequest) =>
       runAction(
         () => personnelChangeApi.createInternalTransferDemand(payload),
-        "Da tao demand",
-        "Demand thuyen chuyen noi bo da duoc ghi nhan.",
+        "Đã tạo nhu cầu",
+        "Nhu cầu thuyên chuyển nội bộ đã được ghi nhận.",
       ),
     hrSelectEmployee: (id: number, payload: HrSelectEmployeeRequest) =>
       runAction(
         () => personnelChangeApi.hrSelectEmployee(id, payload),
-        "Da chon nhan su",
-        "Ho so da chuyen sang buoc lay y kien quan ly hien tai.",
+        "Đã chọn nhân sự",
+        "Hồ sơ đã chuyển sang bước lấy ý kiến quản lý hiện tại.",
       ),
     submitCurrentManagerOpinion: (id: number, payload: CurrentManagerOpinionRequest) =>
       runAction(
         () => personnelChangeApi.submitCurrentManagerOpinion(id, payload),
-        "Da gui y kien quan ly",
-        "Ho so da duoc cap nhat theo y kien quan ly hien tai.",
+        "Đã gửi ý kiến quản lý",
+        "Hồ sơ đã được cập nhật theo ý kiến quản lý hiện tại.",
       ),
     submitEmployeeConsent: (id: number, payload: EmployeeConsentRequest) =>
       runAction(
         () => personnelChangeApi.submitEmployeeConsent(id, payload),
-        "Da gui phan hoi nhan vien",
-        "Phan hoi cua nhan vien da duoc ghi nhan.",
+        "Đã gửi phản hồi nhân viên",
+        "Phản hồi của nhân viên đã được ghi nhận.",
       ),
     directorApproveTransfer: (id: number, payload: DirectorApproveTransferRequest) =>
       runAction(
         () => personnelChangeApi.directorApproveTransfer(id, payload),
-        "Da xu ly phe duyet",
-        "Quyet dinh cua Director da duoc cap nhat.",
+        "Đã xử lý phê duyệt",
+        "Quyết định phê duyệt đã được cập nhật.",
       ),
     issueTransferDecision: (id: number, payload: IssueTransferDecisionRequest) =>
       runAction(
         () => personnelChangeApi.issueTransferDecision(id, payload),
-        "Da ban hanh quyet dinh",
-        "Ho so thuyen chuyen da san sang thuc thi.",
+        "Đã ban hành quyết định",
+        "Hồ sơ thuyên chuyển đã sẵn sàng thực hiện.",
       ),
     executeInternalTransfer: (id: number, payload: ExecutePersonnelChangeRequest) =>
       runAction(
         () => personnelChangeApi.execute(id, payload),
-        "Da thuc thi thuyen chuyen",
-        "Thong tin to chuc cua nhan su da duoc cap nhat.",
+        "Đã thực hiện thuyên chuyển",
+        "Thông tin tổ chức của nhân sự đã được cập nhật.",
       ),
     createSeniorAppointment: (payload: CreateSeniorAppointmentRequest) =>
       runAction(
         () => personnelChangeApi.createSeniorAppointment(payload),
-        "Da tao bo nhiem",
-        "Ho so bo nhiem nhan su cap cao da duoc ghi nhan.",
+        "Đã tạo bổ nhiệm",
+        "Hồ sơ bổ nhiệm nhân sự cấp cao đã được ghi nhận.",
       ),
     submitAppointmentConsent: (id: number, payload: AppointmentConsentRequest) =>
       runAction(
         () => personnelChangeApi.submitAppointmentConsent(id, payload),
-        "Da gui phan hoi",
-        "Phan hoi bo nhiem cua nhan vien da duoc ghi nhan.",
+        "Đã gửi phản hồi",
+        "Phản hồi bổ nhiệm của nhân viên đã được ghi nhận.",
       ),
     startHrContractFlow: (id: number, payload: HrContractFlowRequest) =>
       runAction(
         () => personnelChangeApi.startHrContractFlow(id, payload),
-        "Da tao contract flow",
-        "Ho so bo nhiem da duoc chuyen sang Module 3 xu ly hop dong/phu luc.",
+        "Đã tạo xử lý hợp đồng",
+        "Hồ sơ bổ nhiệm đã chuyển sang bước xử lý hợp đồng hoặc phụ lục.",
       ),
     issueAppointmentDecision: (id: number, payload: IssueAppointmentDecisionRequest) =>
       runAction(
         () => personnelChangeApi.issueAppointmentDecision(id, payload),
-        "Da ban hanh quyet dinh",
-        "Ho so bo nhiem da san sang thuc thi.",
+        "Đã ban hành quyết định",
+        "Hồ sơ bổ nhiệm đã sẵn sàng thực hiện.",
       ),
     executeSeniorAppointment: (id: number, payload: ExecutePersonnelChangeRequest) =>
       runAction(
         () => personnelChangeApi.executeSeniorAppointment(id, payload),
-        "Da thuc thi bo nhiem",
-        "Chuc danh, cap bac va vai tro phong ban cua nhan su da duoc cap nhat.",
+        "Đã thực hiện bổ nhiệm",
+        "Chức danh, cấp bậc và vai trò phòng ban của nhân sự đã được cập nhật.",
       ),
     createDismissal: (payload: CreateDismissalRequest) =>
       runAction(
         () => personnelChangeApi.createDismissal(payload),
-        "Da tao ho so sa thai",
-        "Ho so sa thai/ky luat da duoc ghi nhan.",
+        "Đã tạo hồ sơ kỷ luật",
+        "Hồ sơ kỷ luật hoặc sa thải đã được ghi nhận.",
       ),
     notifyDismissalEmployee: (id: number, payload: NotifyEmployeeDismissalRequest) =>
       runAction(
         () => personnelChangeApi.notifyDismissalEmployee(id, payload),
-        "Da thong bao nhan vien",
-        "Ho so da chuyen sang buoc nhan giai trinh.",
+        "Đã thông báo nhân viên",
+        "Hồ sơ đã chuyển sang bước nhận giải trình.",
       ),
     submitDismissalExplanation: (id: number, payload: DismissalEmployeeExplanationRequest) =>
       runAction(
         () => personnelChangeApi.submitDismissalExplanation(id, payload),
-        "Da gui giai trinh",
-        "Giai trinh cua nhan vien da duoc ghi nhan.",
+        "Đã gửi giải trình",
+        "Giải trình của nhân viên đã được ghi nhận.",
       ),
     directorApproveDismissal: (id: number, payload: DirectorApproveDismissalRequest) =>
       runAction(
         () => personnelChangeApi.directorApproveDismissal(id, payload),
-        "Da xu ly phe duyet",
-        "Quyet dinh cua Director da duoc cap nhat.",
+        "Đã xử lý phê duyệt",
+        "Quyết định phê duyệt đã được cập nhật.",
       ),
     executeDismissal: (id: number, payload: ExecutePersonnelChangeRequest) =>
       runAction(
         () => personnelChangeApi.executeDismissal(id, payload),
-        "Da thuc thi sa thai",
-        "Trang thai nhan su, tai khoan va final settlement da duoc cap nhat neu can.",
+        "Đã thực hiện kỷ luật",
+        "Trạng thái nhân sự, tài khoản và quyết toán cuối cùng đã được cập nhật khi cần.",
       ),
     createPromotion: (payload: CreatePromotionRequest) =>
       runAction(
         () => personnelChangeApi.createPromotion(payload),
-        "Da tao ho so thang tien",
-        "Ho so thang tien da duoc ghi nhan.",
+        "Đã tạo hồ sơ thăng tiến",
+        "Hồ sơ thăng tiến đã được ghi nhận.",
         loadPromotionOfficial,
       ),
     createConvertOfficial: (payload: CreateConvertOfficialRequest) =>
       runAction(
         () => personnelChangeApi.createConvertOfficial(payload),
-        "Da tao ho so chuyen chinh thuc",
-        "Ho so chuyen chinh thuc da duoc ghi nhan.",
+        "Đã tạo hồ sơ chuyển chính thức",
+        "Hồ sơ chuyển chính thức đã được ghi nhận.",
         loadPromotionOfficial,
       ),
     hrReviewPromotion: (id: number, payload: ApprovePromotionRequest) =>
       runAction(
         () => personnelChangeApi.hrReviewPromotion(id, payload),
-        "Da HR review",
-        "Ho so da chuyen sang buoc Director phe duyet hoac bi tu choi.",
+        "Đã duyệt bước HR",
+        "Hồ sơ đã chuyển sang bước phê duyệt tiếp theo hoặc bị từ chối.",
         loadPromotionOfficial,
       ),
     directorApprovePromotion: (id: number, payload: ApprovePromotionRequest) =>
       runAction(
         () => personnelChangeApi.directorApprovePromotion(id, payload),
-        "Da xu ly phe duyet",
-        "Quyet dinh cua Director da duoc cap nhat.",
+        "Đã xử lý phê duyệt",
+        "Quyết định phê duyệt đã được cập nhật.",
         loadPromotionOfficial,
       ),
     executePromotion: (id: number, payload: ExecutePersonnelChangeRequest) =>
       runAction(
         () => personnelChangeApi.executePromotion(id, payload),
-        "Da thuc thi thang tien",
-        "Thong tin chuc danh, cap bac va loai nhan su da duoc cap nhat.",
+        "Đã thực hiện thăng tiến",
+        "Thông tin chức danh, cấp bậc và loại nhân sự đã được cập nhật.",
         loadPromotionOfficial,
       ),
     submitResignation: (payload: SubmitResignationRequest) =>
       runAction(
         () => personnelChangeApi.submitResignation(payload),
-        "Da gui don nghi viec",
-        "Ho so nghi viec chu dong da duoc ghi nhan.",
+        "Đã gửi đơn nghỉ việc",
+        "Hồ sơ nghỉ việc chủ động đã được ghi nhận.",
       ),
     managerReviewResignation: (id: number, payload: ManagerReviewResignationRequest) =>
       runAction(
         () => personnelChangeApi.managerReviewResignation(id, payload),
-        "Da quan ly review",
-        "Ho so da chuyen sang HR review hoac bi tu choi.",
+        "Đã duyệt bước quản lý",
+        "Hồ sơ đã chuyển sang HR xử lý hoặc bị từ chối.",
       ),
     hrReviewResignation: (id: number, payload: HrReviewResignationRequest) =>
       runAction(
         () => personnelChangeApi.hrReviewResignation(id, payload),
-        "Da HR review",
-        "Ho so da chuyen sang Director phe duyet hoac bi tu choi.",
+        "Đã duyệt bước HR",
+        "Hồ sơ đã chuyển sang phê duyệt tiếp theo hoặc bị từ chối.",
       ),
     directorApproveResignation: (id: number, payload: DirectorApproveResignationRequest) =>
       runAction(
         () => personnelChangeApi.directorApproveResignation(id, payload),
-        "Da xu ly phe duyet",
-        "Quyet dinh cua Director da duoc cap nhat.",
+        "Đã xử lý phê duyệt",
+        "Quyết định phê duyệt đã được cập nhật.",
       ),
     executeResignation: (id: number, payload: ExecutePersonnelChangeRequest) =>
       runAction(
         () => personnelChangeApi.executeResignation(id, payload),
-        "Da thuc thi nghi viec",
-        "Trang thai nhan su, service period va final settlement da duoc cap nhat neu can.",
+        "Đã thực hiện nghỉ việc",
+        "Trạng thái nhân sự, quá trình làm việc và quyết toán cuối cùng đã được cập nhật khi cần.",
       ),
     cancel: (id: number, payload: CancelPersonnelChangeRequest) =>
       runAction(
         () => personnelChangeApi.cancel(id, payload),
-        "Da huy ho so",
-        "Ho so bien dong da duoc huy.",
+        "Đã hủy hồ sơ",
+        "Hồ sơ biến động đã được hủy.",
       ),
   };
 };
 
 const getErrorMessage = (error: unknown) =>
-  error instanceof Error ? error.message : "Da co loi xay ra.";
+  error instanceof Error ? error.message : "Đã có lỗi xảy ra.";

@@ -20,39 +20,39 @@ export const PersonnelChangeList = ({
   records,
   kind,
   loading,
-  emptyTitle = "Chua co ho so bien dong",
-  emptyDescription = "Cac ho so bien dong nhan su se hien thi tai day.",
+  emptyTitle = "Chưa có hồ sơ biến động",
+  emptyDescription = "Các hồ sơ biến động nhân sự sẽ hiển thị tại đây.",
   onOpen,
 }: Props) => {
   const columns: Array<DataTableColumn<PersonnelChangeListItem>> = [
     {
       key: "id",
-      header: "Ho so",
+      header: "Hồ sơ",
       render: (row) => <span className="font-semibold">{formatRequestCode(row, kind)}</span>,
     },
     {
       key: "employee",
-      header: "Nhan su",
-      render: (row) => row.employeeName || (row.employeeId ? `#${row.employeeId}` : "Cho xu ly"),
+      header: "Nhân sự",
+      render: (row) => row.employeeName || (row.employeeId ? `#${row.employeeId}` : "Chờ xử lý"),
     },
     {
       key: "type",
-      header: "Loai",
+      header: "Loại",
       render: (row) => getChangeTypeLabel(row),
     },
     {
       key: "reason",
-      header: "Ly do",
+      header: "Lý do",
       render: (row) => row.reason || "-",
     },
     {
       key: "effectiveDate",
-      header: "Hieu luc",
+      header: "Hiệu lực",
       render: (row) => formatDate(row.effectiveDate),
     },
     {
       key: "status",
-      header: "Trang thai",
+      header: "Trạng thái",
       render: (row) => <PersonnelChangeStatusBadge status={row.status} />,
     },
     {
@@ -60,7 +60,7 @@ export const PersonnelChangeList = ({
       header: "",
       render: (row) => (
         <Button variant="secondary" size="sm" onClick={() => onOpen(row.id)}>
-          Mo
+          Mở
         </Button>
       ),
     },
@@ -79,15 +79,15 @@ export const PersonnelChangeList = ({
 };
 
 const getChangeTypeLabel = (row: PersonnelChangeListItem) => {
-  if (row.changeType === PersonnelChangeType.ConvertToOfficial) return "Convert official";
+  if (row.changeType === PersonnelChangeType.ConvertToOfficial) return "Chuyển chính thức";
   if (row.changeType === PersonnelChangeType.Promotion) {
-    return row.promotionType === 2 ? "Job level promotion" : "Position promotion";
+    return row.promotionType === 2 ? "Nâng cấp bậc" : "Thăng tiến chức danh";
   }
-  if (row.changeType === PersonnelChangeType.SeniorAppointment) return "Senior appointment";
-  if (row.changeType === PersonnelChangeType.VoluntaryTermination) return "Resignation";
-  if (row.changeType === PersonnelChangeType.Dismissal) return "Dismissal";
-  if (row.changeType === PersonnelChangeType.InternalTransfer) return "Internal transfer";
-  return "Personnel change";
+  if (row.changeType === PersonnelChangeType.SeniorAppointment) return "Bổ nhiệm cấp cao";
+  if (row.changeType === PersonnelChangeType.VoluntaryTermination) return "Nghỉ việc chủ động";
+  if (row.changeType === PersonnelChangeType.Dismissal) return "Kỷ luật hoặc sa thải";
+  if (row.changeType === PersonnelChangeType.InternalTransfer) return "Thuyên chuyển nội bộ";
+  return "Biến động nhân sự";
 };
 
 const formatRequestCode = (row: PersonnelChangeListItem, kind: PersonnelChangeWorkflowKind) => {

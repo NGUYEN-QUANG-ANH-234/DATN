@@ -16,7 +16,7 @@ export const usePersonnelChangeTimeline = () => {
       return response.data ?? [];
     } catch (error) {
       console.error(error);
-      triggerAlert("error", "Khong tai duoc timeline", getErrorMessage(error));
+      triggerAlert("error", "Không tải được lịch sử xử lý", getErrorMessage(error));
       return [];
     } finally {
       setLoading(false);
@@ -34,4 +34,4 @@ export const usePersonnelChangeTimeline = () => {
 };
 
 const getErrorMessage = (error: unknown) =>
-  error instanceof Error ? error.message : "Da co loi xay ra.";
+  error instanceof Error ? error.message : "Đã có lỗi xảy ra.";

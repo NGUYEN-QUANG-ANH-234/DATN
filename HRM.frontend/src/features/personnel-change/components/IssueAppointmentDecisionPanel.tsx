@@ -21,7 +21,6 @@ type Props = {
 export const IssueAppointmentDecisionPanel = ({ request, saving, onIssue, onExecute }: Props) => {
   const [decision, setDecision] = useState({
     decisionNumber: "",
-    decisionFilePath: "",
     decisionIssuedAt: "",
     note: "",
   });
@@ -34,7 +33,7 @@ export const IssueAppointmentDecisionPanel = ({ request, saving, onIssue, onExec
     if (!request) return;
     await onIssue(request.id, {
       decisionNumber: decision.decisionNumber,
-      decisionFilePath: decision.decisionFilePath || null,
+      decisionFilePath: null,
       decisionIssuedAt: decision.decisionIssuedAt || null,
       note: decision.note || null,
     });
@@ -49,28 +48,30 @@ export const IssueAppointmentDecisionPanel = ({ request, saving, onIssue, onExec
   };
 
   return (
-    <Card title="Appointment decision" description="Ban hanh quyet dinh bo nhiem va cap nhat ho so nhan su.">
+    <Card
+      title="Quyết định bổ nhiệm"
+      description="Ban hành quyết định bổ nhiệm và cập nhật hồ sơ nhân sự."
+    >
       <form className="grid gap-4 md:grid-cols-2" onSubmit={issue}>
         <Input
-          label="So quyet dinh"
+          label="Số quyết định"
           required
           value={decision.decisionNumber}
           onChange={(event) => setDecision((prev) => ({ ...prev, decisionNumber: event.target.value }))}
         />
         <Input
-          label="Ngay ban hanh"
+          label="Ngày ban hành"
           type="date"
           value={decision.decisionIssuedAt}
           onChange={(event) => setDecision((prev) => ({ ...prev, decisionIssuedAt: event.target.value }))}
         />
-        <Input
-          label="File quyet dinh"
-          className="md:col-span-2"
-          value={decision.decisionFilePath}
-          onChange={(event) => setDecision((prev) => ({ ...prev, decisionFilePath: event.target.value }))}
-        />
+        <p className="md:col-span-2 rounded-[var(--radius-md)] border border-[var(--hicas-border)] bg-[var(--hicas-bg-soft)] p-3 text-sm text-[var(--hicas-text-secondary)]">
+          Tệp quyết định sẽ được sinh từ biểu mẫu quyết định sau khi ban hành.
+        </p>
         <label className="block md:col-span-2">
-          <span className="mb-1 block text-sm font-medium text-[var(--hicas-text-main)]">Ghi chu quyet dinh</span>
+          <span className="mb-1 block text-sm font-medium text-[var(--hicas-text-main)]">
+            Ghi chú quyết định
+          </span>
           <textarea
             className="hicas-input min-h-20 resize-y"
             value={decision.note}
@@ -79,13 +80,15 @@ export const IssueAppointmentDecisionPanel = ({ request, saving, onIssue, onExec
         </label>
         <div className="md:col-span-2">
           <Button type="submit" iconLeft={<FileCheck2 size={16} />} isLoading={saving} disabled={!request}>
-            Ban hanh quyet dinh
+            Ban hành quyết định
           </Button>
         </div>
       </form>
       <div className="mt-5 border-t border-[var(--hicas-border-soft)] pt-5">
         <label className="mb-3 block">
-          <span className="mb-1 block text-sm font-medium text-[var(--hicas-text-main)]">Ghi chu thuc thi</span>
+          <span className="mb-1 block text-sm font-medium text-[var(--hicas-text-main)]">
+            Ghi chú thực hiện
+          </span>
           <textarea
             className="hicas-input min-h-20 resize-y"
             disabled={executeDisabled}
@@ -99,7 +102,7 @@ export const IssueAppointmentDecisionPanel = ({ request, saving, onIssue, onExec
           </p>
         ) : null}
         <Button iconLeft={<Play size={16} />} isLoading={saving} disabled={executeDisabled} onClick={execute}>
-          Thuc thi bo nhiem
+          Thực hiện bổ nhiệm
         </Button>
       </div>
     </Card>

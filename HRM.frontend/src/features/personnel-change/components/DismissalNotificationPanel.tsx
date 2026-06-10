@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { BellRing } from "lucide-react";
 import { Button, Card, Input } from "../../../components/ui";
 import type { NotifyEmployeeDismissalRequest, PersonnelChangeDetail } from "../types/personnelChange";
+import { EvidenceFileUpload } from "./PersonnelChangePickers";
 
 type Props = {
   request?: PersonnelChangeDetail | null;
@@ -31,27 +32,32 @@ export const DismissalNotificationPanel = ({ request, saving, onSubmit }: Props)
   };
 
   return (
-    <Card title="Notify employee" description="Ghi nhan thoi diem thong bao va deadline giai trinh.">
+    <Card
+      title="Thông báo nhân viên"
+      description="Ghi nhận thời điểm thông báo và hạn gửi giải trình."
+    >
       <form className="space-y-4" onSubmit={submit}>
         <Input
-          label="Da thong bao luc"
+          label="Đã thông báo lúc"
           type="datetime-local"
           value={form.employeeNotifiedAt}
           onChange={(event) => setForm((prev) => ({ ...prev, employeeNotifiedAt: event.target.value }))}
         />
         <Input
-          label="Deadline giai trinh"
+          label="Hạn giải trình"
           type="datetime-local"
           value={form.responseDeadlineAt}
           onChange={(event) => setForm((prev) => ({ ...prev, responseDeadlineAt: event.target.value }))}
         />
-        <Input
-          label="Evidence file"
+        <EvidenceFileUpload
+          label="Tệp bằng chứng"
           value={form.evidenceFilePath}
-          onChange={(event) => setForm((prev) => ({ ...prev, evidenceFilePath: event.target.value }))}
+          onUploaded={(filePath) => setForm((prev) => ({ ...prev, evidenceFilePath: filePath }))}
         />
         <label className="block">
-          <span className="mb-1 block text-sm font-medium text-[var(--hicas-text-main)]">HR note</span>
+          <span className="mb-1 block text-sm font-medium text-[var(--hicas-text-main)]">
+            Ghi chú HR
+          </span>
           <textarea
             className="hicas-input min-h-20 resize-y"
             value={form.hrNote}
@@ -59,7 +65,9 @@ export const DismissalNotificationPanel = ({ request, saving, onSubmit }: Props)
           />
         </label>
         <label className="block">
-          <span className="mb-1 block text-sm font-medium text-[var(--hicas-text-main)]">Ghi chu thong bao</span>
+          <span className="mb-1 block text-sm font-medium text-[var(--hicas-text-main)]">
+            Ghi chú thông báo
+          </span>
           <textarea
             className="hicas-input min-h-20 resize-y"
             value={form.note}
@@ -67,7 +75,7 @@ export const DismissalNotificationPanel = ({ request, saving, onSubmit }: Props)
           />
         </label>
         <Button type="submit" iconLeft={<BellRing size={16} />} isLoading={saving} disabled={!request}>
-          Ghi nhan thong bao
+          Ghi nhận thông báo
         </Button>
       </form>
     </Card>

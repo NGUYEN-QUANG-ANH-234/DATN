@@ -23,20 +23,20 @@ export const ResignationManagerReviewPanel = ({ request, saving, onSubmit }: Pro
   };
 
   return (
-    <Card title="Manager review" description="Quan ly truc tiep xac nhan yeu cau nghi viec.">
+    <Card title="Quản lý xác nhận" description="Xem xét yêu cầu nghỉ việc trước khi chuyển HR xử lý.">
       <form className="space-y-4" onSubmit={submit}>
         <Select
-          label="Quyet dinh"
+          label="Quyết định"
           value={isApproved}
           disabled={!request || saving}
           options={[
-            { value: "true", label: "Approve" },
-            { value: "false", label: "Reject" },
+            { value: "true", label: "Đồng ý" },
+            { value: "false", label: "Từ chối" },
           ]}
           onChange={(event) => setIsApproved(event.target.value)}
         />
         <label className="block">
-          <span className="mb-1 block text-sm font-medium text-[var(--hicas-text-main)]">Manager note</span>
+          <span className="mb-1 block text-sm font-medium text-[var(--hicas-text-main)]">Ghi chú quản lý</span>
           <textarea
             className="hicas-input min-h-24 resize-y"
             disabled={!request || saving}
@@ -51,7 +51,7 @@ export const ResignationManagerReviewPanel = ({ request, saving, onSubmit }: Pro
           isLoading={saving}
           disabled={!request}
         >
-          Gui review
+          Gửi xác nhận
         </Button>
       </form>
     </Card>

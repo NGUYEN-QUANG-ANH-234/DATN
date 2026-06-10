@@ -20,7 +20,7 @@ export const PersonnelChangeActionPanel = ({ kind, request, children }: Props) =
             #{String(request.id).padStart(5, "0")}
           </span>
           <span className="ml-2 text-[var(--hicas-text-secondary)]">
-            {request.employeeName || "Chua co nhan su"}
+            {request.employeeName || "Chưa có nhân sự"}
           </span>
         </div>
       ) : null}
@@ -28,12 +28,12 @@ export const PersonnelChangeActionPanel = ({ kind, request, children }: Props) =
 
     {!request ? (
       <div className="rounded-[var(--radius-md)] border border-[var(--hicas-border)] bg-white p-4">
-        <p className="text-sm text-[var(--hicas-text-secondary)]">Mo mot ho so trong bang de thao tac.</p>
+        <p className="text-sm text-[var(--hicas-text-secondary)]">Mở một hồ sơ trong bảng để thao tác.</p>
       </div>
     ) : (
       <div className="space-y-5">
         <p className="rounded-[var(--radius-md)] border border-[var(--hicas-border)] bg-white p-3 text-sm text-[var(--hicas-text-secondary)]">
-          {request.reason || "Khong co ghi chu."}
+          {request.reason || "Không có ghi chú."}
         </p>
         {children}
       </div>
@@ -42,17 +42,17 @@ export const PersonnelChangeActionPanel = ({ kind, request, children }: Props) =
 );
 
 const getActionTitle = (kind: PersonnelChangeWorkflowKind) => {
-  if (kind === "promotion") return "Promotion actions";
-  if (kind === "senior-appointment") return "Senior appointment actions";
-  if (kind === "termination") return "Resignation actions";
-  if (kind === "dismissal") return "Dismissal actions";
-  return "Internal transfer actions";
+  if (kind === "promotion") return "Thao tác thăng tiến";
+  if (kind === "senior-appointment") return "Thao tác bổ nhiệm";
+  if (kind === "termination") return "Thao tác nghỉ việc";
+  if (kind === "dismissal") return "Thao tác kỷ luật";
+  return "Thao tác thuyên chuyển";
 };
 
 const getActionDescription = (kind: PersonnelChangeWorkflowKind) => {
-  if (kind === "promotion") return "HR review, Director approval va execute cho F7.1.";
-  if (kind === "senior-appointment") return "Consent, contract flow, decision va execute cho F7.2.";
-  if (kind === "termination") return "Manager, HR, Director, contract termination va execute cho F7.3.";
-  if (kind === "dismissal") return "Notification, giai trinh, Director approval va execute cho F7.4.";
-  return "HR select, manager opinion, consent, decision va execute cho F7.5.";
+  if (kind === "promotion") return "HR rà soát, giám đốc phê duyệt và thực thi hồ sơ.";
+  if (kind === "senior-appointment") return "Xác nhận, xử lý hợp đồng, ban hành quyết định và thực thi.";
+  if (kind === "termination") return "Quản lý, HR và giám đốc cùng xử lý trước khi hoàn tất nghỉ việc.";
+  if (kind === "dismissal") return "Thông báo, ghi nhận giải trình, trình giám đốc và thực thi quyết định.";
+  return "HR chọn nhân sự, lấy ý kiến quản lý, xác nhận và ban hành quyết định.";
 };

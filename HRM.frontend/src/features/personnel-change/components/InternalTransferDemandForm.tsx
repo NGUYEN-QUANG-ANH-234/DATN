@@ -1,6 +1,12 @@
 import { useState, type FormEvent } from "react";
 import { Send } from "lucide-react";
 import { Button, Card, Input, Select } from "../../../components/ui";
+import { usePersonnelChangeLookups } from "../hooks/usePersonnelChangeLookups";
+import {
+  DepartmentPicker,
+  ManagerPicker,
+  PositionPicker,
+} from "./PersonnelChangePickers";
 import type { InternalTransferDemandRequest } from "../types/personnelChange";
 
 type Props = {
@@ -9,6 +15,7 @@ type Props = {
 };
 
 export const InternalTransferDemandForm = ({ saving, onSubmit }: Props) => {
+  const lookups = usePersonnelChangeLookups();
   const [form, setForm] = useState({
     requestedDepartmentId: "",
     requestedPositionId: "",
@@ -41,60 +48,55 @@ export const InternalTransferDemandForm = ({ saving, onSubmit }: Props) => {
   };
 
   return (
-    <Card title="Internal transfer demand" description="Tao demand truoc khi HR chon nhan su phu hop.">
+    <Card title="Nhu cầu thuyên chuyển" description="Ghi nhận nhu cầu trước khi HR chọn nhân sự phù hợp.">
       <form className="grid gap-4 md:grid-cols-2" onSubmit={submit}>
-        <Input
-          label="Phong ban yeu cau"
-          name="requestedDepartmentId"
-          type="number"
-          min={1}
+        <DepartmentPicker
+          label="Phòng ban yêu cầu"
+          departments={lookups.departments}
+          helperText={lookups.loading ? "Đang tải danh sách phòng ban..." : undefined}
           required
           value={form.requestedDepartmentId}
-          onChange={(event) => setForm((prev) => ({ ...prev, requestedDepartmentId: event.target.value }))}
+          onChange={(value) => setForm((prev) => ({ ...prev, requestedDepartmentId: value }))}
         />
-        <Input
-          label="Chuc danh du kien"
-          name="requestedPositionId"
-          type="number"
-          min={1}
+        <PositionPicker
+          label="Chức danh dự kiến"
+          positions={lookups.positions}
           value={form.requestedPositionId}
-          onChange={(event) => setForm((prev) => ({ ...prev, requestedPositionId: event.target.value }))}
+          onChange={(value) => setForm((prev) => ({ ...prev, requestedPositionId: value }))}
         />
-        <Input
-          label="Quan ly moi"
-          name="requestedManagerId"
-          type="number"
-          min={1}
+        <ManagerPicker
+          label="Quản lý mới"
+          managers={lookups.managers}
           value={form.requestedManagerId}
-          onChange={(event) => setForm((prev) => ({ ...prev, requestedManagerId: event.target.value }))}
+          onChange={(value) => setForm((prev) => ({ ...prev, requestedManagerId: value }))}
         />
         <Select
-          label="Muc uu tien"
+          label="Mức ưu tiên"
           name="urgencyLevel"
           value={form.urgencyLevel}
           options={[
-            { value: "Low", label: "Low" },
-            { value: "Normal", label: "Normal" },
-            { value: "High", label: "High" },
-            { value: "Critical", label: "Critical" },
+            { value: "Low", label: "Thấp" },
+            { value: "Normal", label: "Bình thường" },
+            { value: "High", label: "Cao" },
+            { value: "Critical", label: "Khẩn cấp" },
           ]}
           onChange={(event) => setForm((prev) => ({ ...prev, urgencyLevel: event.target.value }))}
         />
         <Input
-          label="Ngay hieu luc du kien"
+          label="Ngày hiệu lực dự kiến"
           name="expectedEffectiveDate"
           type="date"
           value={form.expectedEffectiveDate}
           onChange={(event) => setForm((prev) => ({ ...prev, expectedEffectiveDate: event.target.value }))}
         />
         <Input
-          label="Ky nang can co"
+          label="Kỹ năng cần có"
           name="requiredSkills"
           value={form.requiredSkills}
           onChange={(event) => setForm((prev) => ({ ...prev, requiredSkills: event.target.value }))}
         />
         <label className="block md:col-span-2">
-          <span className="mb-1 block text-sm font-medium text-[var(--hicas-text-main)]">Ly do</span>
+          <span className="mb-1 block text-sm font-medium text-[var(--hicas-text-main)]">Lý do</span>
           <textarea
             className="hicas-input min-h-24 resize-y"
             value={form.reason}
@@ -103,7 +105,7 @@ export const InternalTransferDemandForm = ({ saving, onSubmit }: Props) => {
         </label>
         <div className="md:col-span-2">
           <Button type="submit" iconLeft={<Send size={16} />} isLoading={saving}>
-            Gui demand
+            Gửi nhu cầu
           </Button>
         </div>
       </form>

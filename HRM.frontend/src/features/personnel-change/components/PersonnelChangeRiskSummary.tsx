@@ -11,18 +11,18 @@ export const PersonnelChangeRiskSummary = ({ summary }: Props) => {
   const penalty = summary?.penaltySummary;
 
   return (
-    <Card title="Risk summary" description="Du lieu tham chieu cho ho so bien dong.">
+    <Card title="Dữ liệu tham chiếu" description="Thông tin hỗ trợ đánh giá hồ sơ biến động nhân sự.">
       {!summary ? (
-        <p className="text-sm text-[var(--hicas-text-secondary)]">Chon mot ho so de xem risk summary.</p>
+        <p className="text-sm text-[var(--hicas-text-secondary)]">Chọn một hồ sơ để xem dữ liệu tham chiếu.</p>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <SummaryItem label="Nhan su" value={employee?.fullName ?? "Chua chon"} detail={employee?.employeeCode} />
-          <SummaryItem label="Phong ban" value={employee?.departmentName ?? "-"} detail={employee?.positionName} />
-          <SummaryItem label="Hop dong" value={contract?.contractNumber ?? "-"} detail={contract?.status} />
+          <SummaryItem label="Nhân sự" value={employee?.fullName ?? "Chưa chọn"} detail={employee?.employeeCode} />
+          <SummaryItem label="Phòng ban" value={employee?.departmentName ?? "-"} detail={employee?.positionName} />
+          <SummaryItem label="Hợp đồng" value={contract?.contractNumber ?? "-"} detail={contract?.status} />
           <SummaryItem
-            label="Risk"
-            value={`${penalty?.personnelImpactRecords ?? 0} ho so`}
-            detail={`Penalty ${penalty?.totalPenaltyPoint ?? 0}`}
+            label="Rủi ro"
+            value={`${penalty?.personnelImpactRecords ?? 0} hồ sơ`}
+            detail={`Điểm trừ ${penalty?.totalPenaltyPoint ?? 0}`}
           />
         </div>
       )}

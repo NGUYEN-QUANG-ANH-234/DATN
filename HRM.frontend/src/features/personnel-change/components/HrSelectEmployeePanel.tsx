@@ -1,7 +1,15 @@
 import { useState, type FormEvent } from "react";
 import { UserCheck } from "lucide-react";
-import { Button, Card, Input } from "../../../components/ui";
+import { Button, Card } from "../../../components/ui";
+import { usePersonnelChangeLookups } from "../hooks/usePersonnelChangeLookups";
 import type { HrSelectEmployeeRequest, PersonnelChangeDetail } from "../types/personnelChange";
+import {
+  DepartmentPicker,
+  EmployeePicker,
+  JobLevelPicker,
+  ManagerPicker,
+  PositionPicker,
+} from "./PersonnelChangePickers";
 
 type Props = {
   request?: PersonnelChangeDetail | null;
@@ -10,6 +18,7 @@ type Props = {
 };
 
 export const HrSelectEmployeePanel = ({ request, saving, onSubmit }: Props) => {
+  const lookups = usePersonnelChangeLookups();
   const [form, setForm] = useState({
     employeeId: "",
     newDepartmentId: "",
@@ -36,62 +45,63 @@ export const HrSelectEmployeePanel = ({ request, saving, onSubmit }: Props) => {
   };
 
   return (
-    <Card title="HR select employee" description="Chon nhan su va xac nhan thong tin dich den.">
+    <Card
+      title="HR chọn nhân sự"
+      description="Chọn nhân sự và xác nhận thông tin điều chuyển."
+    >
       <form className="grid gap-4 md:grid-cols-2" onSubmit={submit}>
-        <Input
-          label="Ma nhan su"
-          name="employeeId"
-          type="number"
-          min={1}
+        <EmployeePicker
+          label="Nhân sự được chọn"
+          employees={lookups.employees}
           required
           value={form.employeeId}
-          onChange={(event) => setForm((prev) => ({ ...prev, employeeId: event.target.value }))}
+          helperText={lookups.loading ? "Đang tải danh sách nhân sự..." : undefined}
+          onChange={(value) => setForm((prev) => ({ ...prev, employeeId: value }))}
         />
-        <Input
-          label="Phong ban moi"
-          name="newDepartmentId"
-          type="number"
-          min={1}
-          placeholder={request?.newDepartmentId ? String(request.newDepartmentId) : undefined}
+        <DepartmentPicker
+          label="Phòng ban mới"
+          departments={lookups.departments}
           value={form.newDepartmentId}
-          onChange={(event) => setForm((prev) => ({ ...prev, newDepartmentId: event.target.value }))}
+          placeholder={request?.newDepartmentName || "Giữ theo nhu cầu ban đầu"}
+          onChange={(value) => setForm((prev) => ({ ...prev, newDepartmentId: value }))}
         />
-        <Input
-          label="Chuc danh moi"
-          name="newPositionId"
-          type="number"
-          min={1}
-          placeholder={request?.newPositionId ? String(request.newPositionId) : undefined}
+        <PositionPicker
+          label="Chức danh mới"
+          positions={lookups.positions}
           value={form.newPositionId}
-          onChange={(event) => setForm((prev) => ({ ...prev, newPositionId: event.target.value }))}
+          placeholder={request?.newPositionName || "Giữ theo nhu cầu ban đầu"}
+          onChange={(value) => setForm((prev) => ({ ...prev, newPositionId: value }))}
         />
-        <Input
-          label="Quan ly moi"
-          name="newManagerId"
-          type="number"
-          min={1}
-          placeholder={request?.newManagerId ? String(request.newManagerId) : undefined}
+        <ManagerPicker
+          label="Quản lý mới"
+          managers={lookups.managers}
           value={form.newManagerId}
-          onChange={(event) => setForm((prev) => ({ ...prev, newManagerId: event.target.value }))}
+          placeholder={request?.newManagerName || "Chọn quản lý mới"}
+          onChange={(value) => setForm((prev) => ({ ...prev, newManagerId: value }))}
         />
-        <Input
-          label="Job level moi"
-          name="newJobLevelId"
-          type="number"
-          min={1}
+        <JobLevelPicker
+          label="Cấp bậc mới"
+          jobLevels={lookups.jobLevels}
           value={form.newJobLevelId}
-          onChange={(event) => setForm((prev) => ({ ...prev, newJobLevelId: event.target.value }))}
+          onChange={(value) => setForm((prev) => ({ ...prev, newJobLevelId: value }))}
         />
         <label className="flex items-center gap-3 pt-7 text-sm font-medium text-[var(--hicas-text-main)]">
           <input
             type="checkbox"
             checked={form.requiresContractAddendum}
-            onChange={(event) => setForm((prev) => ({ ...prev, requiresContractAddendum: event.target.checked }))}
+            onChange={(event) =>
+              setForm((prev) => ({
+                ...prev,
+                requiresContractAddendum: event.target.checked,
+              }))
+            }
           />
-          Can phu luc hop dong
+          Cần phụ lục hợp đồng
         </label>
         <label className="block md:col-span-2">
-          <span className="mb-1 block text-sm font-medium text-[var(--hicas-text-main)]">Ghi chu HR</span>
+          <span className="mb-1 block text-sm font-medium text-[var(--hicas-text-main)]">
+            Ghi chú HR
+          </span>
           <textarea
             className="hicas-input min-h-20 resize-y"
             value={form.note}
@@ -99,8 +109,13 @@ export const HrSelectEmployeePanel = ({ request, saving, onSubmit }: Props) => {
           />
         </label>
         <div className="md:col-span-2">
-          <Button type="submit" iconLeft={<UserCheck size={16} />} isLoading={saving} disabled={!request}>
-            Xac nhan nhan su
+          <Button
+            type="submit"
+            iconLeft={<UserCheck size={16} />}
+            isLoading={saving}
+            disabled={!request}
+          >
+            Xác nhận nhân sự
           </Button>
         </div>
       </form>

@@ -24,9 +24,9 @@ export const ContractFlowLinkPanel = ({ request }: Props) => {
   const blockReason = getContractFlowExecutionBlockReason(request);
 
   return (
-    <Card title="Contract flow" description="Luong hop dong duoc xu ly tai Module 3.">
+    <Card title="Liên kết hợp đồng" description="Hợp đồng liên quan được xử lý tại Hồ sơ & hợp đồng.">
       {!request ? (
-        <p className="text-sm text-[var(--hicas-text-secondary)]">Chon mot ho so de xem contract flow.</p>
+        <p className="text-sm text-[var(--hicas-text-secondary)]">Chọn một hồ sơ để xem liên kết hợp đồng.</p>
       ) : (
         <div className="space-y-4">
           {request.requiresContractFlow ? (
@@ -34,16 +34,13 @@ export const ContractFlowLinkPanel = ({ request }: Props) => {
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="text-sm font-semibold text-[var(--hicas-text-main)]">
-                    Luong hop dong duoc xu ly tai Module 3
+                    Hợp đồng liên quan được xử lý tại Hồ sơ & hợp đồng
                   </p>
                   <p className="mt-1 text-sm text-[var(--hicas-text-secondary)]">
-                    Module 7 chi luu link va chi execute sau khi flow duoc chap nhan/ky.
+                    Hồ sơ biến động chỉ lưu liên kết và chỉ thực thi sau khi hợp đồng được chấp thuận hoặc ký.
                   </p>
                 </div>
-                <StatusBadge
-                  status={request.contractFlowStatus || "Pending"}
-                  label={request.contractFlowStatus || "Pending"}
-                />
+                <StatusBadge status={request.contractFlowStatus || "Pending"} />
               </div>
               {blockReason ? (
                 <p className="mt-3 rounded-[var(--radius-md)] border border-amber-200 bg-amber-50 p-2 text-sm text-amber-800">
@@ -53,46 +50,46 @@ export const ContractFlowLinkPanel = ({ request }: Props) => {
             </div>
           ) : (
             <p className="rounded-[var(--radius-md)] border border-[var(--hicas-border)] bg-white p-3 text-sm text-[var(--hicas-text-secondary)]">
-              Ho so nay khong yeu cau contract flow.
+              Hồ sơ này không yêu cầu xử lý hợp đồng.
             </p>
           )}
 
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <InfoItem label="Yeu cau flow" value={request.requiresContractFlow ? "Co" : "Khong"} />
-            <InfoItem label="Loai flow" value={getContractFlowTypeLabel(request.contractFlowType)} />
-            <InfoItem label="Trang thai" value={request.contractFlowStatus || "-"} />
+            <InfoItem label="Cần hợp đồng" value={request.requiresContractFlow ? "Có" : "Không"} />
+            <InfoItem label="Loại xử lý" value={getContractFlowTypeLabel(request.contractFlowType)} />
+            <InfoItem label="Trạng thái" value={request.contractFlowStatus || "-"} />
             <InfoItem
-              label="Dang xu ly"
-              value={isContractFlowInProgress(request) ? "Co" : "Khong"}
+              label="Đang xử lý"
+              value={isContractFlowInProgress(request) ? "Có" : "Không"}
             />
-            <InfoItem label="ContractId" value={primaryLink?.contractId ? `#${primaryLink.contractId}` : "-"} />
+            <InfoItem label="Mã hợp đồng" value={primaryLink?.contractId ? `#${primaryLink.contractId}` : "-"} />
             <InfoItem
-              label="ContractRequestId"
+              label="Mã yêu cầu hợp đồng"
               value={primaryLink?.contractRequestId ? `#${primaryLink.contractRequestId}` : "-"}
             />
             <InfoItem
-              label="AddendumId"
+              label="Mã phụ lục"
               value={primaryLink?.contractAddendumId ? `#${primaryLink.contractAddendumId}` : "-"}
             />
           </div>
 
           <div className="flex flex-wrap gap-2">
             {primaryLink?.contractId ? (
-              <Module3Link to={`/employee-contract/hr-contracts?contractId=${primaryLink.contractId}`}>
-                Mo hop dong
-              </Module3Link>
+              <ContractLinkButton to={`/employee-contract/hr-contracts?contractId=${primaryLink.contractId}`}>
+                Mở hợp đồng
+              </ContractLinkButton>
             ) : null}
             {primaryLink?.contractRequestId ? (
-              <Module3Link
+              <ContractLinkButton
                 to={`/employee-contract/contract-requests?contractRequestId=${primaryLink.contractRequestId}`}
               >
-                Mo request hop dong
-              </Module3Link>
+                Mở yêu cầu hợp đồng
+              </ContractLinkButton>
             ) : null}
             {primaryLink?.contractAddendumId ? (
-              <Module3Link to={`/employee-contract/appendices?addendumId=${primaryLink.contractAddendumId}`}>
-                Mo phu luc
-              </Module3Link>
+              <ContractLinkButton to={`/employee-contract/appendices?addendumId=${primaryLink.contractAddendumId}`}>
+                Mở phụ lục
+              </ContractLinkButton>
             ) : null}
           </div>
 
@@ -104,7 +101,7 @@ export const ContractFlowLinkPanel = ({ request }: Props) => {
             </div>
           ) : (
             <p className="rounded-[var(--radius-md)] border border-[var(--hicas-border)] bg-white p-3 text-sm text-[var(--hicas-text-secondary)]">
-              Chua co link contract flow nao duoc tao.
+              Chưa có liên kết hợp đồng nào.
             </p>
           )}
         </div>
@@ -121,16 +118,16 @@ const ContractLinkItem = ({ link }: { link: PersonnelChangeContractFlowLink }) =
           {getContractFlowTypeLabel(link.contractFlowType)}
         </p>
         <p className="text-sm text-[var(--hicas-text-secondary)]">
-          Contract #{link.contractId ?? "-"} / Request #{link.contractRequestId ?? "-"} / Addendum #
+          Hợp đồng #{link.contractId ?? "-"} / Yêu cầu #{link.contractRequestId ?? "-"} / Phụ lục #
           {link.contractAddendumId ?? "-"}
         </p>
         <p className="mt-2 text-xs text-[var(--hicas-text-secondary)]">
-          Created {formatDateTime(link.createdAt)}
-          {link.completedAt ? ` / Completed ${formatDateTime(link.completedAt)}` : ""}
+          Tạo lúc {formatDateTime(link.createdAt)}
+          {link.completedAt ? ` / Hoàn tất ${formatDateTime(link.completedAt)}` : ""}
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <StatusBadge status={link.status || "Pending"} label={link.status || "Pending"} />
+        <StatusBadge status={link.status || "Pending"} />
         {hasContractReference(link) ? <LinkButtons link={link} /> : null}
       </div>
     </div>
@@ -140,24 +137,24 @@ const ContractLinkItem = ({ link }: { link: PersonnelChangeContractFlowLink }) =
 const LinkButtons = ({ link }: { link: PersonnelChangeContractFlowLink }) => (
   <>
     {link.contractId ? (
-      <Module3Link compact to={`/employee-contract/hr-contracts?contractId=${link.contractId}`}>
-        Contract
-      </Module3Link>
+      <ContractLinkButton compact to={`/employee-contract/hr-contracts?contractId=${link.contractId}`}>
+        Hợp đồng
+      </ContractLinkButton>
     ) : null}
     {link.contractRequestId ? (
-      <Module3Link compact to={`/employee-contract/contract-requests?contractRequestId=${link.contractRequestId}`}>
-        Request
-      </Module3Link>
+      <ContractLinkButton compact to={`/employee-contract/contract-requests?contractRequestId=${link.contractRequestId}`}>
+        Yêu cầu
+      </ContractLinkButton>
     ) : null}
     {link.contractAddendumId ? (
-      <Module3Link compact to={`/employee-contract/appendices?addendumId=${link.contractAddendumId}`}>
-        Addendum
-      </Module3Link>
+      <ContractLinkButton compact to={`/employee-contract/appendices?addendumId=${link.contractAddendumId}`}>
+        Phụ lục
+      </ContractLinkButton>
     ) : null}
   </>
 );
 
-const Module3Link = ({
+const ContractLinkButton = ({
   to,
   compact,
   children,
@@ -185,9 +182,9 @@ const InfoItem = ({ label, value }: { label: string; value: string }) => (
 );
 
 const getContractFlowTypeLabel = (type?: PersonnelChangeContractFlowType | null) => {
-  if (type === PersonnelChangeContractFlowType.NewContract) return "Hop dong moi";
-  if (type === PersonnelChangeContractFlowType.ContractRenewal) return "Gia han hop dong";
-  if (type === PersonnelChangeContractFlowType.ContractAddendum) return "Phu luc hop dong";
-  if (type === PersonnelChangeContractFlowType.ContractTermination) return "Cham dut hop dong";
-  return "None";
+  if (type === PersonnelChangeContractFlowType.NewContract) return "Hợp đồng mới";
+  if (type === PersonnelChangeContractFlowType.ContractRenewal) return "Gia hạn hợp đồng";
+  if (type === PersonnelChangeContractFlowType.ContractAddendum) return "Phụ lục hợp đồng";
+  if (type === PersonnelChangeContractFlowType.ContractTermination) return "Chấm dứt hợp đồng";
+  return "Không áp dụng";
 };

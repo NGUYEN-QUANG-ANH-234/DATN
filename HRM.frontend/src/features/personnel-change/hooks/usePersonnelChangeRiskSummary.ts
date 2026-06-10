@@ -16,7 +16,7 @@ export const usePersonnelChangeRiskSummary = () => {
       return response.data;
     } catch (error) {
       console.error(error);
-      triggerAlert("error", "Khong tai duoc risk summary", getErrorMessage(error));
+      triggerAlert("error", "Không tải được dữ liệu tham chiếu", getErrorMessage(error));
       return null;
     } finally {
       setLoading(false);
@@ -34,4 +34,4 @@ export const usePersonnelChangeRiskSummary = () => {
 };
 
 const getErrorMessage = (error: unknown) =>
-  error instanceof Error ? error.message : "Da co loi xay ra.";
+  error instanceof Error ? error.message : "Đã có lỗi xảy ra.";

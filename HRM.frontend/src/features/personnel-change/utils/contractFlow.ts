@@ -33,7 +33,7 @@ export const getContractFlowExecutionBlockReason = (request?: PersonnelChangeDet
   if (!request) return null;
   if (canExecutePersonnelChange(request)) return null;
 
-  return "Chua the execute vi luong hop dong tai Module 3 chua Accepted/Signed.";
+  return "Chưa thể thực thi vì luồng hợp đồng chưa được chấp thuận hoặc ký.";
 };
 
 export const getPrimaryContractLink = (request?: PersonnelChangeDetail | null) => {

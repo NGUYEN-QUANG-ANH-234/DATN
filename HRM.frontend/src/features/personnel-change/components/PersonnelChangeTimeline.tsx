@@ -10,9 +10,9 @@ type Props = {
 };
 
 export const PersonnelChangeTimeline = ({ items = [] }: Props) => (
-  <Card title="Timeline" description="Lich su xu ly ho so.">
+  <Card title="Lịch sử xử lý" description="Các bước đã diễn ra trong hồ sơ.">
     {items.length === 0 ? (
-      <p className="text-sm text-[var(--hicas-text-secondary)]">Chua co lich su xu ly.</p>
+      <p className="text-sm text-[var(--hicas-text-secondary)]">Chưa có lịch sử xử lý.</p>
     ) : (
       <ol className="space-y-3">
         {items.map((item) => (

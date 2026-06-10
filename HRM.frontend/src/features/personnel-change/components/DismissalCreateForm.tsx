@@ -2,6 +2,16 @@ import { useState, type FormEvent } from "react";
 import { Send } from "lucide-react";
 import { Button, Card, Input, Select } from "../../../components/ui";
 import type { CreateDismissalRequest } from "../types/personnelChange";
+import {
+  useEmployeePersonnelChangeLookups,
+  usePersonnelChangeLookups,
+} from "../hooks/usePersonnelChangeLookups";
+import {
+  ContractPicker,
+  EmployeePicker,
+  EvidenceFileUpload,
+  PenaltyRecordPicker,
+} from "./PersonnelChangePickers";
 
 type Props = {
   saving?: boolean;
@@ -9,6 +19,7 @@ type Props = {
 };
 
 export const DismissalCreateForm = ({ saving, onSubmit }: Props) => {
+  const lookups = usePersonnelChangeLookups();
   const [form, setForm] = useState({
     employeeId: "",
     sourcePenaltyRecordId: "",
@@ -22,6 +33,8 @@ export const DismissalCreateForm = ({ saving, onSubmit }: Props) => {
     lockAccountOnExecution: "true",
     requiresFinalSettlement: "true",
   });
+  const employeeId = toNumberOrNull(form.employeeId);
+  const related = useEmployeePersonnelChangeLookups(employeeId);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -41,68 +54,79 @@ export const DismissalCreateForm = ({ saving, onSubmit }: Props) => {
   };
 
   return (
-    <Card title="Dismissal case" description="Tao ho so sa thai/ky luat tu penalty record da xac dinh.">
+    <Card
+      title="Tạo hồ sơ kỷ luật"
+      description="Ghi nhận hồ sơ kỷ luật hoặc sa thải từ vi phạm đã xác định."
+    >
       <form className="grid gap-4 md:grid-cols-2" onSubmit={submit}>
-        <Input
-          label="Nhan su"
-          type="number"
-          min={1}
+        <EmployeePicker
+          label="Nhân sự"
+          employees={lookups.employees}
           required
           value={form.employeeId}
-          onChange={(event) => setForm((prev) => ({ ...prev, employeeId: event.target.value }))}
+          helperText={lookups.loading ? "Đang tải danh sách nhân sự..." : undefined}
+          onChange={(value) =>
+            setForm((prev) => ({
+              ...prev,
+              employeeId: value,
+              sourcePenaltyRecordId: "",
+              relatedContractId: "",
+            }))
+          }
         />
-        <Input
-          label="Penalty record"
-          type="number"
-          min={1}
+        <PenaltyRecordPicker
+          penalties={related.penalties}
           required
           value={form.sourcePenaltyRecordId}
-          onChange={(event) => setForm((prev) => ({ ...prev, sourcePenaltyRecordId: event.target.value }))}
+          disabled={!employeeId}
+          helperText={!employeeId ? "Chọn nhân sự trước để xem hồ sơ vi phạm." : undefined}
+          onChange={(value) => setForm((prev) => ({ ...prev, sourcePenaltyRecordId: value }))}
         />
-        <Input
-          label="Evidence file"
+        <EvidenceFileUpload
           value={form.evidenceFilePath}
-          onChange={(event) => setForm((prev) => ({ ...prev, evidenceFilePath: event.target.value }))}
+          onUploaded={(filePath) => setForm((prev) => ({ ...prev, evidenceFilePath: filePath }))}
         />
-        <Input
-          label="Hop dong lien quan"
-          type="number"
-          min={1}
+        <ContractPicker
+          contracts={related.contracts}
           value={form.relatedContractId}
-          onChange={(event) => setForm((prev) => ({ ...prev, relatedContractId: event.target.value }))}
+          disabled={!employeeId}
+          helperText={!employeeId ? "Chọn nhân sự trước để xem hợp đồng." : undefined}
+          onChange={(value) => setForm((prev) => ({ ...prev, relatedContractId: value }))}
         />
         <Input
-          label="Deadline giai trinh"
+          label="Hạn giải trình"
           type="datetime-local"
           value={form.responseDeadlineAt}
           onChange={(event) => setForm((prev) => ({ ...prev, responseDeadlineAt: event.target.value }))}
         />
         <Input
-          label="Ngay hieu luc"
+          label="Ngày hiệu lực"
           type="date"
           value={form.effectiveDate}
           onChange={(event) => setForm((prev) => ({ ...prev, effectiveDate: event.target.value }))}
         />
         <Select
-          label="Khoa tai khoan khi execute"
+          label="Khóa tài khoản khi thực hiện"
           value={form.lockAccountOnExecution}
           options={[
-            { value: "true", label: "Co" },
-            { value: "false", label: "Khong" },
+            { value: "true", label: "Có" },
+            { value: "false", label: "Không" },
           ]}
           onChange={(event) => setForm((prev) => ({ ...prev, lockAccountOnExecution: event.target.value }))}
         />
         <Select
-          label="Tao final settlement"
+          label="Tạo quyết toán cuối cùng"
           value={form.requiresFinalSettlement}
           options={[
-            { value: "true", label: "Co" },
-            { value: "false", label: "Khong" },
+            { value: "true", label: "Có" },
+            { value: "false", label: "Không" },
           ]}
           onChange={(event) => setForm((prev) => ({ ...prev, requiresFinalSettlement: event.target.value }))}
         />
         <label className="block md:col-span-2">
-          <span className="mb-1 block text-sm font-medium text-[var(--hicas-text-main)]">Ly do</span>
+          <span className="mb-1 block text-sm font-medium text-[var(--hicas-text-main)]">
+            Lý do
+          </span>
           <textarea
             className="hicas-input min-h-20 resize-y"
             value={form.reason}
@@ -110,7 +134,9 @@ export const DismissalCreateForm = ({ saving, onSubmit }: Props) => {
           />
         </label>
         <label className="block">
-          <span className="mb-1 block text-sm font-medium text-[var(--hicas-text-main)]">HR note</span>
+          <span className="mb-1 block text-sm font-medium text-[var(--hicas-text-main)]">
+            Ghi chú HR
+          </span>
           <textarea
             className="hicas-input min-h-20 resize-y"
             value={form.hrNote}
@@ -118,7 +144,9 @@ export const DismissalCreateForm = ({ saving, onSubmit }: Props) => {
           />
         </label>
         <label className="block">
-          <span className="mb-1 block text-sm font-medium text-[var(--hicas-text-main)]">Manager note</span>
+          <span className="mb-1 block text-sm font-medium text-[var(--hicas-text-main)]">
+            Ghi chú quản lý
+          </span>
           <textarea
             className="hicas-input min-h-20 resize-y"
             value={form.managerNote}
@@ -127,7 +155,7 @@ export const DismissalCreateForm = ({ saving, onSubmit }: Props) => {
         </label>
         <div className="md:col-span-2">
           <Button type="submit" iconLeft={<Send size={16} />} isLoading={saving}>
-            Tao ho so
+            Tạo hồ sơ
           </Button>
         </div>
       </form>

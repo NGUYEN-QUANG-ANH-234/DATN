@@ -5,12 +5,15 @@ import {
   PersonnelChangeContractFlowType,
   type ApprovePromotionRequest,
   type ExecutePersonnelChangeRequest,
+  type PersonnelChangeContractOption,
   type PersonnelChangeDetail,
 } from "../types/personnelChange";
+import { useEmployeePersonnelChangeLookups } from "../hooks/usePersonnelChangeLookups";
 import {
   canExecutePersonnelChange,
   getContractFlowExecutionBlockReason,
 } from "../utils/contractFlow";
+import { ContractPicker } from "./PersonnelChangePickers";
 
 type Props = {
   request?: PersonnelChangeDetail | null;
@@ -27,10 +30,10 @@ export const PromotionApprovalPanel = ({
   onDirectorApprove,
   onExecute,
 }: Props) => {
+  const related = useEmployeePersonnelChangeLookups(request?.employeeId);
   const [hrForm, setHrForm] = useState({
     isApproved: "true",
     note: "",
-    hrAssignedAccountId: "",
     requiresContractFlow: "keep",
     contractFlowType: String(PersonnelChangeContractFlowType.ContractAddendum),
     relatedContractId: "",
@@ -54,7 +57,7 @@ export const PromotionApprovalPanel = ({
   const submitHrReview = async (event: FormEvent) => {
     event.preventDefault();
     if (!request) return;
-    await onHrReview(request.id, toApprovalPayload(hrForm, true));
+    await onHrReview(request.id, toApprovalPayload(hrForm));
   };
 
   const submitDirectorReview = async (event: FormEvent) => {
@@ -73,45 +76,41 @@ export const PromotionApprovalPanel = ({
   };
 
   return (
-    <Card title="Approval and execute" description="Xu ly HR review, Director approval va execute cho F7.1.">
+    <Card
+      title="Phê duyệt và thực hiện"
+      description="Rà soát hồ sơ trước khi cập nhật thay đổi vào thông tin nhân sự."
+    >
       <div className="space-y-5">
         <div className="rounded-[var(--radius-md)] border border-[var(--hicas-border)] bg-white p-3 text-sm">
           <div className="font-semibold text-[var(--hicas-text-main)]">
-            {request ? `PC-${String(request.id).padStart(5, "0")}` : "Chua chon ho so"}
+            {request ? `PC-${String(request.id).padStart(5, "0")}` : "Chưa chọn hồ sơ"}
           </div>
           <div className="mt-1 text-[var(--hicas-text-secondary)]">
-            {request?.employeeName || "Mo mot ho so trong bang de thao tac."}
+            {request?.employeeName || "Mở một hồ sơ trong bảng để thao tác."}
           </div>
         </div>
 
         <form className="grid gap-3 md:grid-cols-2" onSubmit={submitHrReview}>
           <Select
-            label="HR decision"
+            label="Quyết định HR"
             value={hrForm.isApproved}
             disabled={disabled}
             options={[
-              { value: "true", label: "Approve" },
-              { value: "false", label: "Reject" },
+              { value: "true", label: "Đồng ý" },
+              { value: "false", label: "Từ chối" },
             ]}
             onChange={(event) => setHrForm((prev) => ({ ...prev, isApproved: event.target.value }))}
           />
-          <Input
-            label="HR assigned"
-            type="number"
-            min={1}
-            disabled={disabled}
-            value={hrForm.hrAssignedAccountId}
-            onChange={(event) =>
-              setHrForm((prev) => ({ ...prev, hrAssignedAccountId: event.target.value }))
-            }
-          />
           <ContractFlowFields
             disabled={disabled}
+            contracts={related.contracts}
+            loadingContracts={related.loading}
+            hasEmployee={Boolean(request?.employeeId)}
             value={hrForm}
             onChange={(next) => setHrForm((prev) => ({ ...prev, ...next }))}
           />
           <label className="block md:col-span-2">
-            <span className="mb-1 block text-sm font-medium text-[var(--hicas-text-main)]">HR note</span>
+            <span className="mb-1 block text-sm font-medium text-[var(--hicas-text-main)]">Ghi chú HR</span>
             <textarea
               className="hicas-input min-h-16 resize-y"
               disabled={disabled}
@@ -127,19 +126,19 @@ export const PromotionApprovalPanel = ({
               disabled={disabled}
               isLoading={saving}
             >
-              HR review
+              Gửi kiểm tra HR
             </Button>
           </div>
         </form>
 
         <form className="grid gap-3 md:grid-cols-2" onSubmit={submitDirectorReview}>
           <Select
-            label="Director decision"
+            label="Quyết định phê duyệt"
             value={directorForm.isApproved}
             disabled={disabled}
             options={[
-              { value: "true", label: "Approve" },
-              { value: "false", label: "Reject" },
+              { value: "true", label: "Phê duyệt" },
+              { value: "false", label: "Từ chối" },
             ]}
             onChange={(event) =>
               setDirectorForm((prev) => ({ ...prev, isApproved: event.target.value }))
@@ -147,12 +146,15 @@ export const PromotionApprovalPanel = ({
           />
           <ContractFlowFields
             disabled={disabled}
+            contracts={related.contracts}
+            loadingContracts={related.loading}
+            hasEmployee={Boolean(request?.employeeId)}
             value={directorForm}
             onChange={(next) => setDirectorForm((prev) => ({ ...prev, ...next }))}
           />
           <label className="block md:col-span-2">
             <span className="mb-1 block text-sm font-medium text-[var(--hicas-text-main)]">
-              Director note
+              Ghi chú phê duyệt
             </span>
             <textarea
               className="hicas-input min-h-16 resize-y"
@@ -171,21 +173,21 @@ export const PromotionApprovalPanel = ({
               disabled={disabled}
               isLoading={saving}
             >
-              Director approve
+              Gửi phê duyệt
             </Button>
           </div>
         </form>
 
         <form className="grid gap-3 md:grid-cols-2" onSubmit={submitExecute}>
           <Input
-            label="Completed at"
+            label="Thời điểm hoàn tất"
             type="datetime-local"
             disabled={executeDisabled}
             value={executeForm.completedAt}
             onChange={(event) => setExecuteForm((prev) => ({ ...prev, completedAt: event.target.value }))}
           />
           <Input
-            label="Execute note"
+            label="Ghi chú thực hiện"
             disabled={executeDisabled}
             value={executeForm.note}
             onChange={(event) => setExecuteForm((prev) => ({ ...prev, note: event.target.value }))}
@@ -197,7 +199,7 @@ export const PromotionApprovalPanel = ({
           ) : null}
           <div className="md:col-span-2">
             <Button type="submit" iconLeft={<Play size={16} />} disabled={executeDisabled} isLoading={saving}>
-              Execute
+              Thực hiện
             </Button>
           </div>
         </form>
@@ -214,43 +216,55 @@ type ContractFormValue = {
 
 const ContractFlowFields = ({
   disabled,
+  contracts,
+  loadingContracts,
+  hasEmployee,
   value,
   onChange,
 }: {
   disabled?: boolean;
+  contracts: PersonnelChangeContractOption[];
+  loadingContracts?: boolean;
+  hasEmployee: boolean;
   value: ContractFormValue;
   onChange: (next: Partial<ContractFormValue>) => void;
 }) => (
   <>
     <Select
-      label="Contract flow"
+      label="Xử lý hợp đồng"
       value={value.requiresContractFlow}
       disabled={disabled}
       options={[
-        { value: "keep", label: "Giu nguyen" },
-        { value: "true", label: "Can" },
-        { value: "false", label: "Khong can" },
+        { value: "keep", label: "Giữ nguyên" },
+        { value: "true", label: "Cần xử lý" },
+        { value: "false", label: "Không cần" },
       ]}
       onChange={(event) => onChange({ requiresContractFlow: event.target.value })}
     />
     <Select
-      label="Loai contract flow"
+      label="Loại xử lý hợp đồng"
       value={value.contractFlowType}
       disabled={disabled}
       options={[
-        { value: String(PersonnelChangeContractFlowType.ContractAddendum), label: "Phu luc hop dong" },
-        { value: String(PersonnelChangeContractFlowType.ContractRenewal), label: "Gia han hop dong" },
-        { value: String(PersonnelChangeContractFlowType.NewContract), label: "Hop dong moi" },
+        { value: String(PersonnelChangeContractFlowType.ContractAddendum), label: "Phụ lục hợp đồng" },
+        { value: String(PersonnelChangeContractFlowType.ContractRenewal), label: "Gia hạn hợp đồng" },
+        { value: String(PersonnelChangeContractFlowType.NewContract), label: "Hợp đồng mới" },
       ]}
       onChange={(event) => onChange({ contractFlowType: event.target.value })}
     />
-    <Input
-      label="Hop dong lien quan"
-      type="number"
-      min={1}
-      disabled={disabled}
+    <ContractPicker
+      label="Hợp đồng liên quan"
       value={value.relatedContractId}
-      onChange={(event) => onChange({ relatedContractId: event.target.value })}
+      contracts={contracts}
+      disabled={disabled || !hasEmployee}
+      helperText={
+        !hasEmployee
+          ? "Hồ sơ chưa có nhân sự để tra cứu hợp đồng."
+          : loadingContracts
+            ? "Đang tải danh sách hợp đồng..."
+            : undefined
+      }
+      onChange={(nextValue) => onChange({ relatedContractId: nextValue })}
     />
   </>
 );
@@ -262,13 +276,11 @@ const toApprovalPayload = (
     requiresContractFlow: string;
     contractFlowType: string;
     relatedContractId: string;
-    hrAssignedAccountId?: string;
   },
-  includeHrAssigned = false,
 ): ApprovePromotionRequest => ({
   isApproved: form.isApproved === "true",
   note: form.note || null,
-  hrAssignedAccountId: includeHrAssigned ? toNumberOrNull(form.hrAssignedAccountId || "") : null,
+  hrAssignedAccountId: null,
   requiresContractFlow:
     form.requiresContractFlow === "keep" ? null : form.requiresContractFlow === "true",
   contractFlowType: Number(form.contractFlowType) as PersonnelChangeContractFlowType,

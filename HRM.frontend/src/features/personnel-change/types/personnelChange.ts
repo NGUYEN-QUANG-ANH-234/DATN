@@ -4,6 +4,84 @@ export type ApiResponse<T> = {
   data: T;
 };
 
+export type PersonnelChangeEmployeeOption = {
+  id: number;
+  employeeCode: string;
+  fullName: string;
+  departmentId?: number | null;
+  departmentName?: string | null;
+  positionId?: number | null;
+  positionName?: string | null;
+  jobLevelId?: number | null;
+  jobLevelName?: string | null;
+  managerId?: number | null;
+  managerName?: string | null;
+  status?: string | null;
+  employeeType?: string | null;
+};
+
+export type PersonnelChangeDepartmentOption = {
+  id: number;
+  deptCode: string;
+  deptName: string;
+  parentDeptId?: number | null;
+  managerId?: number | null;
+  managerName?: string | null;
+};
+
+export type PersonnelChangePositionOption = {
+  id: number;
+  title: string;
+  jobLevel: number;
+};
+
+export type PersonnelChangeJobLevelOption = {
+  id: number;
+  code: string;
+  name: string;
+  rankOrder: number;
+  isManagementLevel: boolean;
+};
+
+export type PersonnelChangePenaltyOption = {
+  id: number;
+  period: string;
+  ruleCode: string;
+  reason?: string | null;
+  penaltyPoint: number;
+  severity: string;
+  status: string;
+  occurredAt?: string | null;
+  affectsPersonnelDecision: boolean;
+};
+
+export type PersonnelChangePerformanceReviewOption = {
+  id: number;
+  period: string;
+  totalScore: number;
+  finalRating?: string | null;
+  status: string;
+  finalizedAt?: string | null;
+  createdAt: string;
+};
+
+export type PersonnelChangeContractOption = {
+  id: number;
+  contractNumber: string;
+  contractType: string;
+  status: string;
+  startDate: string;
+  endDate?: string | null;
+  basicSalary: number;
+  insuranceSalary: number;
+};
+
+export type PersonnelChangeEvidenceUploadResult = {
+  filePath: string;
+  fileName: string;
+  size: number;
+};
+
 export type PersonnelChangeWorkflowKind =
   | "promotion"
   | "senior-appointment"

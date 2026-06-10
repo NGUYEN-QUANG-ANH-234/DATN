@@ -6,6 +6,17 @@ import {
   PersonnelChangeContractFlowType,
   type CreateConvertOfficialRequest,
 } from "../types/personnelChange";
+import {
+  useEmployeePersonnelChangeLookups,
+  usePersonnelChangeLookups,
+} from "../hooks/usePersonnelChangeLookups";
+import {
+  ContractPicker,
+  EmployeePicker,
+  JobLevelPicker,
+  PerformanceReviewPicker,
+  PositionPicker,
+} from "./PersonnelChangePickers";
 
 type Props = {
   saving?: boolean;
@@ -13,6 +24,7 @@ type Props = {
 };
 
 export const ConvertOfficialForm = ({ saving, onSubmit }: Props) => {
+  const lookups = usePersonnelChangeLookups();
   const [form, setForm] = useState({
     employeeId: "",
     newPositionId: "",
@@ -25,6 +37,8 @@ export const ConvertOfficialForm = ({ saving, onSubmit }: Props) => {
     effectiveDate: "",
     reason: "",
   });
+  const employeeId = toNumberOrNull(form.employeeId);
+  const related = useEmployeePersonnelChangeLookups(employeeId);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -51,82 +65,89 @@ export const ConvertOfficialForm = ({ saving, onSubmit }: Props) => {
   };
 
   return (
-    <Card title="Convert official" description="Tao ho so chuyen nhan su sang chinh thuc.">
+    <Card title="Chuyển chính thức" description="Tạo hồ sơ chuyển nhân sự sang trạng thái chính thức.">
       <form className="grid gap-4 md:grid-cols-2" onSubmit={submit}>
-        <Input
-          label="Nhan su"
-          type="number"
-          min={1}
+        <EmployeePicker
+          label="Nhân sự"
+          employees={lookups.employees}
           required
           value={form.employeeId}
-          onChange={(event) => setForm((prev) => ({ ...prev, employeeId: event.target.value }))}
+          helperText={lookups.loading ? "Đang tải danh sách nhân sự..." : undefined}
+          onChange={(value) =>
+            setForm((prev) => ({
+              ...prev,
+              employeeId: value,
+              sourcePerformanceReviewId: "",
+              relatedContractId: "",
+            }))
+          }
         />
         <Select
-          label="Loai nhan su moi"
+          label="Loại nhân sự mới"
           value={form.newEmployeeType}
           options={[
-            { value: String(EmployeeType.Official), label: "Official" },
-            { value: String(EmployeeType.Contractual), label: "Contractual" },
+            { value: String(EmployeeType.Official), label: "Chính thức" },
+            { value: String(EmployeeType.Contractual), label: "Hợp đồng" },
           ]}
           onChange={(event) => setForm((prev) => ({ ...prev, newEmployeeType: event.target.value }))}
         />
-        <Input
-          label="Chuc danh moi"
-          type="number"
-          min={1}
+        <PositionPicker
+          label="Chức danh mới"
+          positions={lookups.positions}
           value={form.newPositionId}
-          onChange={(event) => setForm((prev) => ({ ...prev, newPositionId: event.target.value }))}
+          onChange={(value) => setForm((prev) => ({ ...prev, newPositionId: value }))}
         />
-        <Input
-          label="Job level moi"
-          type="number"
-          min={1}
+        <JobLevelPicker
+          label="Cấp bậc mới"
+          jobLevels={lookups.jobLevels}
           value={form.newJobLevelId}
-          onChange={(event) => setForm((prev) => ({ ...prev, newJobLevelId: event.target.value }))}
+          onChange={(value) => setForm((prev) => ({ ...prev, newJobLevelId: value }))}
         />
-        <Input
-          label="Performance review"
-          type="number"
-          min={1}
+        <PerformanceReviewPicker
+          label="Đánh giá hiệu suất"
+          reviews={related.performanceReviews}
           value={form.sourcePerformanceReviewId}
-          onChange={(event) =>
-            setForm((prev) => ({ ...prev, sourcePerformanceReviewId: event.target.value }))
-          }
+          disabled={!employeeId}
+          helperText={!employeeId ? "Chọn nhân sự trước để xem đánh giá." : undefined}
+          onChange={(value) => setForm((prev) => ({ ...prev, sourcePerformanceReviewId: value }))}
         />
-        <Input
-          label="Hop dong lien quan"
-          type="number"
-          min={1}
+        <ContractPicker
+          label="Hợp đồng liên quan"
+          contracts={related.contracts}
           value={form.relatedContractId}
-          onChange={(event) => setForm((prev) => ({ ...prev, relatedContractId: event.target.value }))}
+          disabled={!employeeId}
+          helperText={!employeeId ? "Chọn nhân sự trước để xem hợp đồng." : undefined}
+          onChange={(value) => setForm((prev) => ({ ...prev, relatedContractId: value }))}
         />
         <Select
-          label="Can contract flow"
+          label="Cần xử lý hợp đồng"
           value={form.requiresContractFlow}
           options={[
-            { value: "true", label: "Co" },
-            { value: "false", label: "Khong" },
+            { value: "true", label: "Có" },
+            { value: "false", label: "Không" },
           ]}
           onChange={(event) => setForm((prev) => ({ ...prev, requiresContractFlow: event.target.value }))}
         />
         <Select
-          label="Loai contract flow"
+          label="Loại xử lý hợp đồng"
           value={form.contractFlowType}
           options={[
-            { value: String(PersonnelChangeContractFlowType.ContractRenewal), label: "Gia han hop dong" },
-            { value: String(PersonnelChangeContractFlowType.ContractAddendum), label: "Phu luc hop dong" },
-            { value: String(PersonnelChangeContractFlowType.NewContract), label: "Hop dong moi" },
+            { value: String(PersonnelChangeContractFlowType.ContractRenewal), label: "Gia hạn hợp đồng" },
+            { value: String(PersonnelChangeContractFlowType.ContractAddendum), label: "Phụ lục hợp đồng" },
+            { value: String(PersonnelChangeContractFlowType.NewContract), label: "Hợp đồng mới" },
           ]}
           onChange={(event) => setForm((prev) => ({ ...prev, contractFlowType: event.target.value }))}
         />
         <Input
-          label="Ngay hieu luc"
+          label="Ngày hiệu lực"
           type="date"
           value={form.effectiveDate}
           onChange={(event) => setForm((prev) => ({ ...prev, effectiveDate: event.target.value }))}
         />
         <label className="block md:col-span-2">
-          <span className="mb-1 block text-sm font-medium text-[var(--hicas-text-main)]">Ly do</span>
+          <span className="mb-1 block text-sm font-medium text-[var(--hicas-text-main)]">
+            Lý do
+          </span>
           <textarea
             className="hicas-input min-h-20 resize-y"
             value={form.reason}
@@ -135,7 +156,7 @@ export const ConvertOfficialForm = ({ saving, onSubmit }: Props) => {
         </label>
         <div className="md:col-span-2">
           <Button type="submit" iconLeft={<Send size={16} />} isLoading={saving}>
-            Tao ho so chuyen chinh thuc
+            Tạo hồ sơ chuyển chính thức
           </Button>
         </div>
       </form>

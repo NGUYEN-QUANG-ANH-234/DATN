@@ -43,19 +43,19 @@ export const DismissalDirectorApprovalPanel = ({ request, saving, onApprove, onE
   };
 
   return (
-    <Card title="Director approval" description="Phe duyet sa thai va thuc thi sau khi contract termination hoan tat.">
+    <Card title="Phê duyệt kỷ luật" description="Phê duyệt hồ sơ và thực hiện sau khi xử lý hợp đồng hoàn tất.">
       <form className="space-y-4" onSubmit={approve}>
         <Select
-          label="Quyet dinh"
+          label="Quyết định"
           value={isApproved}
           options={[
-            { value: "true", label: "Phe duyet" },
-            { value: "false", label: "Tu choi" },
+            { value: "true", label: "Phê duyệt" },
+            { value: "false", label: "Từ chối" },
           ]}
           onChange={(event) => setIsApproved(event.target.value)}
         />
         <label className="block">
-          <span className="mb-1 block text-sm font-medium text-[var(--hicas-text-main)]">Director note</span>
+          <span className="mb-1 block text-sm font-medium text-[var(--hicas-text-main)]">Ghi chú phê duyệt</span>
           <textarea
             className="hicas-input min-h-24 resize-y"
             value={note}
@@ -63,12 +63,12 @@ export const DismissalDirectorApprovalPanel = ({ request, saving, onApprove, onE
           />
         </label>
         <Button type="submit" iconLeft={<CheckCircle2 size={16} />} isLoading={saving} disabled={!request}>
-          Gui phe duyet
+          Gửi phê duyệt
         </Button>
       </form>
       <div className="mt-5 border-t border-[var(--hicas-border-soft)] pt-5">
         <label className="mb-3 block">
-          <span className="mb-1 block text-sm font-medium text-[var(--hicas-text-main)]">Ghi chu thuc thi</span>
+          <span className="mb-1 block text-sm font-medium text-[var(--hicas-text-main)]">Ghi chú thực hiện</span>
           <textarea
             className="hicas-input min-h-20 resize-y"
             disabled={executeDisabled}
@@ -82,7 +82,7 @@ export const DismissalDirectorApprovalPanel = ({ request, saving, onApprove, onE
           </p>
         ) : null}
         <Button iconLeft={<Play size={16} />} isLoading={saving} disabled={executeDisabled} onClick={execute}>
-          Thuc thi sa thai
+          Thực hiện kỷ luật
         </Button>
       </div>
     </Card>

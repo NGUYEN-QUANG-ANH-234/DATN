@@ -5,6 +5,18 @@ import {
   PersonnelChangeContractFlowType,
   type CreateSeniorAppointmentRequest,
 } from "../types/personnelChange";
+import {
+  useEmployeePersonnelChangeLookups,
+  usePersonnelChangeLookups,
+} from "../hooks/usePersonnelChangeLookups";
+import {
+  ContractPicker,
+  DepartmentPicker,
+  EmployeePicker,
+  JobLevelPicker,
+  ManagerPicker,
+  PositionPicker,
+} from "./PersonnelChangePickers";
 
 type Props = {
   saving?: boolean;
@@ -12,6 +24,7 @@ type Props = {
 };
 
 export const SeniorAppointmentForm = ({ saving, onSubmit }: Props) => {
+  const lookups = usePersonnelChangeLookups();
   const [form, setForm] = useState({
     employeeId: "",
     newDepartmentId: "",
@@ -24,6 +37,8 @@ export const SeniorAppointmentForm = ({ saving, onSubmit }: Props) => {
     effectiveDate: "",
     reason: "",
   });
+  const employeeId = toNumberOrNull(form.employeeId);
+  const related = useEmployeePersonnelChangeLookups(employeeId);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -49,88 +64,87 @@ export const SeniorAppointmentForm = ({ saving, onSubmit }: Props) => {
   };
 
   return (
-    <Card title="Senior appointment" description="Tao ho so bo nhiem NSCC va gui nhan su xac nhan.">
+    <Card title="Bổ nhiệm cấp cao" description="Tạo hồ sơ bổ nhiệm và gửi nhân sự xác nhận.">
       <form className="grid gap-4 md:grid-cols-2" onSubmit={submit}>
-        <Input
-          label="Nhan su"
-          name="employeeId"
-          type="number"
-          min={1}
+        <EmployeePicker
+          label="Nhân sự"
+          employees={lookups.employees}
           required
           value={form.employeeId}
-          onChange={(event) => setForm((prev) => ({ ...prev, employeeId: event.target.value }))}
+          helperText={lookups.loading ? "Đang tải danh sách nhân sự..." : undefined}
+          onChange={(value) =>
+            setForm((prev) => ({
+              ...prev,
+              employeeId: value,
+              relatedContractId: "",
+            }))
+          }
         />
-        <Input
-          label="Chuc danh moi"
-          name="newPositionId"
-          type="number"
-          min={1}
+        <PositionPicker
+          label="Chức danh mới"
+          positions={lookups.positions}
           required
           value={form.newPositionId}
-          onChange={(event) => setForm((prev) => ({ ...prev, newPositionId: event.target.value }))}
+          onChange={(value) => setForm((prev) => ({ ...prev, newPositionId: value }))}
         />
-        <Input
-          label="Phong ban"
-          name="newDepartmentId"
-          type="number"
-          min={1}
+        <DepartmentPicker
+          label="Phòng ban"
+          departments={lookups.departments}
           value={form.newDepartmentId}
-          onChange={(event) => setForm((prev) => ({ ...prev, newDepartmentId: event.target.value }))}
+          onChange={(value) => setForm((prev) => ({ ...prev, newDepartmentId: value }))}
         />
-        <Input
-          label="Job level moi"
-          name="newJobLevelId"
-          type="number"
-          min={1}
+        <JobLevelPicker
+          label="Cấp bậc mới"
+          jobLevels={lookups.jobLevels}
           value={form.newJobLevelId}
-          onChange={(event) => setForm((prev) => ({ ...prev, newJobLevelId: event.target.value }))}
+          onChange={(value) => setForm((prev) => ({ ...prev, newJobLevelId: value }))}
         />
-        <Input
-          label="Quan ly truc tiep"
-          name="reportsToManagerId"
-          type="number"
-          min={1}
+        <ManagerPicker
+          label="Quản lý trực tiếp"
+          managers={lookups.managers}
           value={form.reportsToManagerId}
-          onChange={(event) => setForm((prev) => ({ ...prev, reportsToManagerId: event.target.value }))}
+          onChange={(value) => setForm((prev) => ({ ...prev, reportsToManagerId: value }))}
         />
         <Select
-          label="Bo nhiem truong phong"
+          label="Bổ nhiệm trưởng phòng"
           name="isDepartmentManager"
           value={form.isDepartmentManager}
           options={[
-            { value: "false", label: "Khong" },
-            { value: "true", label: "Co" },
+            { value: "false", label: "Không" },
+            { value: "true", label: "Có" },
           ]}
           onChange={(event) => setForm((prev) => ({ ...prev, isDepartmentManager: event.target.value }))}
         />
-        <Input
-          label="Hop dong lien quan"
-          name="relatedContractId"
-          type="number"
-          min={1}
+        <ContractPicker
+          label="Hợp đồng liên quan"
+          contracts={related.contracts}
           value={form.relatedContractId}
-          onChange={(event) => setForm((prev) => ({ ...prev, relatedContractId: event.target.value }))}
+          disabled={!employeeId}
+          helperText={!employeeId ? "Chọn nhân sự trước để xem hợp đồng." : undefined}
+          onChange={(value) => setForm((prev) => ({ ...prev, relatedContractId: value }))}
         />
         <Select
-          label="Loai contract flow"
+          label="Loại xử lý hợp đồng"
           name="contractFlowType"
           value={form.contractFlowType}
           options={[
-            { value: String(PersonnelChangeContractFlowType.ContractAddendum), label: "Phu luc hop dong" },
-            { value: String(PersonnelChangeContractFlowType.NewContract), label: "Hop dong moi" },
-            { value: String(PersonnelChangeContractFlowType.ContractRenewal), label: "Gia han hop dong" },
+            { value: String(PersonnelChangeContractFlowType.ContractAddendum), label: "Phụ lục hợp đồng" },
+            { value: String(PersonnelChangeContractFlowType.NewContract), label: "Hợp đồng mới" },
+            { value: String(PersonnelChangeContractFlowType.ContractRenewal), label: "Gia hạn hợp đồng" },
           ]}
           onChange={(event) => setForm((prev) => ({ ...prev, contractFlowType: event.target.value }))}
         />
         <Input
-          label="Ngay hieu luc"
+          label="Ngày hiệu lực"
           name="effectiveDate"
           type="date"
           value={form.effectiveDate}
           onChange={(event) => setForm((prev) => ({ ...prev, effectiveDate: event.target.value }))}
         />
         <label className="block md:col-span-2">
-          <span className="mb-1 block text-sm font-medium text-[var(--hicas-text-main)]">Ly do bo nhiem</span>
+          <span className="mb-1 block text-sm font-medium text-[var(--hicas-text-main)]">
+            Lý do bổ nhiệm
+          </span>
           <textarea
             className="hicas-input min-h-24 resize-y"
             value={form.reason}
@@ -139,7 +153,7 @@ export const SeniorAppointmentForm = ({ saving, onSubmit }: Props) => {
         </label>
         <div className="md:col-span-2">
           <Button type="submit" iconLeft={<Send size={16} />} isLoading={saving}>
-            Tao ho so bo nhiem
+            Tạo hồ sơ bổ nhiệm
           </Button>
         </div>
       </form>

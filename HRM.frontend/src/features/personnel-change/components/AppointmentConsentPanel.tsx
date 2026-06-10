@@ -23,19 +23,19 @@ export const AppointmentConsentPanel = ({ request, saving, onSubmit }: Props) =>
   };
 
   return (
-    <Card title="Appointment consent" description="Nhan su xac nhan dong y hoac tu choi de xuat bo nhiem.">
+    <Card title="Xác nhận bổ nhiệm" description="Nhân sự xác nhận đồng ý hoặc từ chối đề xuất bổ nhiệm.">
       <form className="space-y-4" onSubmit={submit}>
         <Select
-          label="Phan hoi"
+          label="Phản hồi"
           value={isAccepted}
           options={[
-            { value: "true", label: "Dong y" },
-            { value: "false", label: "Tu choi" },
+            { value: "true", label: "Đồng ý" },
+            { value: "false", label: "Từ chối" },
           ]}
           onChange={(event) => setIsAccepted(event.target.value)}
         />
         <label className="block">
-          <span className="mb-1 block text-sm font-medium text-[var(--hicas-text-main)]">Ghi chu</span>
+          <span className="mb-1 block text-sm font-medium text-[var(--hicas-text-main)]">Ghi chú</span>
           <textarea
             className="hicas-input min-h-24 resize-y"
             value={note}
@@ -43,7 +43,7 @@ export const AppointmentConsentPanel = ({ request, saving, onSubmit }: Props) =>
           />
         </label>
         <Button type="submit" iconLeft={<CheckCheck size={16} />} isLoading={saving} disabled={!request}>
-          Gui phan hoi bo nhiem
+          Gửi phản hồi bổ nhiệm
         </Button>
       </form>
     </Card>

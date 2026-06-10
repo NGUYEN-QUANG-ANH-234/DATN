@@ -1,11 +1,13 @@
 import { useState, type FormEvent } from "react";
 import { FilePlus2 } from "lucide-react";
-import { Button, Card, Input, Select } from "../../../components/ui";
+import { Button, Card, Select } from "../../../components/ui";
 import {
   PersonnelChangeContractFlowType,
   type HrContractFlowRequest,
   type PersonnelChangeDetail,
 } from "../types/personnelChange";
+import { useEmployeePersonnelChangeLookups } from "../hooks/usePersonnelChangeLookups";
+import { ContractPicker } from "./PersonnelChangePickers";
 
 type Props = {
   request?: PersonnelChangeDetail | null;
@@ -14,6 +16,7 @@ type Props = {
 };
 
 export const HrContractFlowPanel = ({ request, saving, onSubmit }: Props) => {
+  const related = useEmployeePersonnelChangeLookups(request?.employeeId);
   const [form, setForm] = useState({
     contractFlowType: String(PersonnelChangeContractFlowType.ContractAddendum),
     relatedContractId: "",
@@ -31,27 +34,32 @@ export const HrContractFlowPanel = ({ request, saving, onSubmit }: Props) => {
   };
 
   return (
-    <Card title="HR contract flow" description="Tao hop dong/phu luc ben Module 3, Module 7 chi luu link.">
+    <Card
+      title="Xử lý hợp đồng"
+      description="Tạo hợp đồng hoặc phụ lục liên quan cho hồ sơ biến động."
+    >
       <form className="space-y-4" onSubmit={submit}>
         <Select
-          label="Loai flow"
+          label="Loại xử lý"
           value={form.contractFlowType}
           options={[
-            { value: String(PersonnelChangeContractFlowType.ContractAddendum), label: "Phu luc hop dong" },
-            { value: String(PersonnelChangeContractFlowType.NewContract), label: "Hop dong moi" },
-            { value: String(PersonnelChangeContractFlowType.ContractRenewal), label: "Gia han hop dong" },
+            { value: String(PersonnelChangeContractFlowType.ContractAddendum), label: "Phụ lục hợp đồng" },
+            { value: String(PersonnelChangeContractFlowType.NewContract), label: "Hợp đồng mới" },
+            { value: String(PersonnelChangeContractFlowType.ContractRenewal), label: "Gia hạn hợp đồng" },
           ]}
           onChange={(event) => setForm((prev) => ({ ...prev, contractFlowType: event.target.value }))}
         />
-        <Input
-          label="Hop dong lien quan"
-          type="number"
-          min={1}
+        <ContractPicker
+          contracts={related.contracts}
           value={form.relatedContractId}
-          onChange={(event) => setForm((prev) => ({ ...prev, relatedContractId: event.target.value }))}
+          disabled={!request?.employeeId}
+          helperText={!request?.employeeId ? "Hồ sơ chưa có nhân sự để tra cứu hợp đồng." : undefined}
+          onChange={(value) => setForm((prev) => ({ ...prev, relatedContractId: value }))}
         />
         <label className="block">
-          <span className="mb-1 block text-sm font-medium text-[var(--hicas-text-main)]">Ghi chu HR</span>
+          <span className="mb-1 block text-sm font-medium text-[var(--hicas-text-main)]">
+            Ghi chú HR
+          </span>
           <textarea
             className="hicas-input min-h-24 resize-y"
             value={form.note}
@@ -59,7 +67,7 @@ export const HrContractFlowPanel = ({ request, saving, onSubmit }: Props) => {
           />
         </label>
         <Button type="submit" iconLeft={<FilePlus2 size={16} />} isLoading={saving} disabled={!request}>
-          Tao contract flow
+          Tạo xử lý hợp đồng
         </Button>
       </form>
     </Card>

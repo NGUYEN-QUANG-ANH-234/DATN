@@ -9,14 +9,14 @@ type Props = {
 };
 
 export const ResignationSettlementPanel = ({ request }: Props) => (
-  <Card title="Settlement" description="Theo doi contract termination, final settlement va account lock.">
+  <Card title="Quyết toán nghỉ việc" description="Theo dõi hợp đồng, quyết toán cuối cùng và khóa tài khoản.">
     <div className="space-y-4">
       <div className="rounded-[var(--radius-md)] border border-[var(--hicas-border)] bg-white p-3">
         <p className="font-semibold text-[var(--hicas-text-main)]">
-          {request ? `VT-${String(request.id).padStart(5, "0")}` : "Chua chon ho so"}
+          {request ? `VT-${String(request.id).padStart(5, "0")}` : "Chưa chọn hồ sơ"}
         </p>
         <p className="mt-1 text-sm text-[var(--hicas-text-secondary)]">
-          {request?.employeeName || "Mo mot ho so trong bang de xem settlement."}
+          {request?.employeeName || "Mở một hồ sơ trong bảng để xem thông tin quyết toán."}
         </p>
         {request ? (
           <div className="mt-3">
@@ -31,28 +31,28 @@ export const ResignationSettlementPanel = ({ request }: Props) => (
       <div className="grid gap-3 sm:grid-cols-2">
         <InfoTile
           icon={<CalendarDays size={17} />}
-          label="Ngay lam viec cuoi"
+          label="Ngày làm việc cuối"
           value={formatDate(request?.effectiveDate)}
         />
         <InfoTile
           icon={<FileText size={17} />}
-          label="Contract flow"
+          label="Xử lý hợp đồng"
           value={request?.contractFlowStatus || "-"}
         />
         <InfoTile
           icon={<WalletCards size={17} />}
-          label="Final settlement"
-          value={request?.relatedFinalSettlementId ? `FS-${request.relatedFinalSettlementId}` : "Chua tao"}
+          label="Quyết toán cuối cùng"
+          value={request?.relatedFinalSettlementId ? `FS-${request.relatedFinalSettlementId}` : "Chưa tạo"}
         />
         <InfoTile
           icon={<LockKeyhole size={17} />}
-          label="Account locked"
-          value={request?.accountLockedAt ? formatDateTime(request.accountLockedAt) : "Chua khoa"}
+          label="Khóa tài khoản"
+          value={request?.accountLockedAt ? formatDateTime(request.accountLockedAt) : "Chưa khóa"}
         />
       </div>
 
       <div className="rounded-[var(--radius-md)] border border-[var(--hicas-border)] bg-[var(--hicas-orange-lighter)] p-3 text-sm text-[var(--hicas-text-secondary)]">
-        {request?.employeeConsentNote || request?.reason || "Employee note va ly do nghi viec se hien thi tai day."}
+        {request?.employeeConsentNote || request?.reason || "Ghi chú của nhân viên và lý do nghỉ việc sẽ hiển thị tại đây."}
       </div>
     </div>
   </Card>
