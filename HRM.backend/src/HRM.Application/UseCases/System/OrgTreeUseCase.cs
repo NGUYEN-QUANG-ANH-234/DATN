@@ -81,26 +81,11 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
             // Khóa luồng Tree Update để chống Race Condition khi nhiều Admin cùng kéo thả sơ đồ
             return await _lockService.GetWithLockAsync("org_tree_update", async (innerCt) =>
             {
-                if (deptId == dto.NewParentId)
-                    throw new InvalidOperationException("Một phòng ban không thể làm con của chính nó.");
-
                 var currentDept = await _deptRepo.GetByIdAsync(deptId, innerCt);
                 if (currentDept == null)
                     throw new KeyNotFoundException("Phòng ban không tồn tại.");
 
-                // 1. checkCircularDependency
-                if (dto.NewParentId.HasValue)
-                {
-                    int? currentParentCheckId = dto.NewParentId;
-                    while (currentParentCheckId.HasValue)
-                    {
-                        if (currentParentCheckId.Value == deptId)
-                            throw new InvalidOperationException("Lỗi Circular Dependency: Phòng ban cha mới đang là con/cháu của phòng ban hiện tại.");
-
-                        var ancestor = await _deptRepo.GetByIdAsync(currentParentCheckId.Value, innerCt);
-                        currentParentCheckId = ancestor?.ParentDeptId;
-                    }
-                }
+                await ValidateParentAsync(deptId, dto.NewParentId, innerCt);
 
                 // 2. saveDepartment
                 currentDept.ParentDeptId = dto.NewParentId;
@@ -114,6 +99,40 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
                 );
 
                 // 4. commitAsync
+                await _unitOfWork.CommitAsync(innerCt);
+                await _cache.RemoveAsync(DepartmentTreeCacheKey, innerCt);
+
+                return true;
+            }, TimeSpan.FromSeconds(10), ct);
+        }
+
+        public async Task<bool> UpdateDepartmentAsync(int deptId, UpdateDepartmentDto dto, int actorId, CancellationToken ct = default)
+        {
+            return await _lockService.GetWithLockAsync("org_tree_update", async (innerCt) =>
+            {
+                var department = await _deptRepo.GetByIdAsync(deptId, innerCt);
+                if (department == null)
+                    throw new KeyNotFoundException("Phòng ban không tồn tại.");
+
+                var deptName = dto.DeptName.Trim();
+                if (string.IsNullOrWhiteSpace(deptName))
+                    throw new InvalidOperationException("Tên phòng ban không được để trống.");
+
+                await ValidateParentAsync(deptId, dto.ParentDeptId, innerCt);
+
+                var oldName = department.DeptName;
+                var oldParentId = department.ParentDeptId;
+
+                department.DeptName = deptName;
+                department.ParentDeptId = dto.ParentDeptId;
+
+                await _auditLogRepo.LogSystemEventAsync(
+                    actionType: "UPDATE_DEPARTMENT",
+                    accountId: actorId,
+                    module: "departments",
+                    message: $"Cập nhật phòng ban {department.DeptCode}: tên '{oldName}' -> '{deptName}', phòng ban cha {oldParentId} -> {dto.ParentDeptId}"
+                );
+
                 await _unitOfWork.CommitAsync(innerCt);
                 await _cache.RemoveAsync(DepartmentTreeCacheKey, innerCt);
 
@@ -194,6 +213,29 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
             await _cache.RemoveAsync(DepartmentTreeCacheKey, ct);
 
             return newDept.Id;
+        }
+
+        private async Task ValidateParentAsync(int deptId, int? newParentId, CancellationToken ct)
+        {
+            if (deptId == newParentId)
+                throw new InvalidOperationException("Một phòng ban không thể làm con của chính nó.");
+
+            if (!newParentId.HasValue)
+                return;
+
+            var parent = await _deptRepo.GetByIdAsync(newParentId.Value, ct);
+            if (parent == null || parent.Status != DeptStatus.Active)
+                throw new InvalidOperationException("Phòng ban cha không tồn tại hoặc đã ngừng hoạt động.");
+
+            int? currentParentCheckId = newParentId;
+            while (currentParentCheckId.HasValue)
+            {
+                if (currentParentCheckId.Value == deptId)
+                    throw new InvalidOperationException("Lỗi Circular Dependency: Phòng ban cha mới đang là con/cháu của phòng ban hiện tại.");
+
+                var ancestor = await _deptRepo.GetByIdAsync(currentParentCheckId.Value, ct);
+                currentParentCheckId = ancestor?.ParentDeptId;
+            }
         }
     }
 }

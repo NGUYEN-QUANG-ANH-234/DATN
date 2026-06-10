@@ -26,7 +26,10 @@ namespace HRM.backend.src.HRM.Application.DTOs.System
         public decimal StandardHoursPerDay { get; set; } = 8m;
         public bool IncludePaidLeaveInWorkDays { get; set; } = true;
         public string? WorkingDaysOfWeek { get; set; }
+        public int? CompanyCalendarId { get; set; }
         public string? HolidayDatesJson { get; set; }
+        public TimeSpan? HolidayWorkingStartTime { get; set; }
+        public TimeSpan? HolidayWorkingEndTime { get; set; }
         public bool LockWorkCalendar { get; set; }
         public string? CalendarNote { get; set; }
     }

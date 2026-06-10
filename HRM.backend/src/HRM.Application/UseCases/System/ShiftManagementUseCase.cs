@@ -60,6 +60,13 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
             {
                 throw new ArgumentException("Số giờ chuẩn/ngày phải lớn hơn 0 và không vượt quá 24.");
             }
+            if (dto.HolidayWorkingStartTime.HasValue || dto.HolidayWorkingEndTime.HasValue)
+            {
+                if (!dto.HolidayWorkingStartTime.HasValue || !dto.HolidayWorkingEndTime.HasValue)
+                    throw new ArgumentException("Khung giờ làm ngày lễ phải có đủ giờ bắt đầu và giờ kết thúc.");
+                if (dto.HolidayWorkingEndTime <= dto.HolidayWorkingStartTime)
+                    throw new ArgumentException("Giờ kết thúc làm ngày lễ phải lớn hơn giờ bắt đầu.");
+            }
             if (dto.TotalDays < 0)
             {
                 throw new ArgumentException("Số ngày phép định biên không được nhỏ hơn 0.");
@@ -122,7 +129,10 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
                         StandardHoursPerDay = dto.StandardHoursPerDay,
                         IncludePaidLeaveInWorkDays = dto.IncludePaidLeaveInWorkDays,
                         WorkingDaysOfWeek = dto.WorkingDaysOfWeek,
+                        CompanyCalendarId = dto.CompanyCalendarId,
                         HolidayDatesJson = dto.HolidayDatesJson,
+                        HolidayWorkingStartTime = dto.HolidayWorkingStartTime,
+                        HolidayWorkingEndTime = dto.HolidayWorkingEndTime,
                         IsLocked = dto.LockWorkCalendar,
                         Note = dto.CalendarNote,
                         CreatedAt = DateTime.UtcNow,
@@ -136,7 +146,10 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
                     calendar.StandardHoursPerDay = dto.StandardHoursPerDay;
                     calendar.IncludePaidLeaveInWorkDays = dto.IncludePaidLeaveInWorkDays;
                     calendar.WorkingDaysOfWeek = dto.WorkingDaysOfWeek;
+                    calendar.CompanyCalendarId = dto.CompanyCalendarId;
                     calendar.HolidayDatesJson = dto.HolidayDatesJson;
+                    calendar.HolidayWorkingStartTime = dto.HolidayWorkingStartTime;
+                    calendar.HolidayWorkingEndTime = dto.HolidayWorkingEndTime;
                     calendar.IsLocked = dto.LockWorkCalendar;
                     calendar.Note = dto.CalendarNote;
                     calendar.UpdatedAt = DateTime.UtcNow;
@@ -189,7 +202,10 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
                     StandardHoursPerDay = matchedCalendar?.StandardHoursPerDay,
                     IncludePaidLeaveInWorkDays = matchedCalendar?.IncludePaidLeaveInWorkDays ?? true,
                     WorkingDaysOfWeek = matchedCalendar?.WorkingDaysOfWeek,
+                    CompanyCalendarId = matchedCalendar?.CompanyCalendarId,
                     HolidayDatesJson = matchedCalendar?.HolidayDatesJson,
+                    HolidayWorkingStartTime = matchedCalendar?.HolidayWorkingStartTime,
+                    HolidayWorkingEndTime = matchedCalendar?.HolidayWorkingEndTime,
                     IsWorkCalendarLocked = matchedCalendar?.IsLocked ?? false,
                     CalendarNote = matchedCalendar?.Note
                 });

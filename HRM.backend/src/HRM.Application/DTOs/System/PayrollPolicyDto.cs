@@ -18,6 +18,12 @@ namespace HRM.backend.src.HRM.Application.DTOs.System
         public DateTime EffectiveFrom { get; set; }
         public DateTime? EffectiveTo { get; set; }
         public int Version { get; set; }
+        public string? VersionCode { get; set; }
+        public PolicyVersionStatus Status { get; set; }
+        public string? SourceRef { get; set; }
+        public int? SupersedesVersionId { get; set; }
+        public DateTime? ActivatedAt { get; set; }
+        public bool LockedAfterUsed { get; set; }
         public bool IsActive { get; set; }
         public string? Description { get; set; }
     }
@@ -43,6 +49,9 @@ namespace HRM.backend.src.HRM.Application.DTOs.System
         public DateTime EffectiveFrom { get; set; }
         public DateTime? EffectiveTo { get; set; }
         public int Version { get; set; } = 1;
+        public string? VersionCode { get; set; }
+        public PolicyVersionStatus Status { get; set; } = PolicyVersionStatus.Active;
+        public string? SourceRef { get; set; }
         public bool IsActive { get; set; } = true;
         public string? Description { get; set; }
     }

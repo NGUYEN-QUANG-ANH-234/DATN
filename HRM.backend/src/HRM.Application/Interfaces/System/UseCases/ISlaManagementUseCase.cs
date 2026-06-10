@@ -6,5 +6,6 @@ namespace HRM.backend.src.HRM.Application.Interfaces.System.UseCases
     {
         Task<IEnumerable<SlaDto>> GetSLAConfigsAsync(CancellationToken ct = default);
         Task<bool> UpdateSLAParameterAsync(SlaDto dto, int adminId, CancellationToken ct = default);
+        Task<bool> SetSLAActiveAsync(string moduleCode, bool isActive, int adminId, CancellationToken ct = default);
     }
 }

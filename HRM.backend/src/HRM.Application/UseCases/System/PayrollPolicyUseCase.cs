@@ -73,6 +73,10 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
                         EffectiveFrom = dto.EffectiveFrom.Date,
                         EffectiveTo = dto.EffectiveTo?.Date,
                         Version = dto.Version <= 0 ? 1 : dto.Version,
+                        VersionCode = BuildVersionCode(dto.Code, dto.Version <= 0 ? 1 : dto.Version, dto.VersionCode),
+                        Status = dto.Status,
+                        SourceRef = dto.SourceRef,
+                        ActivatedAt = dto.Status == PolicyVersionStatus.Active ? DateTime.UtcNow : null,
                         IsActive = dto.IsActive,
                         Description = dto.Description,
                         CreatedAt = DateTime.UtcNow,
@@ -122,6 +126,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
                     if (!entity.EffectiveTo.HasValue || entity.EffectiveTo.Value.Date > closeDate)
                         entity.EffectiveTo = closeDate;
 
+                    entity.Status = PolicyVersionStatus.Archived;
                     entity.UpdatedAt = DateTime.UtcNow;
                     entity.UpdatedByAccountId = actorId;
 
@@ -140,6 +145,11 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
                         EffectiveFrom = newEffectiveFrom,
                         EffectiveTo = dto.EffectiveTo?.Date,
                         Version = Math.Max(dto.Version, nextVersion),
+                        VersionCode = BuildVersionCode(dto.Code, Math.Max(dto.Version, nextVersion), dto.VersionCode),
+                        Status = dto.Status,
+                        SourceRef = dto.SourceRef,
+                        SupersedesVersionId = entity.Id,
+                        ActivatedAt = dto.Status == PolicyVersionStatus.Active ? DateTime.UtcNow : null,
                         IsActive = dto.IsActive,
                         Description = dto.Description,
                         CreatedAt = DateTime.UtcNow,
@@ -166,6 +176,9 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
                 ?? throw new InvalidOperationException("Không tìm thấy chính sách lương.");
 
             entity.IsActive = isActive;
+            entity.Status = isActive ? PolicyVersionStatus.Active : PolicyVersionStatus.Archived;
+            if (isActive && !entity.ActivatedAt.HasValue)
+                entity.ActivatedAt = DateTime.UtcNow;
             entity.UpdatedAt = DateTime.UtcNow;
             entity.UpdatedByAccountId = actorId;
 
@@ -214,6 +227,8 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
                 throw new ArgumentException("Ngày hiệu lực không hợp lệ.");
             if (dto.EffectiveTo.HasValue && dto.EffectiveTo.Value.Date < dto.EffectiveFrom.Date)
                 throw new ArgumentException("Ngay het hieu luc phai lon hon ngay hieu luc.");
+            if (dto.Status == PolicyVersionStatus.Draft && dto.IsActive)
+                dto.IsActive = false;
 
             switch (dto.ValueType)
             {
@@ -253,6 +268,13 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
         private static string BuildLockKey(PayrollPolicyType policyType, string code) =>
             $"payroll_policy_{policyType}_{code.Trim().ToUpperInvariant()}";
 
+        private static string BuildVersionCode(string code, int version, string? explicitVersionCode)
+        {
+            return string.IsNullOrWhiteSpace(explicitVersionCode)
+                ? $"{code.Trim().ToUpperInvariant()}_V{version}"
+                : explicitVersionCode.Trim().ToUpperInvariant();
+        }
+
         private static PayrollPolicyDto MapToDto(PayrollPolicy entity) => new()
         {
             Id = entity.Id,
@@ -269,6 +291,12 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
             EffectiveFrom = entity.EffectiveFrom,
             EffectiveTo = entity.EffectiveTo,
             Version = entity.Version,
+            VersionCode = entity.VersionCode,
+            Status = entity.Status,
+            SourceRef = entity.SourceRef,
+            SupersedesVersionId = entity.SupersedesVersionId,
+            ActivatedAt = entity.ActivatedAt,
+            LockedAfterUsed = entity.LockedAfterUsed,
             IsActive = entity.IsActive,
             Description = entity.Description
         };

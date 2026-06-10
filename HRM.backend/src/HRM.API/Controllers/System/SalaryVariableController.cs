@@ -67,5 +67,26 @@ namespace HRM.backend.src.HRM.API.Controllers.System
                 return StatusCode(500, new { success = false, message = "Lỗi hệ thống nội bộ trong quá trình xử lý Transaction." });
             }
         }
+
+        [HttpPatch("salary-variables/{code}/active")]
+        [RequirePermission("SALARY_VARIABLE_CREATE", GroupName = SystemModules.SalaryBonus, Description = "Bật/tắt biến cấu hình tính lương")]
+        public async Task<IActionResult> SetVariableActive(string code, [FromBody] SalaryVariableStatusDto dto, CancellationToken ct)
+        {
+            try
+            {
+                var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (!int.TryParse(userIdClaim, out int adminOrHrId))
+                {
+                    return Unauthorized(new { success = false, message = "Không xác định được danh tính người dùng." });
+                }
+
+                await _useCase.SetVariableActiveAsync(code, dto.IsActive, adminOrHrId, ct);
+                return Ok(new { success = true, message = "Đã cập nhật trạng thái biến lương." });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+        }
     }
 }

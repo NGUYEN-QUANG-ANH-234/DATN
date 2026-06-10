@@ -7,9 +7,12 @@ using HRM.backend.src.HRM.Application.DTOs.System;
 using HRM.backend.src.HRM.Application.Interfaces;
 using HRM.backend.src.HRM.Application.Interfaces.System.UseCases;
 using HRM.backend.src.HRM.Core.Entities.EmployeeProfile;
+using HRM.backend.src.HRM.Core.Entities.PersonnelChanges;
 using HRM.backend.src.HRM.Core.Entities.System;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.EmployeeProfile;
+using HRM.backend.src.HRM.Core.Interfaces.Repositories.PayrollAllowances;
+using HRM.backend.src.HRM.Core.Interfaces.Repositories.PersonnelChanges;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.Recruitment;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.System;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.TasksTraining;
@@ -19,7 +22,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
 {
     public class DocumentExportUseCase : IDocumentExportUseCase
     {
-        private const string CacheKey = "DocumentExportTemplateCache";
+        private const string CacheKey = "DocumentExportTemplateCache_v2";
 
         private static readonly JsonSerializerOptions JsonOptions = new()
         {
@@ -28,7 +31,9 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
 
         private static readonly HashSet<string> RawHtmlPlaceholders = new(StringComparer.OrdinalIgnoreCase)
         {
-            "kpi_detail_rows"
+            "kpi_detail_rows",
+            "payroll_detail_rows",
+            "personnel_change_rows"
         };
 
         private readonly IConfigurationRepository _configRepo;
@@ -38,6 +43,8 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
         private readonly IOvertimeRequestRepository _overtimeRepo;
         private readonly IRecruitmentRequestRepository _recruitmentRepo;
         private readonly IPerformanceReviewRepository _performanceRepo;
+        private readonly IPayrollRepository _payrollRepo;
+        private readonly IPersonnelChangeRepository _personnelChangeRepo;
         private readonly IEmployeeRepository _employeeRepo;
         private readonly IBaseRepository<ProfileUpdateRequest> _profileRequestRepo;
         private readonly IBaseRepository<OnboardingRequest> _onboardingRepo;
@@ -52,6 +59,8 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
             IOvertimeRequestRepository overtimeRepo,
             IRecruitmentRequestRepository recruitmentRepo,
             IPerformanceReviewRepository performanceRepo,
+            IPayrollRepository payrollRepo,
+            IPersonnelChangeRepository personnelChangeRepo,
             IEmployeeRepository employeeRepo,
             IBaseRepository<ProfileUpdateRequest> profileRequestRepo,
             IBaseRepository<OnboardingRequest> onboardingRepo,
@@ -65,6 +74,8 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
             _overtimeRepo = overtimeRepo;
             _recruitmentRepo = recruitmentRepo;
             _performanceRepo = performanceRepo;
+            _payrollRepo = payrollRepo;
+            _personnelChangeRepo = personnelChangeRepo;
             _employeeRepo = employeeRepo;
             _profileRequestRepo = profileRequestRepo;
             _onboardingRepo = onboardingRepo;
@@ -124,6 +135,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
                 {
                     var configs = await _configRepo.FetchDocumentTemplatesAsync(innerCt);
                     return configs
+                        .Where(config => config.ParamKey.StartsWith("EXPORT_", StringComparison.OrdinalIgnoreCase))
                         .Select(ParseTemplateConfig)
                         .Where(t => t != null)
                         .Select(t => t!)
@@ -176,6 +188,12 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
                 case "EXPORT_KPI_REVIEW":
                     await FillKpiReviewDataAsync(data, referenceId, ct);
                     break;
+                case "EXPORT_PAYSLIP":
+                    await FillPayslipDataAsync(data, referenceId, ct);
+                    break;
+                case "EXPORT_PERSONNEL_CHANGE_DECISION":
+                    await FillPersonnelChangeDecisionDataAsync(data, referenceId, ct);
+                    break;
                 default:
                     throw new InvalidOperationException("Document template is not supported.");
             }
@@ -198,6 +216,23 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
             data["effective_date"] = Date(contract.StartDate);
             data["created_date"] = Date(DateTime.UtcNow);
             data["status"] = EnumText(contract.Status);
+
+            var snapshot = contract.LegalSnapshots
+                .OrderByDescending(s => s.Version)
+                .ThenByDescending(s => s.CreatedAt)
+                .FirstOrDefault();
+
+            data["bonus_policy"] = Safe(snapshot?.BonusPolicy);
+            data["kpi_bonus_target"] = snapshot?.KpiBonusTargetAmount.HasValue == true
+                ? Money(snapshot.KpiBonusTargetAmount.Value)
+                : "Theo mức thưởng KPI tối đa được ghi nhận trong hệ thống";
+            data["kpi_bonus_policy_code"] = Safe(snapshot?.KpiBonusPolicyCode);
+            data["kpi_bonus_policy_version"] = Safe(snapshot?.KpiBonusPolicyVersionCode);
+            data["kpi_score_formula"] = Safe(snapshot?.KpiScoreFormula);
+            data["kpi_payout_formula"] = Safe(snapshot?.KpiPayoutFormula);
+            data["kpi_bonus_eligibility_rule"] = Safe(snapshot?.KpiBonusEligibilityRule);
+            data["kpi_bonus_payment_period"] = Safe(snapshot?.KpiBonusPaymentPeriod);
+            data["kpi_bonus_approver_role"] = Safe(snapshot?.KpiBonusApproverRole);
         }
 
         private async Task FillAddendumDataAsync(Dictionary<string, string> data, int addendumId, CancellationToken ct)
@@ -323,12 +358,89 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
             data["total_weight"] = review.TotalWeight.ToString(CultureInfo.InvariantCulture);
             data["total_penalty_points"] = review.Details.Sum(d => d.PenaltyPoint).ToString("0.##", CultureInfo.InvariantCulture);
             data["total_score"] = review.TotalScore.ToString("0.##", CultureInfo.InvariantCulture);
+            data["scoring_version"] = Safe(review.ScoringVersion);
             data["final_rating"] = Safe(review.FinalRating);
             data["final_comment"] = Safe(review.FinalComment);
             data["status"] = EnumText(review.Status);
             data["created_date"] = Date(review.CreatedAt);
             data["kpi_detail_rows"] = string.Join("", review.Details.Select(d =>
-                $"<tr><td>{Cell(d.KpiCode)}</td><td>{Cell(d.KpiName)}</td><td>{d.WeightPercent}</td><td>{d.PenaltyPoint:0.##}</td><td>{Cell(d.PenaltyReason)}</td><td>{d.FinalPoint:0.##}</td></tr>"));
+                $"<tr><td>{Cell(d.KpiCode)}</td><td>{Cell(d.KpiName)}</td><td>{d.WeightPercent}</td><td>{Number(d.TargetValue)}</td><td>{Number(d.ActualValue)}</td><td>{d.AchievedPercent:0.##}</td><td>{d.EmployeeSelfPercent:0.##}</td><td>{d.ManagerScore:0.##}</td><td>{d.PenaltyPoint:0.##}</td><td>{Cell(d.PenaltyReason)}</td><td>{d.FinalPoint:0.##}</td></tr>"));
+        }
+
+        private async Task FillPayslipDataAsync(Dictionary<string, string> data, int payrollId, CancellationToken ct)
+        {
+            var payroll = await _payrollRepo.GetDetailAsync(payrollId, ct)
+                ?? throw new InvalidOperationException("Payroll slip not found.");
+
+            FillEmployee(data, payroll.Employee);
+            data["period"] = Safe(payroll.Period) != string.Empty
+                ? Safe(payroll.Period)
+                : $"{payroll.Month:00}/{payroll.Year}";
+            data["month"] = payroll.Month?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
+            data["year"] = payroll.Year?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
+            data["base_salary"] = Money(payroll.BaseSalary);
+            data["gross_income"] = Money(payroll.GrossIncome ?? payroll.GrossSalary);
+            data["total_allowance"] = Money(payroll.TotalAllowance);
+            data["total_bonus"] = Money(payroll.TotalBonus);
+            data["insurance_salary"] = Money(payroll.InsuranceSalary);
+            data["employee_insurance_amount"] = Money(payroll.EmployeeInsuranceAmount ?? payroll.InsuranceDeduction);
+            data["pit_amount"] = Money(payroll.PitAmount);
+            data["other_deductions"] = Money(payroll.OtherDeductions);
+            data["net_salary"] = Money(payroll.NetSalary);
+            data["actual_workdays"] = Number(payroll.ActualWorkDays);
+            data["actual_work_hours"] = Number(payroll.ActualWorkHours);
+            data["status"] = EnumText(payroll.Status);
+            data["created_date"] = Date(payroll.CreatedAt);
+            data["payroll_detail_rows"] = string.Join("", payroll.Details.Select(detail =>
+                $"<tr><td>{Cell(detail.ComponentCode)}</td><td>{Cell(detail.ComponentName)}</td><td style=\"text-align:right\">{Money(detail.Amount)}</td><td style=\"text-align:right\">{Money(detail.TaxableAmount)}</td><td style=\"text-align:right\">{Money(detail.InsuranceBaseAmount)}</td><td>{Cell(detail.Note)}</td></tr>"));
+        }
+
+        private async Task FillPersonnelChangeDecisionDataAsync(Dictionary<string, string> data, int requestId, CancellationToken ct)
+        {
+            var request = await _personnelChangeRepo.GetDetailAsync(requestId, ct)
+                ?? throw new InvalidOperationException("Personnel change request not found.");
+
+            FillEmployee(data, request.Employee);
+            data["request_code"] = $"PC-{request.Id:00000}";
+            data["change_type"] = EnumText(request.ChangeType);
+            data["promotion_type"] = EnumText(request.PromotionType);
+            data["status"] = EnumText(request.Status);
+            data["reason"] = Safe(request.Reason);
+            data["effective_date"] = Date(request.EffectiveDate);
+            data["requested_date"] = Date(request.RequestedAt);
+            data["decision_number"] = Safe(request.DecisionNumber);
+            data["decision_issued_at"] = Date(request.DecisionIssuedAt);
+            data["current_department"] = Safe(request.CurrentDepartment?.DeptName);
+            data["new_department"] = Safe(request.NewDepartment?.DeptName);
+            data["current_position"] = Safe(request.CurrentPosition?.Title);
+            data["new_position"] = Safe(request.NewPosition?.Title);
+            data["current_manager"] = Safe(request.CurrentManager?.FullName);
+            data["new_manager"] = Safe(request.NewManager?.FullName);
+            data["current_job_level"] = Safe(request.CurrentJobLevel?.Name);
+            data["new_job_level"] = Safe(request.NewJobLevel?.Name);
+            data["current_employee_type"] = EnumText(request.CurrentEmployeeType);
+            data["new_employee_type"] = EnumText(request.NewEmployeeType);
+            data["director_note"] = Safe(request.DirectorNote);
+            data["hr_note"] = Safe(request.HRNote);
+            data["manager_note"] = Safe(request.ManagerNote);
+            data["employee_note"] = Safe(request.EmployeeConsentNote ?? request.EmployeeExplanation);
+            data["personnel_change_rows"] = BuildPersonnelChangeRows(request);
+        }
+
+        private static string BuildPersonnelChangeRows(PersonnelChangeRequest request)
+        {
+            var rows = new List<(string Label, string OldValue, string NewValue)>
+            {
+                ("Phòng ban", Safe(request.CurrentDepartment?.DeptName), Safe(request.NewDepartment?.DeptName)),
+                ("Vị trí", Safe(request.CurrentPosition?.Title), Safe(request.NewPosition?.Title)),
+                ("Quản lý trực tiếp", Safe(request.CurrentManager?.FullName), Safe(request.NewManager?.FullName)),
+                ("Cấp bậc", Safe(request.CurrentJobLevel?.Name), Safe(request.NewJobLevel?.Name)),
+                ("Loại nhân sự", EnumText(request.CurrentEmployeeType), EnumText(request.NewEmployeeType))
+            };
+
+            return string.Join("", rows
+                .Where(row => !string.IsNullOrWhiteSpace(row.OldValue) || !string.IsNullOrWhiteSpace(row.NewValue))
+                .Select(row => $"<tr><td>{Cell(row.Label)}</td><td>{Cell(row.OldValue)}</td><td>{Cell(row.NewValue)}</td></tr>"));
         }
 
         private static void FillEmployee(Dictionary<string, string> data, Employee? employee)
@@ -354,6 +466,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
                 ["company_tax_code"] = "",
                 ["company_logo_url"] = "",
                 ["director_name"] = "Giám đốc",
+                ["created_by"] = "",
                 ["created_date"] = Date(DateTime.UtcNow)
             };
         }
@@ -496,6 +609,8 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
         private static string Cell(string? value) => WebUtility.HtmlEncode(Safe(value));
         private static string EnumText(object? value) => value?.ToString() ?? string.Empty;
         private static string Money(decimal value) => value.ToString("#,##0", CultureInfo.InvariantCulture);
+        private static string Money(decimal? value) => value.HasValue ? Money(value.Value) : string.Empty;
+        private static string Number(decimal? value) => value.HasValue ? value.Value.ToString("0.##", CultureInfo.InvariantCulture) : string.Empty;
         private static string Date(DateTime? value) => value.HasValue ? value.Value.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture) : string.Empty;
         private static string Time(TimeSpan value) => value.ToString(@"hh\:mm", CultureInfo.InvariantCulture);
 

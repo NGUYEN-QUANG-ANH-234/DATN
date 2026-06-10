@@ -14,7 +14,10 @@ namespace HRM.backend.src.HRM.Application.Services.System
         private readonly IAppCache _cache;
         private readonly ILockService _lockService;
 
-        public NotificationTemplateRenderer(IConfigurationRepository configRepo, IAppCache cache, ILockService lockService)
+        public NotificationTemplateRenderer(
+            IConfigurationRepository configRepo,
+            IAppCache cache,
+            ILockService lockService)
         {
             _configRepo = configRepo;
             _cache = cache;
@@ -26,13 +29,12 @@ namespace HRM.backend.src.HRM.Application.Services.System
             IDictionary<string, string> tokens,
             CancellationToken ct = default)
         {
-            var normalizedKey = templateKey.ToUpper().Replace("TEMPLATE_", "");
+            var normalizedKey = templateKey.ToUpperInvariant().Replace("TEMPLATE_", "");
             var template = await GetTemplateAsync(normalizedKey, ct);
 
-            var subject = ReplaceTokens(template.Subject, tokens);
-            var body = ReplaceTokens(template.BodyHtml, tokens);
-
-            return (subject, body);
+            return (
+                ReplaceTokens(template.Subject, tokens),
+                ReplaceTokens(template.BodyHtml, tokens));
         }
 
         private async Task<TemplateDto> GetTemplateAsync(string templateKey, CancellationToken ct)
@@ -40,62 +42,39 @@ namespace HRM.backend.src.HRM.Application.Services.System
             var cacheKey = $"{CacheKeyPrefix}{templateKey}";
             return await _cache.GetOrSetWithLockAsync(
                 cacheKey,
-                async (innerCt) =>
+                async innerCt =>
                 {
                     var configs = await _configRepo.FetchAllTemplatesAsync(innerCt);
-                    var config = configs.FirstOrDefault(x =>
-                        string.Equals(x.ParamKey, $"TEMPLATE_{templateKey}", StringComparison.OrdinalIgnoreCase));
+                    var config = configs.FirstOrDefault(item =>
+                        string.Equals(item.ParamKey, $"TEMPLATE_{templateKey}", StringComparison.OrdinalIgnoreCase));
 
                     if (config == null)
-                    {
-                        return new TemplateDto
-                        {
-                            TemplateKey = templateKey,
-                            Subject = templateKey,
-                            BodyHtml = string.Join("<br/>", tokensFallback(templateKey))
-                        };
-                    }
+                        return BuildFallbackTemplate(templateKey);
 
-                    var template = JsonSerializer.Deserialize<TemplateDto>(config.ParamValue) ??
-                        throw new InvalidOperationException($"Mẫu thông báo {templateKey} không hợp lệ.");
-                    template.TemplateKey = templateKey;
-                    return template;
+                    var content = JsonSerializer.Deserialize<TemplateContent>(config.ParamValue);
+                    if (content == null)
+                        return BuildFallbackTemplate(templateKey);
+
+                    return new TemplateDto
+                    {
+                        TemplateKey = templateKey,
+                        Subject = content.Subject,
+                        BodyHtml = content.BodyHtml
+                    };
                 },
                 TimeSpan.FromHours(24),
                 _lockService,
                 ct: ct);
+        }
 
-#pragma warning disable CS0162
-            var cachedTemplate = await _cache.GetAsync<TemplateDto>(cacheKey);
-            if (cachedTemplate != null)
-                return cachedTemplate;
-
-            var configs = await _configRepo.FetchAllTemplatesAsync(ct);
-            var config = configs.FirstOrDefault(x =>
-                string.Equals(x.ParamKey, $"TEMPLATE_{templateKey}", StringComparison.OrdinalIgnoreCase));
-
-            if (config == null)
+        private static TemplateDto BuildFallbackTemplate(string templateKey)
+        {
+            return new TemplateDto
             {
-                return new TemplateDto
-                {
-                    TemplateKey = templateKey,
-                    Subject = templateKey,
-                    BodyHtml = string.Join("<br/>", tokensFallback(templateKey))
-                };
-            }
-
-            var template = JsonSerializer.Deserialize<TemplateDto>(config.ParamValue) ??
-                throw new InvalidOperationException($"Mẫu thông báo {templateKey} không hợp lệ.");
-            template.TemplateKey = templateKey;
-
-            await _cache.SetAsync(cacheKey, template, TimeSpan.FromHours(24), null, ct);
-            return template;
-#pragma warning restore CS0162
-
-            static IEnumerable<string> tokensFallback(string key)
-            {
-                yield return $"Mẫu {key} chưa được cấu hình.";
-            }
+                TemplateKey = templateKey,
+                Subject = templateKey,
+                BodyHtml = $"Mau {templateKey} chua duoc cau hinh."
+            };
         }
 
         private static string ReplaceTokens(string content, IDictionary<string, string> tokens)
@@ -103,5 +82,9 @@ namespace HRM.backend.src.HRM.Application.Services.System
             return tokens.Aggregate(content, (current, token) =>
                 current.Replace($"{{{token.Key}}}", token.Value, StringComparison.OrdinalIgnoreCase));
         }
+
+        private sealed record TemplateContent(
+            string Subject,
+            string BodyHtml);
     }
 }

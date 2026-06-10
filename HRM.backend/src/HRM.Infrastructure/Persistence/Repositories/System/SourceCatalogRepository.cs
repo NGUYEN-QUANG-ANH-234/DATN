@@ -1,6 +1,6 @@
 using HRM.backend.src.HRM.Core.Entities.System;
-using HRM.backend.src.HRM.Core.Enums;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.System;
+using HRM.backend.src.HRM.Core.Models.System;
 using Microsoft.EntityFrameworkCore;
 
 namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.System
@@ -9,12 +9,19 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.System
     {
         public SourceCatalogRepository(MyDbContext context) : base(context) { }
 
-        public async Task<IEnumerable<SourceCatalog>> GetOrderedCatalogsAsync(CancellationToken ct = default)
+        public async Task<IEnumerable<SourceCatalog>> GetOrderedCatalogsAsync(IEnumerable<string> sourcePaths, CancellationToken ct = default)
         {
+            var paths = sourcePaths
+                .Where(path => !string.IsNullOrWhiteSpace(path))
+                .Select(path => path.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
             return await _dbSet
                 .AsNoTracking()
-                .Where(x => x.IsActive)
+                .Where(x => paths.Contains(x.SourcePath))
                 .OrderBy(x => x.Module)
+                .ThenByDescending(x => x.IsActive)
                 .ThenBy(x => x.DisplayName)
                 .ToListAsync(ct);
         }
@@ -26,75 +33,57 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.System
                 .FirstOrDefaultAsync(x => x.SourcePath == sourcePath && x.IsActive, ct);
         }
 
-        public async Task EnsureDefaultPayrollCatalogsAsync(CancellationToken ct = default)
+        public async Task SyncSystemPayrollSourcesAsync(IEnumerable<PayrollSourceDefinition> sources, CancellationToken ct = default)
         {
-            var defaults = new List<SourceCatalog>
+            var definitions = sources
+                .Where(source => !string.IsNullOrWhiteSpace(source.Code))
+                .GroupBy(source => source.Code.Trim(), StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.First())
+                .ToList();
+
+            var definitionCodes = definitions
+                .Select(source => source.Code.Trim())
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            var existingCatalogs = await _dbSet.ToListAsync(ct);
+            var existingByCode = existingCatalogs
+                .GroupBy(source => source.SourcePath, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+
+            foreach (var definition in definitions)
             {
-                new()
+                var sourcePath = definition.Code.Trim();
+                if (existingByCode.TryGetValue(sourcePath, out var existing))
                 {
-                    DisplayName = "Lương cơ bản theo hợp đồng",
-                    SourcePath = "Contract.BasicSalary",
-                    Module = "Hợp đồng",
-                    DataType = SalaryVariableDataType.Money,
-                    AggregationType = SalaryAggregationType.Latest,
-                    IsPeriodBased = false
-                },
-                new()
-                {
-                    DisplayName = "So phut OT hop le trong ky",
-                    SourcePath = "Overtime.ActualOtMinutes",
-                    Module = "Cham cong",
-                    DataType = SalaryVariableDataType.Hours,
-                    AggregationType = SalaryAggregationType.MonthlyTotal,
-                    IsPeriodBased = true
-                },
-                new()
-                {
-                    DisplayName = "So phut OT ngay thuong trong ky",
-                    SourcePath = "Overtime.WeekdayMinutes",
-                    Module = "Cham cong",
-                    DataType = SalaryVariableDataType.Hours,
-                    AggregationType = SalaryAggregationType.MonthlyTotal,
-                    IsPeriodBased = true
-                },
-                new()
-                {
-                    DisplayName = "So phut OT cuoi tuan trong ky",
-                    SourcePath = "Overtime.WeekendMinutes",
-                    Module = "Cham cong",
-                    DataType = SalaryVariableDataType.Hours,
-                    AggregationType = SalaryAggregationType.MonthlyTotal,
-                    IsPeriodBased = true
-                },
-                new()
-                {
-                    DisplayName = "So phut di muon trong ky",
-                    SourcePath = "Attendance.LateMinutes",
-                    Module = "Cham cong",
-                    DataType = SalaryVariableDataType.Number,
-                    AggregationType = SalaryAggregationType.MonthlyTotal,
-                    IsPeriodBased = true
-                },
-                new()
-                {
-                    DisplayName = "So ngay cong thuc te trong ky",
-                    SourcePath = "Attendance.WorkDays",
-                    Module = "Cham cong",
-                    DataType = SalaryVariableDataType.Days,
-                    AggregationType = SalaryAggregationType.MonthlyTotal,
-                    IsPeriodBased = true
+                    existing.DisplayName = definition.DisplayName.Trim();
+                    existing.Module = definition.Module.Trim();
+                    existing.DataType = definition.DataType;
+                    existing.AggregationType = definition.AggregationType;
+                    existing.IsPeriodBased = definition.IsPeriodBased;
+                    continue;
                 }
-            };
 
-            var defaultPaths = defaults.Select(x => x.SourcePath).ToList();
-            var existingPaths = await _dbSet
-                .Where(x => defaultPaths.Contains(x.SourcePath))
-                .Select(x => x.SourcePath)
-                .ToListAsync(ct);
+                await _dbSet.AddAsync(new SourceCatalog
+                {
+                    DisplayName = definition.DisplayName.Trim(),
+                    SourcePath = sourcePath,
+                    Module = definition.Module.Trim(),
+                    DataType = definition.DataType,
+                    AggregationType = definition.AggregationType,
+                    IsPeriodBased = definition.IsPeriodBased,
+                    IsActive = true
+                }, ct);
+            }
 
-            var missing = defaults.Where(x => !existingPaths.Contains(x.SourcePath)).ToList();
-            if (missing.Count > 0)
-                await _dbSet.AddRangeAsync(missing, ct);
+            foreach (var catalog in existingCatalogs)
+            {
+                if (!definitionCodes.Contains(catalog.SourcePath))
+                {
+                    catalog.IsActive = false;
+                    catalog.Module = "Nguồn cũ";
+                    catalog.DisplayName = $"Nguồn cũ - {catalog.SourcePath}";
+                }
+            }
         }
     }
 }

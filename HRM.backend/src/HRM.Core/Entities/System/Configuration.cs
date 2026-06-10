@@ -11,10 +11,11 @@ namespace HRM.backend.src.HRM.Core.Entities.System
         [StringLength(50)]
         public required string ConfigGroup { get; set; }
 
-        [StringLength(50)]
+        [StringLength(120)]
         public required string ParamKey { get; set; }
 
         public required string ParamValue { get; set; }
         public string? Description { get; set; }
+        public bool IsActive { get; set; } = true;
     }
 }

@@ -19,7 +19,7 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.System
                 query = query.Where(x => x.PolicyType == policyType.Value);
 
             if (!includeInactive)
-                query = query.Where(x => x.IsActive);
+                query = query.Where(x => x.IsActive && x.Status != PolicyVersionStatus.Draft);
 
             return await query
                 .OrderBy(x => x.PolicyType)

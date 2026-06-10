@@ -10,7 +10,7 @@ namespace HRM.backend.src.HRM.API.Controllers.System
 {
     [ApiController]
     [Route("api/v1/system/sla")]
-    [Authorize(Roles = "Admin, HR")] // Chỉ Admin mới được cấu hình SLA
+    [Authorize(Roles = "Admin,HR")]
     public class SlaConfigController : ControllerBase
     {
         private readonly ISlaManagementUseCase _useCase;
@@ -51,11 +51,40 @@ namespace HRM.backend.src.HRM.API.Controllers.System
                     return Ok(new
                     {
                         success = true,
-                        message = $"Cập nhật SLA cho phân hệ {dto.ModuleCode.ToUpper()} thành công."
+                        message = $"Cập nhật SLA cho quy trình {dto.ModuleCode} thành công."
                     });
                 }
 
                 return StatusCode(500, new { success = false, message = "Lỗi không xác định khi lưu cấu hình." });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, new { success = false, message = "Lỗi hệ thống nội bộ." });
+            }
+        }
+
+        [HttpPatch("{moduleCode}/active")]
+        [RequirePermission("SLA_CONFIG_UPDATE", GroupName = SystemModules.Config, Description = "Bật/tắt quy trình SLA hệ thống")]
+        public async Task<IActionResult> SetSLAStatus(string moduleCode, [FromBody] SlaStatusDto dto, CancellationToken ct)
+        {
+            try
+            {
+                var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (!int.TryParse(userIdClaim, out var adminId))
+                    return Unauthorized(new { success = false, message = "Không xác định được danh tính Admin." });
+
+                await _useCase.SetSLAActiveAsync(moduleCode, dto.IsActive, adminId, ct);
+                return Ok(new
+                {
+                    success = true,
+                    message = dto.IsActive
+                        ? "Đã bật quy trình SLA."
+                        : "Đã tắt quy trình SLA."
+                });
             }
             catch (ArgumentException ex)
             {
