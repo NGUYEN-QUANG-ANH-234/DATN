@@ -9,5 +9,7 @@ namespace HRM.backend.src.HRM.Core.Interfaces.Repositories.Recruitment
         Task<List<RecruitmentRequest>> GetRequestsByStatusAsync(RecruitmentRequestStatus status, CancellationToken ct = default);
         Task<List<RecruitmentRequest>> GetRequestsByCreatorAsync(int userId, CancellationToken ct = default);
         Task<List<RecruitmentRequest>> GetRequestsWithDetailsAsync(List<int> ids, CancellationToken ct = default);
+        Task<List<RecruitmentRequest>> GetRequestsWithCandidatesAsync(CancellationToken ct = default);
+        Task<RecruitmentRequest?> GetByIdWithCandidatesAsync(int id, CancellationToken ct = default);
     }
 }

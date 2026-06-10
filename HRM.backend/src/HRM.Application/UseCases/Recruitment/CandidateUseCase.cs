@@ -10,6 +10,7 @@ using HRM.backend.src.HRM.Core.Interfaces.Repositories;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.EmployeeProfile;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.Recruitment;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.System;
+using System.Net;
 
 namespace HRM.backend.src.HRM.Application.UseCases.Recruitment
 {
@@ -72,7 +73,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.Recruitment
             }
 
             // 1. Kiểm tra nghiệp vụ: Tin tuyển dụng
-            var job = await _reqRepo.GetByIdAsync(dto.RecruitmentRequestId, ct);
+            var job = await _reqRepo.GetByIdWithCandidatesAsync(dto.RecruitmentRequestId, ct);
             if (job == null)
                 throw new InvalidOperationException("Tin tuyển dụng không tồn tại.");
 
@@ -83,9 +84,17 @@ namespace HRM.backend.src.HRM.Application.UseCases.Recruitment
                 throw new InvalidOperationException("Tin tuyển dụng này đã hết hạn nộp hồ sơ.");
 
             // 2. Tìm kiếm ứng viên theo Email và Job
+            await EnsureJobCanReceiveApplicationsAsync(job, ct);
+
             var normalizedEmail = dto.Email.Trim().ToLowerInvariant();
             return await _lockService.GetWithLockAsync($"candidate_apply_{dto.RecruitmentRequestId}_{normalizedEmail}", async (innerCt) =>
             {
+            var currentJob = await _reqRepo.GetByIdWithCandidatesAsync(dto.RecruitmentRequestId, innerCt);
+            if (currentJob == null)
+                throw new InvalidOperationException("Tin tuyển dụng không tồn tại.");
+
+            await EnsureJobCanReceiveApplicationsAsync(currentJob, innerCt);
+
             var existingCandidate = (await _candidateRepo.FindAsync(c =>
                 c.RecruitmentRequestId == dto.RecruitmentRequestId &&
                 c.Email != null && c.Email.ToLower() == normalizedEmail, innerCt)).FirstOrDefault();
@@ -93,7 +102,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.Recruitment
             // 3. Upload CV mới
             string newCvUrl = await _storageService.UploadFileAsync(dto.CvFile, "cvs", innerCt);
 
-            string generatedTrackingCode = Guid.NewGuid().ToString("N").Substring(0, 8).ToUpper();
+            string generatedTrackingCode = GenerateTrackingCode();
 
             if (existingCandidate != null)
             {
@@ -110,6 +119,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.Recruitment
                 existingCandidate.TrackingCode = generatedTrackingCode;
 
                 await _candidateRepo.UpdateAsync(existingCandidate, innerCt);
+                await SendApplicationReceiptEmailAsync(existingCandidate, currentJob, generatedTrackingCode);
                 await _unitOfWork.CommitAsync(innerCt);
                 await _idempotencyService.SaveAsync("CANDIDATE_APPLY", idempotencyKey ?? string.Empty, "Candidate", existingCandidate.Id, null, innerCt);
                 await _unitOfWork.CommitAsync(innerCt);
@@ -131,6 +141,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.Recruitment
                 };
 
                 await _candidateRepo.AddAsync(newCandidate, innerCt);
+                await SendApplicationReceiptEmailAsync(newCandidate, currentJob, generatedTrackingCode);
                 await _unitOfWork.CommitAsync(innerCt);
                 await _idempotencyService.SaveAsync("CANDIDATE_APPLY", idempotencyKey ?? string.Empty, "Candidate", newCandidate.Id, null, innerCt);
                 await _unitOfWork.CommitAsync(innerCt);
@@ -144,8 +155,12 @@ namespace HRM.backend.src.HRM.Application.UseCases.Recruitment
         {
             if (string.IsNullOrWhiteSpace(email)) return Enumerable.Empty<CandidateHistoryDto>();
 
-            var candidates = await _candidateRepo.FindAsync(c => c.Email != null && c.Email.ToLower() == email.ToLower() && 
-                (string.IsNullOrEmpty(trackingCode) || c.TrackingCode == trackingCode), ct);
+            var normalizedEmail = email.Trim().ToLowerInvariant();
+            var normalizedTrackingCode = trackingCode?.Trim().ToUpperInvariant();
+
+            var candidates = await _candidateRepo.FindAsync(c => c.Email != null && c.Email.ToLower() == normalizedEmail &&
+                (string.IsNullOrEmpty(normalizedTrackingCode) ||
+                    (c.TrackingCode != null && c.TrackingCode.ToUpper() == normalizedTrackingCode)), ct);
             var reqIds = candidates.Where(c => c.RecruitmentRequestId.HasValue).Select(c => c.RecruitmentRequestId!.Value).Distinct();
             var requests = await _reqRepo.FindAsync(r => reqIds.Contains(r.Id), ct); // Need Department Name? The Repo usually doesn't include it unless Include is used. For now just return JobTitle (PositionName usually in Position? Wait, we need to check RecruitmentRequest entity)
 
@@ -367,6 +382,65 @@ namespace HRM.backend.src.HRM.Application.UseCases.Recruitment
         private static bool IsManager(string actorRoleName)
         {
             return string.Equals(actorRoleName, "Manager", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private async Task EnsureJobCanReceiveApplicationsAsync(RecruitmentRequest job, CancellationToken ct)
+        {
+            if (job.Status == RecruitmentRequestStatus.Closed)
+                throw new InvalidOperationException("Tin tuyển dụng đã được đóng.");
+
+            if (job.Status != RecruitmentRequestStatus.Approved)
+                throw new InvalidOperationException("Tin tuyển dụng này chưa được mở hoặc đã đóng.");
+
+            if (job.Deadline.HasValue && job.Deadline.Value.Date < DateTime.UtcNow.Date)
+                throw new InvalidOperationException("Tin tuyển dụng này đã hết hạn nộp hồ sơ.");
+
+            if (job.Quantity > 0 && CountFilledSlots(job) >= job.Quantity)
+            {
+                job.Status = RecruitmentRequestStatus.Closed;
+                await _reqRepo.UpdateAsync(job, ct);
+                await _unitOfWork.CommitAsync(ct);
+                throw new InvalidOperationException("Tin tuyển dụng đã đủ số lượng cần tuyển.");
+            }
+        }
+
+        private static int CountFilledSlots(RecruitmentRequest request)
+        {
+            return request.Candidates.Count(c => c.Status == CandidateStatus.Offer || c.Status == CandidateStatus.Hired);
+        }
+
+        private static string GenerateTrackingCode()
+        {
+            return $"CAND-{Guid.NewGuid():N}".Substring(0, 13).ToUpperInvariant();
+        }
+
+        private async Task SendApplicationReceiptEmailAsync(Candidate candidate, RecruitmentRequest job, string trackingCode)
+        {
+            if (string.IsNullOrWhiteSpace(candidate.Email))
+                return;
+
+            var candidateName = WebUtility.HtmlEncode(candidate.FullName);
+            var jobTitle = WebUtility.HtmlEncode(job.Position?.Title ?? job.Description ?? "Vị trí tuyển dụng");
+            var departmentName = WebUtility.HtmlEncode(job.Department?.DeptName ?? "HICAS");
+            var safeTrackingCode = WebUtility.HtmlEncode(trackingCode);
+            var appliedDate = DateTime.UtcNow.ToString("dd/MM/yyyy");
+
+            var subject = $"[HICAS] Xác nhận đã nhận hồ sơ - {trackingCode}";
+            var body = $@"
+                <div style=""font-family:Arial,sans-serif;line-height:1.6;color:#111827"">
+                    <p>Chào <b>{candidateName}</b>,</p>
+                    <p>HICAS đã nhận hồ sơ ứng tuyển của bạn cho vị trí <b>{jobTitle}</b> thuộc <b>{departmentName}</b>.</p>
+                    <p>Mã tra cứu hồ sơ của bạn là:</p>
+                    <p style=""display:inline-block;padding:12px 16px;border:1px dashed #f58220;border-radius:8px;background:#fff7ed;color:#c2410c;font-size:20px;font-weight:700;letter-spacing:1px"">
+                        {safeTrackingCode}
+                    </p>
+                    <p>Vui lòng lưu lại mã này để tra cứu trạng thái hồ sơ trên cổng tuyển dụng HICAS.</p>
+                    <p><b>Ngày ghi nhận:</b> {appliedDate}</p>
+                    <br/>
+                    <p>Trân trọng,<br/>Bộ phận Tuyển dụng HICAS</p>
+                </div>";
+
+            await _emailService.SendEmailAsync(candidate.Email, subject, body);
         }
 
     }

@@ -183,9 +183,130 @@ namespace HRM.backend.src.HRM.Application.UseCases.Recruitment
             return await _reqRepo.GetRequestsByCreatorAsync(userId, ct);
         }
 
+        public async Task<List<RecruitmentRequestListItemDto>> GetRequestsAsync(int actorId, string actorRoleName, CancellationToken ct = default)
+        {
+            var requests = await _reqRepo.GetRequestsWithCandidatesAsync(ct);
+
+            if (IsManager(actorRoleName))
+            {
+                var managerDeptId = await GetManagerDeptIdAsync(actorId, ct);
+                requests = requests
+                    .Where(r => r.DeptId.HasValue && r.DeptId.Value == managerDeptId)
+                    .ToList();
+            }
+            else if (!CanViewAllRecruitmentRequests(actorRoleName))
+            {
+                requests = requests
+                    .Where(r => r.CreatedById == actorId)
+                    .ToList();
+            }
+
+            var changed = false;
+            foreach (var request in requests)
+            {
+                if (request.Status == RecruitmentRequestStatus.Approved && IsRequestFull(request))
+                {
+                    request.Status = RecruitmentRequestStatus.Closed;
+                    _reqRepo.Update(request);
+                    changed = true;
+                }
+            }
+
+            if (changed)
+                await _unitOfWork.CommitAsync(ct);
+
+            return requests.Select(MapToListItem).ToList();
+        }
+
+        public async Task<RecruitmentRequestListItemDto> CloseRequestAsync(int requestId, int actorId, string actorRoleName, CloseRecruitmentRequestDto dto, CancellationToken ct = default)
+        {
+            if (!CanCloseRecruitmentRequest(actorRoleName))
+                throw new UnauthorizedAccessException("Chỉ HR hoặc Admin được đóng tin tuyển dụng.");
+
+            return await _lockService.GetWithLockAsync($"recruitment_close_{requestId}", async (innerCt) =>
+            {
+                var request = await _reqRepo.GetByIdWithCandidatesAsync(requestId, innerCt);
+                if (request == null)
+                    throw new InvalidOperationException("Không tìm thấy nhu cầu tuyển dụng.");
+
+                if (request.Status == RecruitmentRequestStatus.Closed)
+                    throw new InvalidOperationException("Tin tuyển dụng đã được đóng trước đó.");
+
+                if (request.Status != RecruitmentRequestStatus.Approved)
+                    throw new InvalidOperationException("Chỉ có thể đóng tin tuyển dụng đang mở.");
+
+                request.Status = RecruitmentRequestStatus.Closed;
+                _reqRepo.Update(request);
+                await _unitOfWork.CommitAsync(innerCt);
+
+                return MapToListItem(request);
+            }, cancellationToken: ct);
+        }
+
         private static bool IsManager(string actorRoleName)
         {
             return string.Equals(actorRoleName, "Manager", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool CanViewAllRecruitmentRequests(string actorRoleName)
+        {
+            return string.Equals(actorRoleName, "Admin", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(actorRoleName, "HR", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(actorRoleName, "Director", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool CanCloseRecruitmentRequest(string actorRoleName)
+        {
+            return string.Equals(actorRoleName, "Admin", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(actorRoleName, "HR", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static RecruitmentRequestListItemDto MapToListItem(RecruitmentRequest request)
+        {
+            var filledSlots = CountFilledSlots(request);
+            var activeCandidateCount = CountActiveCandidates(request);
+            var isExpired = IsExpired(request);
+            var isFull = request.Quantity > 0 && filledSlots >= request.Quantity;
+            var isClosed = request.Status == RecruitmentRequestStatus.Closed;
+
+            return new RecruitmentRequestListItemDto
+            {
+                Id = request.Id,
+                Quantity = request.Quantity,
+                FilledSlots = filledSlots,
+                ActiveCandidateCount = activeCandidateCount,
+                RemainingSlots = Math.Max(request.Quantity - filledSlots, 0),
+                Description = request.Description,
+                Deadline = request.Deadline,
+                CreatedAt = request.CreatedAt,
+                Status = request.Status.ToString(),
+                DepartmentName = request.Department?.DeptName,
+                PositionName = request.Position?.Title,
+                IsClosed = isClosed,
+                IsExpired = isExpired,
+                IsFull = isFull,
+                CanApply = request.Status == RecruitmentRequestStatus.Approved && !isClosed && !isExpired && !isFull
+            };
+        }
+
+        private static int CountFilledSlots(RecruitmentRequest request)
+        {
+            return request.Candidates.Count(c => c.Status == CandidateStatus.Offer || c.Status == CandidateStatus.Hired);
+        }
+
+        private static int CountActiveCandidates(RecruitmentRequest request)
+        {
+            return request.Candidates.Count(c => c.Status != CandidateStatus.Rejected && c.Status != CandidateStatus.SLA_Expired);
+        }
+
+        private static bool IsRequestFull(RecruitmentRequest request)
+        {
+            return request.Quantity > 0 && CountFilledSlots(request) >= request.Quantity;
+        }
+
+        private static bool IsExpired(RecruitmentRequest request)
+        {
+            return request.Deadline.HasValue && request.Deadline.Value.Date < DateTime.UtcNow.Date;
         }
 
         private async Task<int> GetManagerDeptIdAsync(int accountId, CancellationToken ct)

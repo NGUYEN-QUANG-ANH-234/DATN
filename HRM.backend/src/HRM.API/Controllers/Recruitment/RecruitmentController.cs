@@ -2,6 +2,7 @@
 using HRM.backend.src.HRM.Application.DTOs;
 using HRM.backend.src.HRM.Application.DTOs.Recruitment;
 using HRM.backend.src.HRM.Application.Interfaces.Recruitment.Usecases;
+using HRM.backend.src.HRM.Core.Enums;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.Recruitment;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -89,19 +90,76 @@ namespace HRM.backend.src.HRM.API.Controllers.Recruitment
             }
         }
 
+        [HttpGet("requests")]
+        [Authorize]
+        [RequirePermission("RECRUITMENT_REQUEST_SELF_VIEW", GroupName = SystemModules.Recruitment, Description = "Xem danh sách nhu cầu tuyển dụng")]
+        public async Task<IActionResult> GetRequests(CancellationToken ct)
+        {
+            try
+            {
+                var actorId = User.GetAccountIdOrThrow();
+                var actorRoleName = GetRole();
+                var requests = await _useCase.GetRequestsAsync(actorId, actorRoleName, ct);
+                return Ok(new { Success = true, Data = requests });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, new { Success = false, Message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Success = false, Message = ex.Message });
+            }
+        }
+
+        [HttpPatch("requests/{id}/close")]
+        [Authorize]
+        [RequirePermission("RECRUITMENT_REQUEST_REVIEW", GroupName = SystemModules.Recruitment, Description = "Đóng tin tuyển dụng")]
+        public async Task<IActionResult> CloseRequest(int id, [FromBody] CloseRecruitmentRequestDto dto, CancellationToken ct)
+        {
+            try
+            {
+                var actorId = User.GetAccountIdOrThrow();
+                var actorRoleName = GetRole();
+                var request = await _useCase.CloseRequestAsync(id, actorId, actorRoleName, dto, ct);
+                return Ok(new { Success = true, Data = request, Message = "Đã đóng tin tuyển dụng." });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, new { Success = false, Message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return UnprocessableEntity(new { Success = false, Message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Success = false, Message = ex.Message });
+            }
+        }
+
         [HttpGet("active-jobs")]
         [AllowAnonymous] // Public cho Cổng Ứng viên gọi để hiển thị danh sách Job
         public async Task<IActionResult> GetActiveJobs(CancellationToken ct)
         {
             var jobs = await _reqRepo.GetActiveJobPostingsAsync(ct);
-            var result = jobs.Select(j => new
+            var result = jobs.Select(j =>
             {
-                j.Id,
-                DepartmentName = j.Department?.DeptName,
-                PositionName = j.Position?.Title,
-                j.Quantity,
-                j.Description,
-                j.Deadline
+                var filledSlots = j.Candidates.Count(c => c.Status == CandidateStatus.Offer || c.Status == CandidateStatus.Hired);
+                var remainingSlots = Math.Max(j.Quantity - filledSlots, 0);
+                return new
+                {
+                    j.Id,
+                    DepartmentName = j.Department?.DeptName,
+                    PositionName = j.Position?.Title,
+                    j.Quantity,
+                    FilledSlots = filledSlots,
+                    RemainingSlots = remainingSlots,
+                    CanApply = remainingSlots > 0,
+                    j.Description,
+                    j.Deadline,
+                    Status = j.Status.ToString()
+                };
             });
             return Ok(new { Success = true, Data = result });
         }

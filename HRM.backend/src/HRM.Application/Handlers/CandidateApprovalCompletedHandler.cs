@@ -12,6 +12,7 @@ namespace HRM.backend.src.HRM.Application.Handlers
     public class CandidateApprovalCompletedHandler : INotificationHandler<ApprovalCompletedEvent>
     {
         private readonly ICandidateRepository _candidateRepo;
+        private readonly IRecruitmentRequestRepository _recruitmentRequestRepo;
         private readonly ISlaTrackingService _slaTrackingService;
         private readonly IAuditLogRepository _auditLogRepo;
         private readonly IUnitOfWork _unitOfWork;
@@ -19,12 +20,14 @@ namespace HRM.backend.src.HRM.Application.Handlers
 
         public CandidateApprovalCompletedHandler(
             ICandidateRepository candidateRepo,
+            IRecruitmentRequestRepository recruitmentRequestRepo,
             ISlaTrackingService slaTrackingService,
             IAuditLogRepository auditLogRepo,
             IUnitOfWork unitOfWork,
             IEmailService emailService)
         {
             _candidateRepo = candidateRepo;
+            _recruitmentRequestRepo = recruitmentRequestRepo;
             _slaTrackingService = slaTrackingService;
             _auditLogRepo = auditLogRepo;
             _unitOfWork = unitOfWork;
@@ -42,6 +45,24 @@ namespace HRM.backend.src.HRM.Application.Handlers
             {
                 candidate.Status = CandidateStatus.Offer;
                 await _candidateRepo.UpdateAsync(candidate, ct);
+
+                if (candidate.RecruitmentRequestId.HasValue)
+                {
+                    var request = await _recruitmentRequestRepo.GetByIdWithCandidatesAsync(candidate.RecruitmentRequestId.Value, ct);
+                    if (request != null && request.Status == RecruitmentRequestStatus.Approved && request.Quantity > 0)
+                    {
+                        var filledSlots = request.Candidates.Count(c =>
+                            c.Id == candidate.Id ||
+                            c.Status == CandidateStatus.Offer ||
+                            c.Status == CandidateStatus.Hired);
+
+                        if (filledSlots >= request.Quantity)
+                        {
+                            request.Status = RecruitmentRequestStatus.Closed;
+                            await _recruitmentRequestRepo.UpdateAsync(request, ct);
+                        }
+                    }
+                }
 
                 await _slaTrackingService.ResolveTaskAsync(SlaModuleType.CandidateApproval, candidate.Id, ct);
 

@@ -14,8 +14,10 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.Recruitmen
             return await _dbSet
                 .Include(r => r.Department)
                 .Include(r => r.Position)
+                .Include(r => r.Candidates)
                 .Where(r => r.Status == RecruitmentRequestStatus.Approved &&
-                           (r.Deadline == null || r.Deadline >= DateTime.UtcNow))
+                           (r.Deadline == null || r.Deadline.Value.Date >= DateTime.UtcNow.Date) &&
+                           r.Candidates.Count(c => c.Status == CandidateStatus.Offer || c.Status == CandidateStatus.Hired) < r.Quantity)
                 .AsNoTracking()
                 .ToListAsync(ct);
         }
@@ -49,6 +51,25 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.Recruitmen
                 .Where(r => ids.Contains(r.Id))
                 .AsNoTracking()
                 .ToListAsync(ct);
+        }
+
+        public async Task<List<RecruitmentRequest>> GetRequestsWithCandidatesAsync(CancellationToken ct = default)
+        {
+            return await _context.RecruitmentRequests
+                .Include(r => r.Department)
+                .Include(r => r.Position)
+                .Include(r => r.Candidates)
+                .OrderByDescending(r => r.CreatedAt)
+                .ToListAsync(ct);
+        }
+
+        public async Task<RecruitmentRequest?> GetByIdWithCandidatesAsync(int id, CancellationToken ct = default)
+        {
+            return await _context.RecruitmentRequests
+                .Include(r => r.Department)
+                .Include(r => r.Position)
+                .Include(r => r.Candidates)
+                .FirstOrDefaultAsync(r => r.Id == id, ct);
         }
     }
 }

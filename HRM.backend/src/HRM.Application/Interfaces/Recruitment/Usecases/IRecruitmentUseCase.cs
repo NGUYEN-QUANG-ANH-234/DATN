@@ -14,5 +14,7 @@ namespace HRM.backend.src.HRM.Application.Interfaces.Recruitment.Usecases
             CancellationToken ct = default);
         Task<List<RecruitmentRequest>> GetPendingRequestsAsync(int actorId, CancellationToken ct = default);
         Task<List<RecruitmentRequest>> GetMyRequestsAsync(int userId, CancellationToken ct = default);
+        Task<List<RecruitmentRequestListItemDto>> GetRequestsAsync(int actorId, string actorRoleName, CancellationToken ct = default);
+        Task<RecruitmentRequestListItemDto> CloseRequestAsync(int requestId, int actorId, string actorRoleName, CloseRecruitmentRequestDto dto, CancellationToken ct = default);
     }
 }
