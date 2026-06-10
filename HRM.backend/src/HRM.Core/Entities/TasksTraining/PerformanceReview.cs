@@ -38,6 +38,8 @@ namespace HRM.backend.src.HRM.Core.Entities.TasksTraining
 
         [StringLength(1000)] public string? FinalComment { get; set; }
 
+        [StringLength(40)] public string? ScoringVersion { get; set; }
+
         public ReviewStatus Status { get; set; } = ReviewStatus.Draft;
 
         public DateTime? ReviewDeadline { get; set; }

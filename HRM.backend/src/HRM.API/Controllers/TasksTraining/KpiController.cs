@@ -49,6 +49,10 @@ namespace HRM.backend.src.HRM.API.Controllers.TasksTraining
             {
                 return StatusCode(StatusCodes.Status403Forbidden, new { Success = false, Message = ex.Message });
             }
+            catch (InvalidOperationException ex)
+            {
+                return UnprocessableEntity(new { Success = false, Message = ex.Message });
+            }
             catch (ArgumentException ex)
             {
                 return BadRequest(new { Success = false, Message = ex.Message });

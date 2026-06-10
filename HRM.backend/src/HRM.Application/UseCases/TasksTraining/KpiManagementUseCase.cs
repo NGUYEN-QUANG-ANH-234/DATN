@@ -13,6 +13,8 @@ namespace HRM.backend.src.HRM.Application.UseCases.TasksTraining
 {
     public class KpiManagementUseCase : IKpiManagementUseCase
     {
+        private const string WeightedScoringVersion = "WeightedV2";
+
         private readonly IExcelKpiParserService _excelParser;
         private readonly IEmployeeRepository _employeeRepo;
         private readonly IPerformanceReviewRepository _reviewRepo;
@@ -39,7 +41,11 @@ namespace HRM.backend.src.HRM.Application.UseCases.TasksTraining
             _lockService = lockService;
         }
 
-        public async Task<KpiImportResultDto> ImportKpisFromExcelAsync(KpiImportRequestDto dto, int actorAccountId, string actorRole, CancellationToken ct = default)
+        public async Task<KpiImportResultDto> ImportKpisFromExcelAsync(
+            KpiImportRequestDto dto,
+            int actorAccountId,
+            string actorRole,
+            CancellationToken ct = default)
         {
             var period = NormalizePeriod(dto.Period);
             var actor = await _employeeRepo.GetByAccountIdAsync(actorAccountId, ct);
@@ -51,7 +57,12 @@ namespace HRM.backend.src.HRM.Application.UseCases.TasksTraining
                 cancellationToken: ct);
         }
 
-        private async Task<KpiImportResultDto> ImportInternalAsync(KpiImportRequestDto dto, int actorAccountId, int deptId, string period, CancellationToken ct)
+        private async Task<KpiImportResultDto> ImportInternalAsync(
+            KpiImportRequestDto dto,
+            int actorAccountId,
+            int deptId,
+            string period,
+            CancellationToken ct)
         {
             var rows = await _excelParser.ParseToDtoListAsync(dto.File, ct);
             var employees = await _employeeRepo.GetActiveByDeptWithDepartmentAsync(deptId, ct: ct);
@@ -98,6 +109,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.TasksTraining
                             ImportBatch = batch,
                             CreatedByAccountId = actorAccountId,
                             Period = period,
+                            ScoringVersion = WeightedScoringVersion,
                             Status = ReviewStatus.PendingEmployeeUpdate,
                             ReviewDeadline = DateTime.UtcNow.AddDays(7),
                             CreatedAt = DateTime.UtcNow
@@ -107,6 +119,9 @@ namespace HRM.backend.src.HRM.Application.UseCases.TasksTraining
                     }
                     else
                     {
+                        if (review.IsPayrollSynced || review.PayrollSyncedAt.HasValue)
+                            throw new InvalidOperationException($"KPI kỳ {period} của nhân viên {employee.EmployeeCode} đã được đồng bộ sang payroll, không thể ghi đè bằng file import.");
+
                         if (review.Details.Any())
                             _detailRepo.RemoveRange(review.Details);
 
@@ -118,6 +133,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.TasksTraining
                         review.FinalRating = null;
                         review.FinalComment = null;
                         review.FinalizedAt = null;
+                        review.ScoringVersion = WeightedScoringVersion;
                         review.TotalScore = 0;
                         review.IsPayrollSynced = false;
                         review.PayrollSyncedAt = null;
@@ -168,7 +184,9 @@ namespace HRM.backend.src.HRM.Application.UseCases.TasksTraining
             };
         }
 
-        private static List<KpiImportErrorDto> ValidateRows(List<KpiImportRowDto> rows, Dictionary<string, Employee> employeeByCode)
+        private static List<KpiImportErrorDto> ValidateRows(
+            List<KpiImportRowDto> rows,
+            Dictionary<string, Employee> employeeByCode)
         {
             var errors = new List<KpiImportErrorDto>();
             if (!rows.Any())
@@ -191,11 +209,13 @@ namespace HRM.backend.src.HRM.Application.UseCases.TasksTraining
                     errors.Add(new KpiImportErrorDto { RowNumber = row.RowNumber, Message = "Trọng số KPI phải nằm trong khoảng 1-100." });
             }
 
-            foreach (var group in rows.Where(r => !string.IsNullOrWhiteSpace(r.EmployeeCode)).GroupBy(r => r.EmployeeCode.Trim(), StringComparer.OrdinalIgnoreCase))
+            foreach (var group in rows
+                .Where(r => !string.IsNullOrWhiteSpace(r.EmployeeCode))
+                .GroupBy(r => r.EmployeeCode.Trim(), StringComparer.OrdinalIgnoreCase))
             {
                 var totalWeight = group.Sum(r => r.WeightPercent);
-                if (totalWeight > 100)
-                    errors.Add(new KpiImportErrorDto { RowNumber = group.First().RowNumber, Message = $"Tổng trọng số của nhân viên {group.Key} vượt quá 100%." });
+                if (totalWeight != 100)
+                    errors.Add(new KpiImportErrorDto { RowNumber = group.First().RowNumber, Message = $"Tổng trọng số KPI của nhân viên {group.Key} phải bằng 100%, hiện tại là {totalWeight}%." });
 
                 var duplicatedCodes = group
                     .Where(r => !string.IsNullOrWhiteSpace(r.KpiCode))

@@ -10,6 +10,7 @@ namespace HRM.backend.src.HRM.Application.DTOs.TasksTraining
         public int TotalWeight { get; set; }
         public decimal SystemPenaltyPoint { get; set; }
         public decimal TotalScore { get; set; }
+        public string? ScoringVersion { get; set; }
         public string? FinalRating { get; set; }
         public string? FinalComment { get; set; }
         public string Status { get; set; } = string.Empty;
