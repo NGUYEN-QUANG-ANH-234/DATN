@@ -6,16 +6,19 @@ import { Badge, Button, Card, DataTable } from "../../../components/ui";
 import type { DataTableColumn } from "../../../components/ui";
 import { formatOptionalMoney } from "../../../utils";
 import { usePayrollPolicies } from "../hooks/usePayrollPolicies";
+import { PayrollFeatureTogglePanel } from "./PayrollFeatureTogglePanel";
 import type { PayrollPolicy, PayrollPolicyPayload } from "../types/payrollPolicy";
 import { PayrollPolicyType, PayrollPolicyValueType } from "../types/payrollPolicy";
 
 const policyTypeOptions = [
-  { value: PayrollPolicyType.Overtime, label: "OT / tăng ca" },
+  { value: PayrollPolicyType.Overtime, label: "Làm thêm giờ" },
   { value: PayrollPolicyType.PitTax, label: "Thuế TNCN" },
   { value: PayrollPolicyType.Insurance, label: "Bảo hiểm" },
   { value: PayrollPolicyType.Allowance, label: "Phụ cấp" },
   { value: PayrollPolicyType.Deduction, label: "Điều chỉnh giảm hợp lệ" },
   { value: PayrollPolicyType.Seniority, label: "Phụ cấp thâm niên" },
+  { value: PayrollPolicyType.MinimumWage, label: "Lương tối thiểu vùng" },
+  { value: PayrollPolicyType.KpiBonus, label: "Thưởng KPI" },
 ];
 
 const valueTypeOptions = [
@@ -228,14 +231,15 @@ export const PayrollPolicyManager = () => {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="F0.7 Cấu hình chính sách lương"
-        description="Quản lý phiên bản chính sách OT, thuế TNCN, bảo hiểm, phụ cấp, phụ cấp thâm niên và các điều chỉnh giảm hợp lệ theo hiệu lực thời gian."
+        title="Chính sách lương"
+        description="Quản lý các chính sách lương đang áp dụng."
         breadcrumb={[
-          { label: "Module 0" },
           { label: "Cấu hình hệ thống" },
           { label: "Chính sách lương" },
         ]}
       />
+
+      <PayrollFeatureTogglePanel />
 
       {message && (
         <div
@@ -251,7 +255,7 @@ export const PayrollPolicyManager = () => {
 
       <Card
         title={editingId ? "Tạo phiên bản chính sách mới" : "Thêm chính sách lương"}
-        description="Với phụ cấp thâm niên, dùng Bậc/khoảng với Từ mức/Đến mức là số tháng làm việc hợp lệ; Số tiền là phụ cấp tháng hoặc Tỷ lệ % là tỷ lệ theo lương cơ bản."
+        description="Nhập giá trị và thời gian áp dụng cho chính sách."
         actions={<CopyPlus size={20} className="text-[var(--hicas-orange)]" />}
       >
         <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-4">
@@ -468,7 +472,7 @@ export const PayrollPolicyManager = () => {
         loading={loading}
         rowKey={(row) => row.id}
         emptyTitle="Chưa có chính sách lương"
-        emptyDescription="Hãy thêm chính sách OT, thuế, bảo hiểm, phụ cấp hoặc phụ cấp thâm niên đầu tiên."
+        emptyDescription="Hãy thêm chính sách làm thêm, thuế, bảo hiểm, phụ cấp hoặc phụ cấp thâm niên đầu tiên."
       />
     </div>
   );

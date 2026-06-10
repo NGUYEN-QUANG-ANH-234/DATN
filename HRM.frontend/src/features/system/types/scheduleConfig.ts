@@ -15,7 +15,10 @@ export interface ConfigureWorkScheduleDto {
   standardHoursPerDay: number;
   includePaidLeaveInWorkDays: boolean;
   workingDaysOfWeek?: string | null;
+  companyCalendarId?: number | null;
   holidayDatesJson?: string | null;
+  holidayWorkingStartTime?: string | null;
+  holidayWorkingEndTime?: string | null;
   lockWorkCalendar: boolean;
   calendarNote?: string | null;
 }
@@ -38,7 +41,10 @@ export interface ConfiguredScheduleItem {
   standardHoursPerDay?: number | null;
   includePaidLeaveInWorkDays: boolean;
   workingDaysOfWeek?: string | null;
+  companyCalendarId?: number | null;
   holidayDatesJson?: string | null;
+  holidayWorkingStartTime?: string | null;
+  holidayWorkingEndTime?: string | null;
   isWorkCalendarLocked: boolean;
   calendarNote?: string | null;
 }

@@ -1,5 +1,8 @@
-import React, { useEffect, useState } from "react";
-import { Button, Card, EmptyState } from "../../../components/ui";
+import React, { useEffect, useMemo, useState } from "react";
+import { CheckSquare, LockKeyhole, Save, ShieldCheck, Users } from "lucide-react";
+import { PageHeader } from "../../../components/layout";
+import { Badge, Button, Card, EmptyState } from "../../../components/ui";
+import { cn } from "../../../components/ui/classNames";
 import { useRbac } from "../hooks/useRbac";
 
 type RolePermission = {
@@ -20,19 +23,35 @@ type PermissionModule = {
 
 export const RbacManager: React.FC = () => {
   const { roles, availableModules, loading, updatePermissions } = useRbac();
-  const availableModulesTyped = availableModules as PermissionModule[] | undefined;
+  const availableModulesTyped = (availableModules as PermissionModule[] | undefined) ?? [];
 
   const [selectedRoleId, setSelectedRoleId] = useState<string | number | null>(null);
   const [currentPermissions, setCurrentPermissions] = useState<string[]>([]);
-  const [message, setMessage] = useState<string>("");
+  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(
+    null,
+  );
+
+  useEffect(() => {
+    if (selectedRoleId === null && roles.length > 0) {
+      setSelectedRoleId(roles[0].roleId);
+    }
+  }, [roles, selectedRoleId]);
 
   useEffect(() => {
     if (selectedRoleId !== null) {
       const role = roles.find((item) => item.roleId === selectedRoleId);
       setCurrentPermissions(role ? [...role.permissions] : []);
-      setMessage("");
+      setMessage(null);
     }
   }, [selectedRoleId, roles]);
+
+  const totalPermissions = useMemo(
+    () => availableModulesTyped.reduce((sum, module) => sum + module.codes.length, 0),
+    [availableModulesTyped],
+  );
+
+  const selectedRole = roles.find((role: RolePermission) => role.roleId === selectedRoleId);
+  const isRootRole = Number(selectedRole?.roleId) === 1;
 
   const handleCheckboxChange = (code: string) => {
     setCurrentPermissions((prev) =>
@@ -55,7 +74,7 @@ export const RbacManager: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-    if (selectedRoleId === null) return;
+    if (selectedRoleId === null || isRootRole) return;
 
     try {
       const res = await updatePermissions({
@@ -68,137 +87,245 @@ export const RbacManager: React.FC = () => {
           ? String((res as { message?: unknown }).message || "")
           : "";
 
-      setMessage(responseMessage || "Cập nhật quyền thành công!");
+      setMessage({
+        type: "success",
+        text: responseMessage || "Đã cập nhật quyền cho vai trò.",
+      });
     } catch (error: unknown) {
-      setMessage(`Lỗi: ${error}`);
+      setMessage({
+        type: "error",
+        text: error instanceof Error ? error.message : "Không thể cập nhật quyền.",
+      });
     }
   };
 
-  const selectedRole = roles.find((role) => role.roleId === selectedRoleId);
-
   return (
-    <Card
-      title="Phân quyền hệ thống (RBAC)"
-      description="Quản lý ma trận quyền truy cập theo vai trò và chức năng trong từng phân hệ."
-    >
-      {loading && roles.length === 0 ? (
-        <p className="text-sm text-[var(--hicas-text-secondary)]">Đang tải dữ liệu...</p>
-      ) : (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[260px_1fr]">
-          <aside className="border-b border-[var(--hicas-border-soft)] pb-4 lg:border-b-0 lg:border-r lg:pr-4">
-            <h3 className="mb-3 text-sm font-semibold text-[var(--hicas-text-main)]">
-              Chọn vai trò
-            </h3>
-            <div className="space-y-2">
-              {roles.map((role: RolePermission) => (
-                <button
-                  key={role.roleId}
-                  type="button"
-                  onClick={() => setSelectedRoleId(role.roleId)}
-                  className={`min-h-10 w-full rounded-[var(--radius-md)] border px-3 text-left text-sm transition ${
-                    selectedRoleId === role.roleId
-                      ? "border-[var(--hicas-orange)] bg-[var(--hicas-orange-soft)] font-semibold text-[var(--hicas-orange-dark)]"
-                      : "border-[var(--hicas-border)] text-[var(--hicas-text-main)] hover:border-[var(--hicas-orange)] hover:bg-[var(--hicas-orange-lighter)]"
-                  }`}
-                >
-                  {role.roleName}
-                  {role.roleId === 1 && (
-                    <span className="ml-2 text-xs text-[var(--hicas-danger)]">(Root)</span>
-                  )}
-                </button>
-              ))}
+    <div className="space-y-6">
+      <PageHeader
+        title="Phân quyền hệ thống"
+        description="Quản lý quyền truy cập theo vai trò."
+        breadcrumb={[
+          { label: "Quản trị" },
+          { label: "Vai trò & phân quyền" },
+        ]}
+        actions={
+          <Button
+            type="button"
+            iconLeft={<Save size={16} />}
+            disabled={!selectedRole || isRootRole}
+            onClick={handleSubmit}
+          >
+            Lưu phân quyền
+          </Button>
+        }
+      />
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card className="p-4" padded={false}>
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-[var(--hicas-text-secondary)]">Vai trò</p>
+              <p className="mt-1 text-2xl font-bold text-[var(--hicas-text-main)]">
+                {roles.length}
+              </p>
             </div>
-          </aside>
+            <span className="flex h-11 w-11 items-center justify-center rounded-[var(--radius-lg)] bg-[var(--hicas-orange-soft)] text-[var(--hicas-orange-dark)]">
+              <Users size={20} />
+            </span>
+          </div>
+        </Card>
+        <Card className="p-4" padded={false}>
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-[var(--hicas-text-secondary)]">Nhóm quyền</p>
+              <p className="mt-1 text-2xl font-bold text-[var(--hicas-text-main)]">
+                {availableModulesTyped.length}
+              </p>
+            </div>
+            <span className="flex h-11 w-11 items-center justify-center rounded-[var(--radius-lg)] bg-[var(--hicas-info-soft)] text-[var(--hicas-info)]">
+              <ShieldCheck size={20} />
+            </span>
+          </div>
+        </Card>
+        <Card className="p-4" padded={false}>
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-[var(--hicas-text-secondary)]">
+                Quyền đang chọn
+              </p>
+              <p className="mt-1 text-2xl font-bold text-[var(--hicas-text-main)]">
+                {currentPermissions.length}/{totalPermissions}
+              </p>
+            </div>
+            <span className="flex h-11 w-11 items-center justify-center rounded-[var(--radius-lg)] bg-[var(--hicas-success-soft)] text-[var(--hicas-success)]">
+              <CheckSquare size={20} />
+            </span>
+          </div>
+        </Card>
+      </div>
 
-          <section>
-            {!selectedRole ? (
-              <EmptyState
-                title="Chưa chọn vai trò"
-                description="Chọn một vai trò ở danh sách bên trái để cấu hình quyền."
-              />
-            ) : (
-              <div className="space-y-5">
-                <div className="flex flex-col gap-3 border-b border-[var(--hicas-border-soft)] pb-4 sm:flex-row sm:items-center sm:justify-between">
-                  <h3 className="text-lg font-semibold text-[var(--hicas-text-main)]">
-                    Quyền hạn của: {selectedRole.roleName}
-                  </h3>
-                  <Button
-                    onClick={handleSubmit}
-                    disabled={selectedRole.roleId === 1}
-                    variant={selectedRole.roleId === 1 ? "secondary" : "primary"}
+      {message && (
+        <div
+          className={cn(
+            "rounded-[var(--radius-lg)] border px-4 py-3 text-sm font-medium",
+            message.type === "error"
+              ? "border-[var(--hicas-danger)] bg-[var(--hicas-danger-soft)] text-[var(--hicas-danger)]"
+              : "border-[var(--hicas-success)] bg-[var(--hicas-success-soft)] text-[var(--hicas-success)]",
+          )}
+        >
+          {message.text}
+        </div>
+      )}
+
+      <section className="grid items-start gap-6 xl:grid-cols-[300px_minmax(0,1fr)]">
+        <Card
+          title="Vai trò"
+          description="Chọn một vai trò để xem và cập nhật quyền."
+          actions={<Badge variant="orange">{roles.length} vai trò</Badge>}
+        >
+          {loading && roles.length === 0 ? (
+            <p className="py-8 text-center text-sm text-[var(--hicas-text-secondary)]">
+              Đang tải dữ liệu...
+            </p>
+          ) : (
+            <div className="max-h-[640px] space-y-2 overflow-y-auto pr-1">
+              {roles.map((role: RolePermission) => {
+                const selected = selectedRoleId === role.roleId;
+                const root = Number(role.roleId) === 1;
+
+                return (
+                  <button
+                    key={role.roleId}
+                    type="button"
+                    onClick={() => setSelectedRoleId(role.roleId)}
+                    className={cn(
+                      "w-full rounded-[var(--radius-lg)] border px-4 py-3 text-left transition",
+                      selected
+                        ? "border-[var(--hicas-orange)] bg-[var(--hicas-orange-soft)] text-[var(--hicas-orange-dark)]"
+                        : "border-[var(--hicas-border)] bg-white text-[var(--hicas-text-main)] hover:border-[var(--hicas-orange)] hover:bg-[var(--hicas-orange-lighter)]",
+                    )}
                   >
-                    Lưu thay đổi
-                  </Button>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold">{role.roleName}</p>
+                        <p className="mt-1 text-xs text-[var(--hicas-text-secondary)]">
+                          {role.permissions.length} quyền đang gán
+                        </p>
+                      </div>
+                      <Badge variant={root ? "danger" : selected ? "orange" : "neutral"}>
+                        {root ? "Quản trị gốc" : "Vai trò"}
+                      </Badge>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </Card>
+
+        <Card
+          title={selectedRole ? `Ma trận quyền: ${selectedRole.roleName}` : "Ma trận quyền"}
+          description="Bật hoặc tắt quyền theo từng phân hệ."
+          actions={
+            selectedRole ? (
+              <Badge variant={isRootRole ? "danger" : "info"}>
+                {isRootRole ? "Không chỉnh sửa" : `${currentPermissions.length} quyền`}
+              </Badge>
+            ) : null
+          }
+        >
+          {!selectedRole ? (
+            <EmptyState
+              title="Chưa chọn vai trò"
+              description="Chọn một vai trò ở danh sách bên trái để cấu hình quyền."
+            />
+          ) : (
+            <div className="space-y-5">
+              {isRootRole && (
+                <div className="flex gap-3 rounded-[var(--radius-lg)] border border-[var(--hicas-danger)] bg-[var(--hicas-danger-soft)] px-4 py-3 text-sm text-[var(--hicas-danger)]">
+                  <LockKeyhole size={18} className="mt-0.5 shrink-0" />
+                  <span>
+                    Vai trò quản trị gốc là vai trò hệ thống, không cho phép chỉnh sửa từ giao diện để
+                    tránh mất quyền quản trị cao nhất.
+                  </span>
                 </div>
+              )}
 
-                {selectedRole.roleId === 1 && (
-                  <div className="rounded-[var(--radius-md)] border border-[var(--hicas-danger)] bg-[var(--hicas-danger-soft)] px-4 py-3 text-sm text-[var(--hicas-danger)]">
-                    Bảo mật: hệ thống không cho phép chỉnh sửa quyền của tài khoản Root (Super Admin).
-                  </div>
-                )}
+              <div className="grid gap-4 2xl:grid-cols-2">
+                {availableModulesTyped.map((module: PermissionModule) => {
+                  const selectedCount = module.codes.filter((item) =>
+                    currentPermissions.includes(item.code),
+                  ).length;
+                  const allSelected =
+                    module.codes.length > 0 && selectedCount === module.codes.length;
 
-                {message && (
-                  <p
-                    className={`text-sm font-medium ${
-                      message.startsWith("Lỗi")
-                        ? "text-[var(--hicas-danger)]"
-                        : "text-[var(--hicas-success)]"
-                    }`}
-                  >
-                    {message}
-                  </p>
-                )}
-
-                <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                  {availableModulesTyped?.map((module: PermissionModule) => (
-                    <div
+                  return (
+                    <section
                       key={module.group}
-                      className="rounded-[var(--radius-lg)] border border-[var(--hicas-border)] bg-[var(--hicas-bg)] p-4"
+                      className="rounded-[var(--radius-lg)] border border-[var(--hicas-border)] bg-white p-4"
                     >
-                      <div className="mb-3 flex items-center justify-between gap-3">
-                        <h4 className="font-semibold text-[var(--hicas-text-main)]">
-                          {module.group}
-                        </h4>
+                      <div className="mb-4 flex items-start justify-between gap-3">
+                        <div>
+                          <h3 className="font-semibold text-[var(--hicas-text-main)]">
+                            {module.group}
+                          </h3>
+                          <p className="mt-1 text-xs text-[var(--hicas-text-secondary)]">
+                            {selectedCount}/{module.codes.length} quyền đã chọn
+                          </p>
+                        </div>
                         <Button
                           type="button"
                           size="sm"
-                          variant="ghost"
+                          variant={allSelected ? "secondary" : "ghost"}
                           onClick={() => handleSelectAll(module.codes)}
-                          disabled={selectedRole.roleId === 1}
+                          disabled={isRootRole}
                         >
-                          Chọn/Bỏ chọn tất cả
+                          {allSelected ? "Bỏ chọn" : "Chọn hết"}
                         </Button>
                       </div>
 
-                      <div className="space-y-3">
-                        {module.codes.map((item: PermissionItem) => (
-                          <label key={item.code} className="flex cursor-pointer flex-col">
-                            <div className="flex items-center gap-2">
+                      <div className="space-y-2">
+                        {module.codes.map((item: PermissionItem) => {
+                          const checked = currentPermissions.includes(item.code);
+
+                          return (
+                            <label
+                              key={item.code}
+                              className={cn(
+                                "flex cursor-pointer items-start gap-3 rounded-[var(--radius-md)] border px-3 py-3 transition",
+                                checked
+                                  ? "border-[var(--hicas-orange)] bg-[var(--hicas-orange-lighter)]"
+                                  : "border-[var(--hicas-border-soft)] bg-[var(--hicas-bg)] hover:border-[var(--hicas-orange)]",
+                                isRootRole && "cursor-not-allowed opacity-75",
+                              )}
+                            >
                               <input
                                 type="checkbox"
-                                checked={currentPermissions.includes(item.code)}
+                                checked={checked}
                                 onChange={() => handleCheckboxChange(item.code)}
-                                disabled={selectedRole.roleId === 1}
-                                className="h-4 w-4 rounded border-[var(--hicas-border)] accent-[var(--hicas-orange)]"
+                                disabled={isRootRole}
+                                className="mt-1 h-4 w-4 rounded border-[var(--hicas-border)] accent-[var(--hicas-orange)]"
                               />
-                              <span className="text-sm font-semibold text-[var(--hicas-text-main)]">
-                                {item.code}
+                              <span>
+                                <span className="block font-mono text-xs font-semibold text-[var(--hicas-text-main)]">
+                                  {item.code}
+                                </span>
+                                <span className="mt-1 block text-xs leading-5 text-[var(--hicas-text-secondary)]">
+                                  {item.desc}
+                                </span>
                               </span>
-                            </div>
-                            <span className="ml-6 text-xs leading-5 text-[var(--hicas-text-secondary)]">
-                              {item.desc}
-                            </span>
-                          </label>
-                        ))}
+                            </label>
+                          );
+                        })}
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    </section>
+                  );
+                })}
               </div>
-            )}
-          </section>
-        </div>
-      )}
-    </Card>
+            </div>
+          )}
+        </Card>
+      </section>
+    </div>
   );
 };

@@ -1,14 +1,16 @@
-import type { FormEvent } from "react";
-import { useState } from "react";
+﻿import type { FormEvent } from "react";
+import { useEffect, useState } from "react";
 import { CalendarDays, History, Save } from "lucide-react";
 import { PageHeader } from "../../../components/layout";
 import { Badge, Button, Card, DataTable } from "../../../components/ui";
 import type { DataTableColumn } from "../../../components/ui";
 import { useScheduleConfig } from "../hooks/useScheduleConfig";
+import { companyCalendarApi } from "../api/companyCalendarApi";
 import type {
   ConfiguredScheduleItem,
   ScheduleChangeHistoryItem,
 } from "../types/scheduleConfig";
+import type { CompanyCalendar } from "../types/companyCalendar";
 import type { DepartmentTree } from "../../organization/types/department";
 
 const currentDate = new Date();
@@ -85,17 +87,37 @@ export const ScheduleConfiguration = () => {
     standardHoursPerDay: 8,
     includePaidLeaveInWorkDays: true,
     workingDaysOfWeek: "1,2,3,4,5",
+    companyCalendarId: "",
     holidayDatesJson: "[]",
+    holidayWorkingStartTime: "",
+    holidayWorkingEndTime: "",
     lockWorkCalendar: false,
     calendarNote: "",
     totalDays: 12,
   });
   const [holidayDateInput, setHolidayDateInput] = useState("");
+  const [companyCalendars, setCompanyCalendars] = useState<CompanyCalendar[]>([]);
 
   const flatDepts = flattenDepartments(departments);
   const selectedDeptId = formData.deptId || flatDepts[0]?.id.toString() || "";
   const selectedLeaveTypeId = formData.leaveTypeId || leaveTypes[0]?.id.toString() || "";
   const holidayDates = parseHolidayDates(formData.holidayDatesJson);
+
+  useEffect(() => {
+    let mounted = true;
+    companyCalendarApi
+      .getByYear(Number(formData.year))
+      .then((res) => {
+        if (mounted) setCompanyCalendars(res.data);
+      })
+      .catch(() => {
+        if (mounted) setCompanyCalendars([]);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [formData.year]);
 
   const updateHolidayDates = (dates: string[]) => {
     setFormData((prev) => ({
@@ -126,12 +148,21 @@ export const ScheduleConfiguration = () => {
       standardWorkDays: Number(formData.standardWorkDays),
       standardHoursPerDay: Number(formData.standardHoursPerDay),
       includePaidLeaveInWorkDays: formData.includePaidLeaveInWorkDays,
+      companyCalendarId: formData.companyCalendarId
+        ? Number(formData.companyCalendarId)
+        : null,
       totalDays: Number(formData.totalDays),
       startTime: `${formData.startTime}:00`,
       endTime: `${formData.endTime}:00`,
       breakStartTime: formData.hasBreak ? `${formData.breakStartTime}:00` : null,
       breakEndTime: formData.hasBreak ? `${formData.breakEndTime}:00` : null,
       holidayDatesJson: stringifyHolidayDates(holidayDates),
+      holidayWorkingStartTime: formData.holidayWorkingStartTime
+        ? `${formData.holidayWorkingStartTime}:00`
+        : null,
+      holidayWorkingEndTime: formData.holidayWorkingEndTime
+        ? `${formData.holidayWorkingEndTime}:00`
+        : null,
       calendarNote: formData.calendarNote || null,
     });
   };
@@ -247,18 +278,17 @@ export const ScheduleConfiguration = () => {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="F0.6 Cấu hình lịch trình làm việc"
-        description="Thiết lập ca làm việc, kỳ công, ngày nghỉ lễ và quỹ phép theo phòng ban. Dữ liệu này là nền cho chấm công, bảng công và tính lương."
+        title="Ca làm việc"
+        description="Thiết lập ca làm việc, kỳ công và lịch áp dụng cho từng phòng ban."
         breadcrumb={[
-          { label: "Module 0" },
           { label: "Cấu hình hệ thống" },
-          { label: "Lịch trình làm việc" },
+          { label: "Ca làm việc" },
         ]}
       />
 
       <Card
-        title="Thiết lập ca, kỳ công và quỹ phép"
-        description="Các thay đổi sẽ được ghi nhận vào lịch sử để phục vụ audit và đối chiếu payroll."
+        title="Thiết lập ca làm việc"
+        description="Cập nhật ca, ngày công chuẩn, lịch nghỉ công ty và quỹ phép cho phòng ban."
         actions={<CalendarDays size={20} className="text-[var(--hicas-orange)]" />}
       >
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -463,10 +493,52 @@ export const ScheduleConfiguration = () => {
                   placeholder="1,2,3,4,5"
                 />
               </label>
-              <div className="rounded-2xl border border-[var(--hicas-border)] bg-[var(--hicas-orange-lighter)] p-4 text-sm text-[var(--hicas-text-secondary)]">
+              <label className="block">
+                <span className="mb-2 block text-sm font-semibold">Lịch nghỉ công ty</span>
+                <select
+                  className="hicas-select w-full"
+                  value={formData.companyCalendarId}
+                  onChange={(event) =>
+                    setFormData({ ...formData, companyCalendarId: event.target.value })
+                  }
+                >
+                  <option value="">Dùng lịch active theo năm</option>
+                  {companyCalendars.map((calendar) => (
+                    <option key={calendar.id} value={calendar.id}>
+                      {calendar.versionCode}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            <div className="rounded-2xl border border-[var(--hicas-border)] bg-[var(--hicas-orange-lighter)] p-4 text-sm text-[var(--hicas-text-secondary)]">
                 Ngày công = phút làm thực tế / giờ chuẩn, tối đa 1 công/ngày. Phần vượt giờ
-                chuẩn được xử lý riêng ở OT.
+                chuẩn được xử lý riêng ở phần làm thêm.
               </div>
+            </div>
+
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <label className="block">
+                <span className="mb-2 block text-sm font-semibold">Giờ bắt đầu làm ngày lễ</span>
+                <input
+                  type="time"
+                  className="hicas-input w-full"
+                  value={formData.holidayWorkingStartTime}
+                  onChange={(event) =>
+                    setFormData({ ...formData, holidayWorkingStartTime: event.target.value })
+                  }
+                />
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-sm font-semibold">Giờ kết thúc làm ngày lễ</span>
+                <input
+                  type="time"
+                  className="hicas-input w-full"
+                  value={formData.holidayWorkingEndTime}
+                  onChange={(event) =>
+                    setFormData({ ...formData, holidayWorkingEndTime: event.target.value })
+                  }
+                />
+              </label>
             </div>
 
             <div className="mt-4 grid gap-4 md:grid-cols-2">
@@ -615,3 +687,4 @@ export const ScheduleConfiguration = () => {
     </div>
   );
 };
+

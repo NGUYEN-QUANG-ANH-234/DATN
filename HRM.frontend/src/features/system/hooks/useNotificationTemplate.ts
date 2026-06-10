@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { notificationTemplateApi } from "../api/notificationTemplateApi";
-import type { NotificationTemplate } from "../types/notificationTemplate";
+import type { NotificationTemplate, TemplateVariable } from "../types/notificationTemplate";
 
 export const useNotificationTemplate = () => {
   const [templates, setTemplates] = useState<NotificationTemplate[]>([]);
@@ -10,13 +10,21 @@ export const useNotificationTemplate = () => {
     setLoading(true);
     try {
       const res = (await notificationTemplateApi.getAll()) as unknown;
-      if (Array.isArray(res)) setTemplates(res);
-      else if (
+      if (Array.isArray(res)) {
+        setTemplates(normalizeTemplates(res));
+      } else if (
         res &&
         typeof res === "object" &&
-        Array.isArray((res as { data: unknown }).data)
-      )
-        setTemplates((res as { data: NotificationTemplate[] }).data);
+        Array.isArray((res as { data?: unknown; Data?: unknown }).data)
+      ) {
+        setTemplates(normalizeTemplates((res as { data: NotificationTemplate[] }).data));
+      } else if (
+        res &&
+        typeof res === "object" &&
+        Array.isArray((res as { Data?: unknown }).Data)
+      ) {
+        setTemplates(normalizeTemplates((res as { Data: NotificationTemplate[] }).Data));
+      }
     } catch (error) {
       console.error("Lỗi tải mẫu thông báo:", error);
     } finally {
@@ -33,7 +41,7 @@ export const useNotificationTemplate = () => {
         templateKey,
         payload,
       )) as unknown;
-      await fetchTemplates(); // Refresh sau khi cập nhật
+      await fetchTemplates();
       return res;
     } catch (error: unknown) {
       throw (
@@ -49,3 +57,53 @@ export const useNotificationTemplate = () => {
 
   return { templates, loading, updateTemplate };
 };
+
+const normalizeTemplates = (items: NotificationTemplate[]): NotificationTemplate[] =>
+  items.map((item) => {
+    const raw = item as NotificationTemplate & {
+      TemplateKey?: string;
+      DisplayName?: string;
+      Category?: string;
+      AllowedPlaceholders?: string[];
+      SystemPlaceholders?: string[];
+      CustomVariables?: TemplateVariable[];
+      Subject?: string;
+      BodyHtml?: string;
+    };
+    const templateKey = item.templateKey || raw.TemplateKey || "";
+
+    return {
+      templateKey,
+      displayName: item.displayName || raw.DisplayName || templateKey,
+      category: item.category || raw.Category || "Mẫu hệ thống",
+      allowedPlaceholders: item.allowedPlaceholders || raw.AllowedPlaceholders || [],
+      systemPlaceholders: item.systemPlaceholders || raw.SystemPlaceholders || [],
+      customVariables: normalizeVariables(item.customVariables || raw.CustomVariables || []),
+      subject: item.subject || raw.Subject || "",
+      bodyHtml: item.bodyHtml || raw.BodyHtml || "",
+    };
+  });
+
+const normalizeVariables = (items: TemplateVariable[]): TemplateVariable[] =>
+  items.map((item) => {
+    const raw = item as TemplateVariable & {
+      Code?: string;
+      Label?: string;
+      DataType?: TemplateVariable["dataType"];
+      SourceType?: "Manual";
+      IsRequired?: boolean;
+      Description?: string | null;
+      Placeholder?: string;
+    };
+    const code = item.code || raw.Code || "";
+
+    return {
+      code,
+      label: item.label || raw.Label || code,
+      dataType: item.dataType || raw.DataType || "Text",
+      sourceType: "Manual",
+      isRequired: item.isRequired ?? raw.IsRequired ?? false,
+      description: item.description ?? raw.Description ?? null,
+      placeholder: item.placeholder || raw.Placeholder || `{${code}}`,
+    };
+  });

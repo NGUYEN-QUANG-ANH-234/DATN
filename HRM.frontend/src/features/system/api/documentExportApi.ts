@@ -32,8 +32,25 @@ function downloadBlob(blob: Blob, fileName: string) {
 }
 
 export const documentExportApi = {
-  getTemplates: async (): Promise<{ success: boolean; data: DocumentTemplateSummary[] }> => {
-    return await axiosClient.get(`${ENDPOINT}/templates`);
+  getTemplates: async (): Promise<DocumentTemplateSummary[]> => {
+    const res = (await axiosClient.get(`${ENDPOINT}/templates`)) as unknown;
+    if (Array.isArray(res)) return normalizeTemplates(res);
+    if (
+      res &&
+      typeof res === "object" &&
+      Array.isArray((res as { data?: unknown }).data)
+    ) {
+      return normalizeTemplates((res as { data: DocumentTemplateSummary[] }).data);
+    }
+    if (
+      res &&
+      typeof res === "object" &&
+      Array.isArray((res as { Data?: unknown }).Data)
+    ) {
+      return normalizeTemplates((res as { Data: DocumentTemplateSummary[] }).Data);
+    }
+
+    return [];
   },
 
   exportHtml: async (templateKey: string, referenceId: number, layoutVersion?: string) => {
@@ -76,4 +93,33 @@ export const documentExportApi = {
   exportKpiReview: async (reviewId: number, layoutVersion?: string) => {
     return documentExportApi.exportHtml("EXPORT_KPI_REVIEW", reviewId, layoutVersion);
   },
+
+  exportPayslip: async (payrollId: number, layoutVersion?: string) => {
+    return documentExportApi.exportHtml("EXPORT_PAYSLIP", payrollId, layoutVersion);
+  },
+
+  exportPersonnelChangeDecision: async (requestId: number, layoutVersion?: string) => {
+    return documentExportApi.exportHtml("EXPORT_PERSONNEL_CHANGE_DECISION", requestId, layoutVersion);
+  },
 };
+
+const normalizeTemplates = (items: DocumentTemplateSummary[]): DocumentTemplateSummary[] =>
+  items.map((item) => {
+    const raw = item as DocumentTemplateSummary & {
+      TemplateKey?: string;
+      DocumentType?: string;
+      DisplayName?: string;
+      ActiveLayoutVersion?: string;
+      AllowedOutputs?: string[];
+      LayoutVersions?: DocumentTemplateSummary["layoutVersions"];
+    };
+
+    return {
+      templateKey: item.templateKey || raw.TemplateKey || "",
+      documentType: item.documentType || raw.DocumentType || "",
+      displayName: item.displayName || raw.DisplayName || item.templateKey || raw.TemplateKey || "",
+      activeLayoutVersion: item.activeLayoutVersion || raw.ActiveLayoutVersion || "",
+      allowedOutputs: item.allowedOutputs || raw.AllowedOutputs || [],
+      layoutVersions: item.layoutVersions || raw.LayoutVersions || [],
+    };
+  });

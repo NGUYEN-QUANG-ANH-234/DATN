@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { salaryVariableApi } from "../api/salaryVariableApi";
 import type {
-  CreateSourceCatalogPayload,
   SalaryVariable,
   SourceCatalogItem,
 } from "../types/salaryVariable";
+
+const extractErrorMessage = (error: unknown) =>
+  (error as { response?: { data?: { message?: string } } }).response?.data
+    ?.message || "Lỗi hệ thống";
 
 export const useSalaryVariable = () => {
   const [variables, setVariables] = useState<SalaryVariable[]>([]);
@@ -17,9 +20,9 @@ export const useSalaryVariable = () => {
       const res = await salaryVariableApi.getAll();
 
       if (Array.isArray(res)) {
-        setVariables(res);
+        setVariables(res.map((item) => ({ ...item, isActive: item.isActive ?? true })));
       } else if (res && Array.isArray(res.data)) {
-        setVariables(res.data);
+        setVariables(res.data.map((item) => ({ ...item, isActive: item.isActive ?? true })));
       } else {
         setVariables([]);
       }
@@ -56,25 +59,31 @@ export const useSalaryVariable = () => {
       }
       return res;
     } catch (error: unknown) {
-      throw (
-        (error as { response?: { data?: { message?: string } } }).response?.data
-          ?.message || "Loi he thong"
-      );
+      throw extractErrorMessage(error);
     }
   };
 
-  const createCatalog = async (payload: CreateSourceCatalogPayload) => {
+  const setVariableActive = async (code: string, isActive: boolean) => {
     try {
-      const res = await salaryVariableApi.createCatalog(payload);
+      const res = await salaryVariableApi.setActive(code, isActive);
+      if (res.success) {
+        await fetchVariables();
+      }
+      return res;
+    } catch (error: unknown) {
+      throw extractErrorMessage(error);
+    }
+  };
+
+  const setCatalogActive = async (id: number, isActive: boolean) => {
+    try {
+      const res = await salaryVariableApi.setCatalogActive(id, isActive);
       if (res.success) {
         await fetchCatalogs();
       }
       return res;
     } catch (error: unknown) {
-      throw (
-        (error as { response?: { data?: { message?: string } } }).response?.data
-          ?.message || "Loi he thong"
-      );
+      throw extractErrorMessage(error);
     }
   };
 
@@ -83,5 +92,12 @@ export const useSalaryVariable = () => {
     fetchCatalogs();
   }, [fetchVariables, fetchCatalogs]);
 
-  return { variables, catalogs, loading, defineVariable, createCatalog };
+  return {
+    variables,
+    catalogs,
+    loading,
+    defineVariable,
+    setVariableActive,
+    setCatalogActive,
+  };
 };

@@ -1,5 +1,5 @@
 import axiosClient from "../../../core/api/axiosClient";
-import type { SlaConfig, SlaUpdateRequest } from "../types/sla.ts";
+import type { SlaConfig, SlaStatusRequest, SlaUpdateRequest } from "../types/sla.ts";
 
 type BaseResponse<T> = {
   data: T;
@@ -16,5 +16,15 @@ export const slaApi = {
 
   update: async (payload: SlaUpdateRequest): Promise<BaseResponse<null>> => {
     return await axiosClient.put(ENDPOINT, payload);
+  },
+
+  setActive: async (
+    moduleCode: string,
+    payload: SlaStatusRequest,
+  ): Promise<BaseResponse<null>> => {
+    return await axiosClient.patch(
+      `${ENDPOINT}/${encodeURIComponent(moduleCode)}/active`,
+      payload,
+    );
   },
 };

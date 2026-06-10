@@ -3,6 +3,8 @@ export { PayrollPolicyManager } from "./components/PayrollPolicyManager";
 export { SalaryVariableManager } from "./components/SalaryVariableManager";
 export { SlaManager } from "./components/SlaManager";
 export { TemplateManager } from "./components/TemplateManager";
+export { DocumentTemplateManager } from "./components/DocumentTemplateManager";
 export { RbacManager } from "./components/RbacManager";
 export { AuditLogViewer } from "./components/AuditLogViewer";
 export { ScheduleConfiguration } from "./components/ScheduleConfiguration";
+export { CompanyCalendarManager } from "./components/CompanyCalendarManager";

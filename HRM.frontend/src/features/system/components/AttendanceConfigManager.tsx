@@ -126,10 +126,9 @@ export const AttendanceConfigManager = () => {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="F0.4 Cấu hình tham số chấm công"
-        description="Thiết lập IP public, tọa độ GPS và bán kính hợp lệ cho từng cơ sở làm việc để kiểm tra điều kiện check-in/check-out."
+        title="Tham số chấm công"
+        description="Thiết lập vị trí, bán kính và mạng cho phép tại từng cơ sở làm việc."
         breadcrumb={[
-          { label: "Module 0" },
           { label: "Cấu hình hệ thống" },
           { label: "Tham số chấm công" },
         ]}
@@ -159,7 +158,7 @@ export const AttendanceConfigManager = () => {
       {loading && !config ? (
         <Card>
           <div className="py-10 text-center text-sm text-[var(--hicas-text-secondary)]">
-            Đang tải cấu hình chấm công...
+            Đang tải dữ liệu...
           </div>
         </Card>
       ) : (
@@ -169,7 +168,7 @@ export const AttendanceConfigManager = () => {
               <Card
                 key={index}
                 title={`Cơ sở #${index + 1}`}
-                description="Tọa độ, bán kính và danh sách IP/CIDR cho phép."
+                description="Tọa độ, bán kính và mạng được phép chấm công."
                 actions={
                   <div className="flex items-center gap-2">
                     <Badge variant={office.isActive ? "success" : "neutral"}>

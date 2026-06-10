@@ -5,6 +5,8 @@ export const PayrollPolicyType = {
   Allowance: 3,
   Deduction: 4,
   Seniority: 5,
+  MinimumWage: 6,
+  KpiBonus: 7,
 } as const;
 
 export type PayrollPolicyType =
@@ -35,6 +37,12 @@ export interface PayrollPolicy {
   effectiveFrom: string;
   effectiveTo?: string | null;
   version: number;
+  versionCode?: string | null;
+  status?: number | string;
+  sourceRef?: string | null;
+  supersedesVersionId?: number | null;
+  activatedAt?: string | null;
+  lockedAfterUsed?: boolean;
   isActive: boolean;
   description?: string | null;
 }
