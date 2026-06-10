@@ -57,6 +57,31 @@ namespace HRM.backend.src.HRM.API.Controllers.Organization
             }
         }
 
+        [HttpPut("{id}")]
+        [RequirePermission("ORG_TREE_UPDATE", GroupName = SystemModules.SystemManagement, Description = "Cập nhật thông tin phòng ban")]
+        public async Task<IActionResult> Update(int id, [FromBody] UpdateDepartmentDto dto, CancellationToken ct)
+        {
+            try
+            {
+                int actorId = User.GetAccountIdOrThrow();
+                await _orgTreeUseCase.UpdateDepartmentAsync(id, dto, actorId, ct);
+
+                return Ok(new { Success = true, Message = "Cập nhật thông tin phòng ban thành công." });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { Message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { Message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = ex.Message });
+            }
+        }
+
         [HttpPatch("{id}/deactivate")]
         [RequirePermission("ORG_TREE_DELETE", GroupName = SystemModules.SystemManagement, Description = "Giải thể phòng ban")]
         public async Task<IActionResult> Deactivate(int id, CancellationToken ct)

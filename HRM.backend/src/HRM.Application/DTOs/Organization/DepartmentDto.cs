@@ -18,6 +18,14 @@ namespace HRM.backend.src.HRM.Application.DTOs.Organization
         public int? NewParentId { get; set; }
     }
 
+    public class UpdateDepartmentDto
+    {
+        [Required, StringLength(100)]
+        public string DeptName { get; set; } = string.Empty;
+
+        public int? ParentDeptId { get; set; }
+    }
+
     public class CreateDepartmentDto
     {
         [Required, StringLength(20)]
@@ -54,7 +62,10 @@ namespace HRM.backend.src.HRM.Application.DTOs.Organization
         public decimal? StandardHoursPerDay { get; set; }
         public bool IncludePaidLeaveInWorkDays { get; set; }
         public string? WorkingDaysOfWeek { get; set; }
+        public int? CompanyCalendarId { get; set; }
         public string? HolidayDatesJson { get; set; }
+        public TimeSpan? HolidayWorkingStartTime { get; set; }
+        public TimeSpan? HolidayWorkingEndTime { get; set; }
         public bool IsWorkCalendarLocked { get; set; }
         public string? CalendarNote { get; set; }
     }
