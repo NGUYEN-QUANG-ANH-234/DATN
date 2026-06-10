@@ -31,7 +31,7 @@ export const DataTable = <T,>({
   data,
   rowKey,
   loading = false,
-  emptyTitle = "Không có dữ liệu",
+  emptyTitle = "Chưa có dữ liệu",
   emptyDescription,
   className,
   tableClassName,

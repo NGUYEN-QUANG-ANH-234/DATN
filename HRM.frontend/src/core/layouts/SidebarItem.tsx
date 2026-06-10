@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { hasAnyRole } from "../auth/roleAccess";
 import type { MenuItem } from "../types/menu";
 
 interface SidebarItemProps {
@@ -17,9 +18,7 @@ export const SidebarItem = ({ item, userRole }: SidebarItemProps) => {
 
   const [isOpen, setIsOpen] = useState(isChildActive || false);
 
-  const visibleChildren = item.children?.filter((child) =>
-    child.roles.includes(userRole),
-  );
+  const visibleChildren = item.children?.filter((child) => hasAnyRole(child.roles, userRole));
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect

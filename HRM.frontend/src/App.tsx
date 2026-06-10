@@ -1,7 +1,9 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AccountSecurityPage, LoginPage, MfaSetup } from "./core/auth";
+import { useCurrentUser } from "./core/auth/hooks/useCurrentUser";
 import DashboardPage from "./features/dashboard/DashboardPage";
 import ProtectedRoute from "./routes/ProtectedRoute";
+import { getFirstAccessiblePath } from "./routes/appRoutes";
 import { MainLayout } from "./core/layouts/MainLayout";
 import {
   AttendanceConfigManager,
@@ -9,36 +11,39 @@ import {
   SalaryVariableManager,
   SlaManager,
   TemplateManager,
+  DocumentTemplateManager,
   RbacManager,
   AuditLogViewer,
   ScheduleConfiguration,
+  CompanyCalendarManager,
 } from "./features/system";
 import { AccountManagement } from "./features/system/components/AccountManagement";
 import { NotificationProvider } from "./core/context/NotificationContext";
 import { DepartmentManagement } from "./features/organization";
-import { ApprovalTrackingPage, ApprovalWorkspacePage } from "./features/approvals";
+import {
+  ApprovalTrackingPage,
+  ApprovalWorkspacePage,
+  getApprovalRedirect,
+} from "./features/approvals";
 import {
   AttendanceLogPage,
   AttendanceSummaryPage,
   LeaveRequestPage,
-  OvertimeApprovalPage,
   OvertimeRequestPage,
 } from "./features/attendance";
 import {
-  HRProfileReviewList,
   MyContracts,
   MyProfile,
   OnboardingForm,
   ProfileUpdateForm,
   ContractManagement,
   HRContractManagement,
-  DirectorContractApproval,
   ContractAddendumManagement,
   EmployeeHistoryTimeline,
 } from "./features/employees";
 import {
   CreateRecruitmentForm,
-  RecruitmentApprovalInbox,
+  RecruitmentDemandListPage,
   PublicCareersPage,
   CandidateHistory,
   CandidateManagement,
@@ -54,12 +59,88 @@ import {
   PayrollAdjustmentPage,
   PayrollAggregationPage,
   PayslipLookupPage,
+  ProjectBonusImportPage,
   SalaryFormulaPage,
 } from "./features/payroll";
 import { PenaltyRecordPage } from "./features/penalties";
 import { PersonnelChangePage } from "./features/personnel-change";
+import { DocumentFormsPage } from "./features/document-forms";
 
 const Redirect = ({ to }: { to: string }) => <Navigate to={to} replace />;
+
+const RoleRedirect = ({ candidates }: { candidates: string[] }) => {
+  const { user } = useCurrentUser();
+  return <Navigate to={getFirstAccessiblePath(user?.role, candidates)} replace />;
+};
+
+const SYSTEM_CONFIG_ROUTES = [
+  "/system-config/positions-departments",
+  "/system-config/salary-variables",
+  "/system-config/sla",
+  "/system-config/notification-templates",
+  "/system-config/document-templates",
+  "/system-config/attendance-parameters",
+  "/system-config/work-schedules",
+  "/system-config/company-calendar",
+  "/system-config/payroll-policies",
+];
+
+const ADMIN_ROUTES = [
+  "/admin/roles-permissions",
+  "/admin/audit-logs",
+  "/admin/identity-auth",
+  "/admin/accounts-access",
+];
+
+const RECRUITMENT_ROUTES = [
+  "/recruitment/jobs",
+  "/recruitment/demands",
+  "/recruitment/candidates",
+  "/recruitment/history",
+];
+
+const EMPLOYEE_CONTRACT_ROUTES = [
+  "/employee-contract/my-profile",
+  "/employee-contract/profile-change",
+  "/employee-contract/contracts",
+  "/employee-contract/contract-requests",
+  "/employee-contract/profile-setup",
+  "/employee-contract/hr-contracts",
+  "/employee-contract/appendices",
+  "/employee-contract/history",
+];
+
+const ATTENDANCE_ROUTES = [
+  "/attendance-leave/attendance",
+  "/attendance-leave/overtime",
+  "/attendance-leave/timesheet-summary",
+  "/attendance-leave/leave",
+];
+
+const PERFORMANCE_ROUTES = [
+  "/performance-training/criteria",
+  "/performance-training/result-update",
+  "/performance-training/penalties",
+  "/performance-training/review-finalize",
+  "/performance-training/development-training",
+];
+
+const PAYROLL_ROUTES = [
+  "/payroll/salary-formula",
+  "/payroll/payroll-aggregation",
+  "/payroll/payslip",
+  "/payroll/adjustments",
+  "/payroll/project-bonuses",
+  "/payroll/external-timesheets",
+];
+
+const PERSONNEL_CHANGE_ROUTES = [
+  "/personnel-change/promotion",
+  "/personnel-change/senior-appointment",
+  "/personnel-change/termination",
+  "/personnel-change/dismissal",
+  "/personnel-change/internal-transfer",
+];
 
 function App() {
   return (
@@ -77,7 +158,7 @@ function App() {
 
               <Route
                 path="/system-config"
-                element={<Redirect to="/system-config/salary-variables" />}
+                element={<RoleRedirect candidates={SYSTEM_CONFIG_ROUTES} />}
               />
               <Route
                 path="/system-config/positions-departments"
@@ -97,6 +178,10 @@ function App() {
                 element={<TemplateManager />}
               />
               <Route
+                path="/system-config/document-templates"
+                element={<DocumentTemplateManager />}
+              />
+              <Route
                 path="/system-config/attendance-parameters"
                 element={<AttendanceConfigManager />}
               />
@@ -104,24 +189,35 @@ function App() {
                 path="/system-config/work-schedules"
                 element={<ScheduleConfiguration />}
               />
+              <Route
+                path="/system-config/company-calendar"
+                element={<CompanyCalendarManager />}
+              />
 
-              <Route path="/admin" element={<Redirect to="/admin/roles-permissions" />} />
+              <Route path="/admin" element={<RoleRedirect candidates={ADMIN_ROUTES} />} />
               <Route path="/admin/roles-permissions" element={<RbacManager />} />
               <Route path="/admin/audit-logs" element={<AuditLogViewer />} />
               <Route path="/admin/identity-auth" element={<MfaSetup />} />
               <Route path="/admin/accounts-access" element={<AccountManagement />} />
 
-              <Route path="/recruitment" element={<Redirect to="/recruitment/demands" />} />
+              <Route path="/recruitment" element={<RoleRedirect candidates={RECRUITMENT_ROUTES} />} />
               <Route path="/recruitment/jobs" element={<PublicCareersPage />} />
-              <Route path="/recruitment/demands" element={<RecruitmentApprovalInbox />} />
+              <Route
+                path="/recruitment/demands"
+                element={<RecruitmentDemandListPage />}
+              />
               <Route path="/recruitment/demands/create" element={<CreateRecruitmentForm />} />
               <Route path="/recruitment/apply-cv" element={<PublicCareersPage />} />
-              <Route path="/recruitment/candidate-review" element={<CandidateManagement />} />
+              <Route path="/recruitment/candidates" element={<CandidateManagement />} />
+              <Route
+                path="/recruitment/candidate-review"
+                element={<Redirect to="/recruitment/candidates" />}
+              />
               <Route path="/recruitment/history" element={<CandidateHistory />} />
 
               <Route
                 path="/employee-contract"
-                element={<Redirect to="/employee-contract/my-profile" />}
+                element={<RoleRedirect candidates={EMPLOYEE_CONTRACT_ROUTES} />}
               />
               <Route path="/employee-contract/my-profile" element={<MyProfile />} />
               <Route path="/employee-contract/profile-setup" element={<OnboardingForm />} />
@@ -130,7 +226,10 @@ function App() {
                 element={<OnboardingForm />}
               />
               <Route path="/employee-contract/profile-change" element={<ProfileUpdateForm />} />
-              <Route path="/employee-contract/profile-review" element={<HRProfileReviewList />} />
+              <Route
+                path="/employee-contract/profile-review"
+                element={<Redirect to={getApprovalRedirect("PROFILE")} />}
+              />
               <Route path="/employee-contract/contracts" element={<MyContracts />} />
               <Route
                 path="/employee-contract/contract-requests"
@@ -139,7 +238,7 @@ function App() {
               <Route path="/employee-contract/hr-contracts" element={<HRContractManagement />} />
               <Route
                 path="/employee-contract/director-contract-approval"
-                element={<DirectorContractApproval />}
+                element={<Redirect to={getApprovalRedirect("CONTRACT")} />}
               />
               <Route
                 path="/employee-contract/appendices"
@@ -149,13 +248,13 @@ function App() {
 
               <Route
                 path="/attendance-leave"
-                element={<Redirect to="/attendance-leave/attendance" />}
+                element={<RoleRedirect candidates={ATTENDANCE_ROUTES} />}
               />
               <Route path="/attendance-leave/attendance" element={<AttendanceLogPage />} />
               <Route path="/attendance-leave/overtime" element={<OvertimeRequestPage />} />
               <Route
                 path="/attendance-leave/overtime-approvals"
-                element={<OvertimeApprovalPage />}
+                element={<Redirect to={getApprovalRedirect("OVERTIME")} />}
               />
               <Route
                 path="/attendance-leave/timesheet-summary"
@@ -165,7 +264,7 @@ function App() {
 
               <Route
                 path="/performance-training"
-                element={<Redirect to="/performance-training/criteria" />}
+                element={<RoleRedirect candidates={PERFORMANCE_ROUTES} />}
               />
               <Route path="/performance-training/criteria" element={<KpiImportPage />} />
               <Route
@@ -185,11 +284,12 @@ function App() {
                 element={<TrainingEvaluationPage />}
               />
 
-              <Route path="/payroll" element={<Redirect to="/payroll/payroll-aggregation" />} />
+              <Route path="/payroll" element={<RoleRedirect candidates={PAYROLL_ROUTES} />} />
               <Route path="/payroll/salary-formula" element={<SalaryFormulaPage />} />
               <Route path="/payroll/payroll-aggregation" element={<PayrollAggregationPage />} />
               <Route path="/payroll/payslip" element={<PayslipLookupPage />} />
               <Route path="/payroll/adjustments" element={<PayrollAdjustmentPage />} />
+              <Route path="/payroll/project-bonuses" element={<ProjectBonusImportPage />} />
               <Route
                 path="/payroll/external-timesheets"
                 element={<ExternalTimesheetImportPage />}
@@ -197,7 +297,7 @@ function App() {
 
               <Route
                 path="/personnel-change"
-                element={<Redirect to="/personnel-change/promotion" />}
+                element={<RoleRedirect candidates={PERSONNEL_CHANGE_ROUTES} />}
               />
               <Route
                 path="/personnel-change/promotion"
@@ -223,7 +323,10 @@ function App() {
               <Route path="/approvals" element={<ApprovalWorkspacePage />} />
               <Route path="/approvals/tracking" element={<ApprovalTrackingPage />} />
 
-              <Route path="/system" element={<Redirect to="/system-config/salary-variables" />} />
+              <Route path="/document-forms" element={<RoleRedirect candidates={["/document-forms/create"]} />} />
+              <Route path="/document-forms/create" element={<DocumentFormsPage />} />
+
+              <Route path="/system" element={<RoleRedirect candidates={SYSTEM_CONFIG_ROUTES} />} />
               <Route
                 path="/system/salary-variables"
                 element={<Redirect to="/system-config/salary-variables" />}
@@ -238,12 +341,20 @@ function App() {
                 element={<Redirect to="/system-config/notification-templates" />}
               />
               <Route
+                path="/system/document-templates"
+                element={<Redirect to="/system-config/document-templates" />}
+              />
+              <Route
                 path="/system/attendance-config"
                 element={<Redirect to="/system-config/attendance-parameters" />}
               />
               <Route
                 path="/system/schedule-configuration"
                 element={<Redirect to="/system-config/work-schedules" />}
+              />
+              <Route
+                path="/system/company-calendar"
+                element={<Redirect to="/system-config/company-calendar" />}
               />
               <Route path="/system/rbac" element={<Redirect to="/admin/roles-permissions" />} />
               <Route path="/system/audit-logs" element={<Redirect to="/admin/audit-logs" />} />
@@ -266,11 +377,11 @@ function App() {
               />
               <Route
                 path="/recruitment/approval-inbox"
-                element={<Redirect to="/recruitment/demands" />}
+                element={<Redirect to={getApprovalRedirect("RECRUITMENT")} />}
               />
               <Route
                 path="/recruitment/candidates-management"
-                element={<Redirect to="/recruitment/candidate-review" />}
+                element={<Redirect to="/recruitment/candidates" />}
               />
 
               <Route
@@ -283,7 +394,7 @@ function App() {
               />
               <Route
                 path="/employees/hr-profile-review"
-                element={<Redirect to="/employee-contract/profile-review" />}
+                element={<Redirect to={getApprovalRedirect("PROFILE")} />}
               />
               <Route
                 path="/employees/my-contracts"
@@ -303,7 +414,7 @@ function App() {
               />
               <Route
                 path="/employees/director-contract-approval"
-                element={<Redirect to="/employee-contract/director-contract-approval" />}
+                element={<Redirect to={getApprovalRedirect("CONTRACT")} />}
               />
               <Route
                 path="/employees/contract-addendums"
@@ -325,7 +436,7 @@ function App() {
               />
               <Route
                 path="/attendance/overtime-approvals"
-                element={<Redirect to="/attendance-leave/overtime-approvals" />}
+                element={<Redirect to={getApprovalRedirect("OVERTIME")} />}
               />
               <Route
                 path="/attendance/leaves"

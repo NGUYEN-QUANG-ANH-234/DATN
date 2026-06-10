@@ -1,5 +1,4 @@
 import {
-  Bell,
   BriefcaseBusiness,
   CalendarClock,
   CheckCircle2,
@@ -31,16 +30,44 @@ interface SidebarProps {
   onNavigate?: () => void;
 }
 
-const getMenuIcon = (label: string): LucideIcon => {
+const getMenuIcon = (item: MenuItem): LucideIcon => {
+  switch (item.icon) {
+    case "dashboard":
+      return LayoutDashboard;
+    case "settings":
+      return Settings;
+    case "access":
+      return CheckCircle2;
+    case "recruitment":
+      return BriefcaseBusiness;
+    case "profile":
+      return FileUser;
+    case "attendance":
+      return CalendarClock;
+    case "training":
+      return GraduationCap;
+    case "payroll":
+      return WalletCards;
+    case "personnel":
+      return Network;
+    case "forms":
+    case "approvals":
+      return ClipboardList;
+    default:
+      break;
+  }
+
+  const label = item.label;
   if (label.includes("Tổng quan")) return LayoutDashboard;
-  if (label.includes("Module 0")) return Settings;
-  if (label.includes("Module 1")) return CheckCircle2;
-  if (label.includes("Module 2")) return BriefcaseBusiness;
-  if (label.includes("Module 3")) return FileUser;
-  if (label.includes("Module 4")) return CalendarClock;
-  if (label.includes("Module 5")) return GraduationCap;
-  if (label.includes("Module 6")) return WalletCards;
-  if (label.includes("Module 7")) return Network;
+  if (label.includes("Cấu hình")) return Settings;
+  if (label.includes("Quản trị")) return CheckCircle2;
+  if (label.includes("Tuyển dụng")) return BriefcaseBusiness;
+  if (label.includes("Hồ sơ")) return FileUser;
+  if (label.includes("Chấm công")) return CalendarClock;
+  if (label.includes("Hiệu suất")) return GraduationCap;
+  if (label.includes("Lương")) return WalletCards;
+  if (label.includes("Biến động")) return Network;
+  if (label.includes("Biểu mẫu")) return ClipboardList;
   if (label.includes("Phê duyệt")) return ClipboardList;
   return FolderKanban;
 };
@@ -110,7 +137,7 @@ export const Sidebar = ({
             <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--hicas-orange)]">
               HICAS
             </p>
-            <h1 className="truncate text-lg font-bold text-white">HR Portal</h1>
+            <h1 className="truncate text-lg font-bold text-white">Nhân sự</h1>
           </div>
         )}
 
@@ -127,7 +154,7 @@ export const Sidebar = ({
       <nav className="scrollbar-sidebar flex-1 overflow-y-auto px-4 pb-4">
         <div className="space-y-1.5">
           {visibleNavigation.map((item) => {
-            const Icon = getMenuIcon(item.label);
+            const Icon = getMenuIcon(item);
             const active = isItemActive(item, location.pathname);
             const expanded = Boolean(openGroups[item.label]);
             const hasChildren = Boolean(item.children?.length);
@@ -203,22 +230,6 @@ export const Sidebar = ({
         </div>
       </nav>
 
-      {!compact && (
-        <div className="p-4">
-          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-            <div className="mb-3 flex items-center gap-2 text-[var(--hicas-orange)]">
-              <Bell size={18} />
-              <span className="text-xs font-semibold uppercase tracking-[0.16em]">
-                HICAS Ops
-              </span>
-            </div>
-            <p className="text-sm font-semibold leading-5 text-white">
-              Building People. Powering Progress.
-            </p>
-            <div className="mt-4 h-12 rounded-xl border border-[rgba(255,122,0,0.22)] bg-[linear-gradient(135deg,rgba(255,122,0,0.2),rgba(255,255,255,0.03))]" />
-          </div>
-        </div>
-      )}
     </aside>
   );
 };

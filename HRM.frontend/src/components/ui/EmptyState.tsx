@@ -3,7 +3,7 @@ import { Inbox } from "lucide-react";
 import { cn } from "./classNames";
 
 export type EmptyStateProps = {
-  title: string;
+  title?: string;
   description?: string;
   icon?: ReactNode;
   action?: ReactNode;
@@ -11,7 +11,7 @@ export type EmptyStateProps = {
 };
 
 export const EmptyState = ({
-  title,
+  title = "Chưa có dữ liệu",
   description,
   icon,
   action,

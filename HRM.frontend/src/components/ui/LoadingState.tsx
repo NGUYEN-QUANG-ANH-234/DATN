@@ -8,8 +8,8 @@ export type LoadingStateProps = {
 };
 
 export const LoadingState = ({
-  title = "Đang tải dữ liệu",
-  description = "Vui lòng chờ trong giây lát.",
+  title = "Đang tải dữ liệu...",
+  description,
   className,
 }: LoadingStateProps) => (
   <div
@@ -22,8 +22,10 @@ export const LoadingState = ({
       <Loader2 size={22} className="animate-spin" />
     </div>
     <p className="font-semibold text-[var(--hicas-text-main)]">{title}</p>
-    <p className="mx-auto mt-1 max-w-md text-sm leading-6 text-[var(--hicas-text-secondary)]">
-      {description}
-    </p>
+    {description ? (
+      <p className="mx-auto mt-1 max-w-md text-sm leading-6 text-[var(--hicas-text-secondary)]">
+        {description}
+      </p>
+    ) : null}
   </div>
 );

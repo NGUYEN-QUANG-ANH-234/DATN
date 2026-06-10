@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useGoogleLogin } from "@react-oauth/google";
-import { Eye, Globe2, LockKeyhole, Mail } from "lucide-react";
+import { Eye, EyeOff, Globe2, LockKeyhole, Mail } from "lucide-react";
 import { Button } from "../../../components/ui";
 import logo from "../../../assets/images/hicas-logo.jpg";
 import heroImage from "../../../assets/images/login-platform-hero-focused.png";
@@ -77,19 +77,16 @@ export const LoginPage = () => {
 
   const title =
     step === "LOGIN"
-      ? "HICAS WORKSPACE"
+      ? "Đăng nhập"
       : mfaMode === "OTP"
-        ? "Xác thực hai lớp"
-        : "Khôi phục truy cập";
+        ? "Xác thực bảo mật"
+        : "Mã khôi phục";
 
-  // const subtitle =
-  //   step === "LOGIN"
-  //     ? "Đăng nhập vào không gian làm việc nội bộ của HICAS."
-  //     : "Tài khoản của bạn đang được bảo vệ bằng MFA.";
+  const subtitle = step === "LOGIN" ? "" : "Nhập mã xác thực để tiếp tục.";
 
   return (
     <div className="min-h-screen bg-[#F6F7F9]">
-      <div className="grid min-h-screen lg:grid-cols-[52fr_48fr]">
+      <div className="grid min-h-screen lg:grid-cols-[58fr_42fr] xl:grid-cols-[60fr_40fr]">
         <aside className="relative hidden min-h-screen overflow-hidden bg-[#101112] lg:block">
           <img
             src={heroImage}
@@ -98,11 +95,11 @@ export const LoginPage = () => {
           />
           <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(16,17,18,0.18)_0%,rgba(16,17,18,0.08)_42%,rgba(16,17,18,0.01)_100%)]" />
           <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(16,17,18,0.18)_0%,rgba(16,17,18,0.035)_30%,rgba(16,17,18,0)_66%,rgba(16,17,18,0.04)_100%)]" />
-          <div className="absolute left-0 top-0 h-[46%] w-[88%] bg-[radial-gradient(ellipse_at_18%_18%,rgba(0,0,0,0.9)_0%,rgba(0,0,0,0.68)_34%,rgba(0,0,0,0.34)_62%,transparent_100%)] backdrop-blur-[1px]" />
+          <div className="absolute left-0 top-0 h-[66%] w-[92%] bg-[radial-gradient(ellipse_at_18%_20%,rgba(0,0,0,0.9)_0%,rgba(0,0,0,0.68)_36%,rgba(0,0,0,0.32)_66%,transparent_100%)] backdrop-blur-[1px]" />
 
           <div className="relative z-10 flex h-full flex-col px-8 py-7 text-white xl:px-10">
             <div className="flex items-center gap-4">
-              <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl bg-white shadow-[0_18px_48px_rgba(0,0,0,0.28)]">
+              <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl bg-white shadow-[0_18px_48px_rgba(0,0,0,0.28)]">
                 <img
                   src={logo}
                   alt="HICAS"
@@ -110,38 +107,29 @@ export const LoginPage = () => {
                 />
               </div>
               <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--hicas-orange)] [text-shadow:0_3px_18px_rgba(0,0,0,0.9)]">
-                  Engineering Workspace
+                <p className="text-lg font-extrabold uppercase tracking-[0.24em] text-[var(--hicas-orange)] [text-shadow:0_3px_18px_rgba(0,0,0,0.9)]">
+                  HICAS
                 </p>
-                <p className="mt-1 text-sm text-white/72 [text-shadow:0_3px_18px_rgba(0,0,0,0.9)]">
-                  BIM / ERP / AI / Data Platform
+                <p className="mt-1 text-base font-medium text-white/82 [text-shadow:0_3px_18px_rgba(0,0,0,0.9)]">
+                  Nền tảng nhân sự
                 </p>
               </div>
             </div>
 
-            <div className="mt-12 max-w-2xl xl:mt-14">
-              {/* <div className="mb-4 inline-flex items-center rounded-full border border-[rgba(255,122,0,0.34)] bg-[#111111]/42 px-4 py-2 text-sm font-semibold text-[var(--hicas-orange-hover)] backdrop-blur">
-                Engineering Software Platform
-              </div> */}
-
-              <h1 className="text-[clamp(1.95rem,3.15vw,3.65rem)] font-extrabold leading-[1.07] tracking-[-0.045em] [text-shadow:0_5px_28px_rgba(0,0,0,0.92)]">
-                Engineering Software.
+            <div className="mt-16 max-w-2xl">
+              <h1 className="text-[clamp(2.35rem,4vw,4.55rem)] font-extrabold leading-[1.04] tracking-normal [text-shadow:0_8px_32px_rgba(0,0,0,0.95)]">
+                Quản lý nhân sự
                 <span className="block text-[var(--hicas-orange)]">
-                  Connected Operations.
+                  Kết nối cơ hội
                 </span>
               </h1>
-
-              {/* <p className="mt-4 max-w-xl text-sm leading-7 text-white/76 xl:text-base">
-                Không gian nội bộ kết nối con người, vận hành và dữ liệu trong
-                hệ sinh thái BIM-ERP-AI của HICAS.
-              </p> */}
             </div>
           </div>
         </aside>
 
-        <main className="flex min-h-screen items-center justify-center px-5 py-8 sm:px-8 lg:px-10">
-          <div className="w-full max-w-[480px]">
-            <div className="mb-8 flex items-center justify-between lg:justify-end">
+        <main className="flex min-h-screen items-center justify-center px-5 py-8 sm:px-8 lg:px-8 xl:px-10">
+          <div className="w-full max-w-[390px] xl:max-w-[410px]">
+            <div className="mb-6 flex items-center justify-between lg:justify-end">
               <div className="flex items-center gap-3 lg:hidden">
                 <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl bg-white shadow-[var(--shadow-card)]">
                   <img
@@ -151,50 +139,51 @@ export const LoginPage = () => {
                   />
                 </div>
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-[var(--hicas-orange)]">
+                  <p className="text-sm font-bold uppercase tracking-[0.18em] text-[var(--hicas-orange)]">
                     HICAS
                   </p>
-                  <p className="text-sm font-semibold">Workspace</p>
+                  <p className="text-base font-bold text-[var(--hicas-text-main)]">
+                    Quản lý nhân sự
+                  </p>
                 </div>
               </div>
-              <div className="flex items-center gap-5 text-sm text-[var(--hicas-text-secondary)]">
-                <button className="inline-flex items-center gap-2 font-semibold text-[var(--hicas-text-main)]">
-                  <Globe2 size={16} />
-                  Tiếng Việt
-                </button>
-                <button>Trợ giúp</button>
-              </div>
+              <span className="inline-flex items-center gap-2 text-base font-bold text-[var(--hicas-text-main)]">
+                <Globe2 size={18} />
+                Tiếng Việt
+              </span>
             </div>
 
-            <section className="rounded-[20px] border border-[var(--hicas-border)] bg-white p-6 shadow-[0_18px_58px_rgba(17,24,39,0.08)] sm:p-8">
-              <div className="mb-7">
-                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--hicas-orange)]">
-                  Welcome back
+            <section className="rounded-[20px] border border-[var(--hicas-border)] bg-white p-6 shadow-[0_18px_58px_rgba(17,24,39,0.08)] sm:p-7">
+              <div className="mb-6 text-center">
+                <p className="text-sm font-bold uppercase tracking-[0.18em] text-[var(--hicas-orange)]">
+                  HICAS
                 </p>
-                <h2 className="mt-3 text-3xl font-bold tracking-tight text-[var(--hicas-text-main)]">
+                <h2 className="mt-2 text-[32px] font-extrabold tracking-normal text-[var(--hicas-text-main)]">
                   {title}
                 </h2>
-                <p className="mt-3 text-sm leading-6 text-[var(--hicas-text-secondary)]">
-                  {/* {subtitle} */}
-                </p>
+                {subtitle && (
+                  <p className="mt-2 text-base font-medium leading-7 text-[var(--hicas-text-secondary)]">
+                    {subtitle}
+                  </p>
+                )}
               </div>
 
               {error && (
-                <div className="mb-5 rounded-2xl border border-[var(--hicas-danger)] bg-[var(--hicas-danger-soft)] px-4 py-3 text-sm font-medium text-[var(--hicas-danger)]">
+                <div className="mb-5 rounded-xl border border-[var(--hicas-danger)] bg-[var(--hicas-danger-soft)] px-4 py-3 text-base font-semibold text-[var(--hicas-danger)]">
                   {error}
                 </div>
               )}
 
               {step === "LOGIN" ? (
-                <div className="space-y-6">
+                <div className="space-y-5">
                   <form onSubmit={onSubmitBasicLogin} className="space-y-4">
                     <label className="block">
-                      <span className="mb-2 block text-sm font-semibold text-[var(--hicas-text-main)]">
+                      <span className="mb-2 block text-base font-bold text-[var(--hicas-text-main)]">
                         Email hoặc tài khoản
                       </span>
                       <span className="relative block">
                         <Mail
-                          size={18}
+                          size={20}
                           className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[var(--hicas-text-muted)]"
                         />
                         <input
@@ -202,19 +191,19 @@ export const LoginPage = () => {
                           required
                           value={email}
                           onChange={(event) => setEmail(event.target.value)}
-                          className="hicas-input hicas-input-icon-left h-12 w-full rounded-xl"
+                          className="hicas-input hicas-input-icon-left min-h-[52px] w-full rounded-xl text-base font-semibold"
                           placeholder="admin@hicas.vn"
                         />
                       </span>
                     </label>
 
                     <label className="block">
-                      <span className="mb-2 block text-sm font-semibold text-[var(--hicas-text-main)]">
+                      <span className="mb-2 block text-base font-bold text-[var(--hicas-text-main)]">
                         Mật khẩu
                       </span>
                       <span className="relative block">
                         <LockKeyhole
-                          size={18}
+                          size={20}
                           className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[var(--hicas-text-muted)]"
                         />
                         <input
@@ -222,7 +211,7 @@ export const LoginPage = () => {
                           required
                           value={password}
                           onChange={(event) => setPassword(event.target.value)}
-                          className="hicas-input hicas-input-icon-left hicas-input-icon-right h-12 w-full rounded-xl"
+                          className="hicas-input hicas-input-icon-left hicas-input-icon-right min-h-[52px] w-full rounded-xl text-base font-semibold"
                           placeholder="••••••••"
                         />
                         <button
@@ -233,28 +222,21 @@ export const LoginPage = () => {
                             showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"
                           }
                         >
-                          <Eye size={18} />
+                          {showPassword ? (
+                            <EyeOff size={20} />
+                          ) : (
+                            <Eye size={20} />
+                          )}
                         </button>
                       </span>
                     </label>
 
-                    <div className="flex items-center justify-between gap-4 text-sm">
-                      <label className="flex items-center gap-2 text-[var(--hicas-text-secondary)]">
-                        <input
-                          type="checkbox"
-                          className="h-4 w-4 rounded border-[var(--hicas-border)] accent-[var(--hicas-orange)]"
-                        />
-                        Ghi nhớ đăng nhập
-                      </label>
-                      <button
-                        type="button"
-                        className="font-semibold text-[var(--hicas-orange)] hover:text-[var(--hicas-orange-dark)]"
-                      >
-                        Quên mật khẩu?
-                      </button>
-                    </div>
-
-                    <Button type="submit" fullWidth size="lg">
+                    <Button
+                      type="submit"
+                      fullWidth
+                      size="lg"
+                      className="min-h-[54px] text-[17px] font-bold"
+                    >
                       Đăng nhập
                     </Button>
                   </form>
@@ -263,9 +245,9 @@ export const LoginPage = () => {
                     <div className="absolute inset-0 flex items-center">
                       <div className="w-full border-t border-[var(--hicas-border)]" />
                     </div>
-                    <div className="relative flex justify-center text-sm">
-                      <span className="bg-white px-3 text-[var(--hicas-text-muted)]">
-                        hoặc tiếp tục với
+                    <div className="relative flex justify-center text-base">
+                      <span className="bg-white px-3 font-semibold text-[var(--hicas-text-muted)]">
+                        hoặc
                       </span>
                     </div>
                   </div>
@@ -277,37 +259,59 @@ export const LoginPage = () => {
                     size="lg"
                     onClick={() => loginWithGoogle()}
                     iconLeft={<GoogleIcon />}
+                    className="min-h-[54px] text-[17px] font-bold"
                   >
-                    Đăng nhập bằng Google
+                    Đăng nhập với Google
                   </Button>
-
-                  {/* <div className="flex items-center justify-center gap-3 rounded-2xl border border-[var(--hicas-border)] bg-[var(--hicas-orange-lighter)] px-4 py-3 text-sm font-semibold text-[var(--hicas-orange-dark)]">
-                    <ShieldCheck size={18} />
-                    Secure access with MFA enabled
-                  </div> */}
                 </div>
               ) : (
                 <form onSubmit={onSubmitMfa} className="space-y-5">
+                  <div className="grid grid-cols-2 rounded-xl bg-[var(--hicas-bg-soft)] p-1 text-base font-bold">
+                    <button
+                      type="button"
+                      onClick={() => setMfaMode("OTP")}
+                      className={`rounded-lg px-3 py-2 transition ${
+                        mfaMode === "OTP"
+                          ? "bg-white text-[var(--hicas-text-main)] shadow-sm"
+                          : "text-[var(--hicas-text-secondary)] hover:text-[var(--hicas-text-main)]"
+                      }`}
+                    >
+                      Authenticator
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMfaMode("RECOVERY")}
+                      className={`rounded-lg px-3 py-2 transition ${
+                        mfaMode === "RECOVERY"
+                          ? "bg-white text-[var(--hicas-text-main)] shadow-sm"
+                          : "text-[var(--hicas-text-secondary)] hover:text-[var(--hicas-text-main)]"
+                      }`}
+                    >
+                      Mã khôi phục
+                    </button>
+                  </div>
+
                   {mfaMode === "OTP" ? (
                     <label className="block">
-                      <span className="mb-2 block text-sm font-semibold text-[var(--hicas-text-main)]">
-                        Mã Google Authenticator
+                      <span className="mb-2 block text-base font-bold text-[var(--hicas-text-main)]">
+                        Mã xác thực
                       </span>
                       <input
                         type="text"
                         required
+                        inputMode="numeric"
                         maxLength={6}
                         value={otpCode}
                         onChange={(event) =>
                           setOtpCode(event.target.value.replace(/\D/g, ""))
                         }
-                        className="hicas-input h-14 w-full text-center text-2xl font-semibold tracking-[0.48em]"
+                        className="hicas-input h-14 w-full text-center text-2xl font-semibold tracking-[0.42em]"
                         placeholder="000000"
                       />
                     </label>
                   ) : (
                     <label className="block">
-                      <span className="mb-2 block text-sm font-semibold text-[var(--hicas-text-main)]">
+                      <span className="mb-2 block text-base font-bold text-[var(--hicas-text-main)]">
                         Mã khôi phục
                       </span>
                       <input
@@ -323,22 +327,13 @@ export const LoginPage = () => {
                     </label>
                   )}
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMfaMode(mfaMode === "OTP" ? "RECOVERY" : "OTP");
-                      setOtpCode("");
-                      setRecoveryCode("");
-                    }}
-                    className="text-sm font-semibold text-[var(--hicas-orange)] hover:text-[var(--hicas-orange-dark)]"
-                  >
-                    {mfaMode === "OTP"
-                      ? "Không có ứng dụng? Dùng mã khôi phục"
-                      : "Quay lại nhập mã Authenticator"}
-                  </button>
-
                   <div className="grid gap-3">
-                    <Button type="submit" fullWidth size="lg">
+                    <Button
+                      type="submit"
+                      fullWidth
+                      size="lg"
+                      className="min-h-[54px] text-[17px] font-bold"
+                    >
                       Xác nhận
                     </Button>
                     <Button
@@ -346,6 +341,7 @@ export const LoginPage = () => {
                       variant="secondary"
                       fullWidth
                       size="lg"
+                      className="min-h-[54px] text-[17px] font-bold"
                       onClick={() => {
                         setStep("LOGIN");
                         setMfaMode("OTP");
@@ -357,10 +353,6 @@ export const LoginPage = () => {
                 </form>
               )}
             </section>
-
-            <p className="mt-8 text-center text-xs text-[var(--hicas-text-muted)]">
-              © 2026 HICAS Group. All rights reserved.
-            </p>
           </div>
         </main>
       </div>

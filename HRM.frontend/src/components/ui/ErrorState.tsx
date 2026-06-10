@@ -10,8 +10,8 @@ export type ErrorStateProps = {
 };
 
 export const ErrorState = ({
-  title = "Không thể tải dữ liệu",
-  description = "Vui lòng kiểm tra kết nối hoặc thử lại sau.",
+  title = "Không thể tải dữ liệu.",
+  description = "Vui lòng thử lại.",
   action,
   className,
 }: ErrorStateProps) => (
@@ -26,6 +26,6 @@ export const ErrorState = ({
     </div>
     <p className="font-semibold text-[var(--hicas-danger)]">{title}</p>
     <p className="mx-auto mt-1 max-w-md text-sm leading-6 text-red-700">{description}</p>
-    {action && <div className="mt-4">{action}</div>}
+    {action ? <div className="mt-4">{action}</div> : null}
   </div>
 );

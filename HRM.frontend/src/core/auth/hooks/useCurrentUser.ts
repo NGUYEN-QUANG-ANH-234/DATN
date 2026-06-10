@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { jwtDecode } from "jwt-decode";
 import type { UserState, JwtPayload } from "../types";
 import { API_BASE_URL } from "../../api/config";
+import { normalizeRole } from "../roleAccess";
 
 interface MyProfileHeaderResponse {
   success?: boolean;
@@ -23,6 +24,7 @@ export const useCurrentUser = () => {
         "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name";
       const emailClaim =
         "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress";
+      const role = normalizeRole(decoded.role) || String(decoded.role || "");
 
       return {
         name:
@@ -31,7 +33,7 @@ export const useCurrentUser = () => {
           decoded.email ||
           decoded[emailClaim] ||
           "Người dùng",
-        role: decoded.role || "Nhân viên",
+        role,
         avatar: decoded.avatar || "",
       } as UserState;
     } catch (error) {

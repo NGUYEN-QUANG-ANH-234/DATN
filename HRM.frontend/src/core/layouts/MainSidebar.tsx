@@ -1,4 +1,5 @@
 import { useCurrentUser } from "../auth/hooks/useCurrentUser";
+import { hasAnyRole } from "../auth/roleAccess";
 import { MENU_ITEMS } from "../types/menu";
 import { SidebarItem } from "./SidebarItem";
 
@@ -7,9 +8,7 @@ export const MainSidebar = () => {
   const userRole = user?.role || "";
 
   // Lọc menu cấp 1: Nếu role của user nằm trong mảng roles của item đó thì mới hiển thị
-  const visibleMenu = MENU_ITEMS.filter((item) =>
-    item.roles.includes(userRole),
-  );
+  const visibleMenu = MENU_ITEMS.filter((item) => hasAnyRole(item.roles, userRole));
 
   return (
     <aside className="flex w-64 flex-col bg-slate-900 text-gray-300 transition-all duration-300">

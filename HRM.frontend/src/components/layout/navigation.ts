@@ -1,12 +1,13 @@
 import type { MenuItem } from "../../core/types/menu";
 import { MENU_ITEMS } from "../../core/types/menu";
+import { hasAnyRole } from "../../core/auth/roleAccess";
 
 export const getHicasNavigation = (): MenuItem[] => MENU_ITEMS;
 
 export const filterMenuByRole = (items: MenuItem[], role?: string | null) =>
   items.reduce<MenuItem[]>((result, item) => {
     const children = item.children ? filterMenuByRole(item.children, role) : undefined;
-    const canViewSelf = !role || item.roles.includes(role);
+    const canViewSelf = hasAnyRole(item.roles, role);
 
     if (!canViewSelf && !children?.length) {
       return result;

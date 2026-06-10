@@ -98,7 +98,7 @@ export const AccountSecurityPage = () => {
     <div className="space-y-6">
       <PageHeader
         title="Bảo mật tài khoản"
-        description="Tự đổi mật khẩu đăng nhập nội bộ của bạn. Sau khi đổi thành công, hệ thống sẽ yêu cầu đăng nhập lại để làm mới phiên bảo mật."
+        description="Đổi mật khẩu và kiểm tra trạng thái bảo mật tài khoản."
         breadcrumb={[
           { label: "Tài khoản" },
           { label: "Bảo mật" },
@@ -108,7 +108,7 @@ export const AccountSecurityPage = () => {
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
         <Card
           title="Đổi mật khẩu"
-          description="Nhập mật khẩu hiện tại để xác nhận chính chủ trước khi cập nhật mật khẩu mới."
+          description="Nhập mật khẩu hiện tại trước khi cập nhật mật khẩu mới."
         >
           <form onSubmit={handleSubmit} className="space-y-5">
             {error && (
@@ -181,7 +181,7 @@ export const AccountSecurityPage = () => {
 
         <Card
           title="Yêu cầu bảo mật"
-          description="Mật khẩu mạnh giúp giảm rủi ro khi tài khoản có quyền truy cập dữ liệu nhân sự, lương và phê duyệt."
+          description="Mật khẩu mạnh giúp giảm rủi ro truy cập trái phép."
         >
           <div className="space-y-3">
             {ruleItems.map((item) => (
