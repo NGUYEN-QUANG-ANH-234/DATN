@@ -96,9 +96,10 @@ namespace HRM.backend.src.HRM.Infrastructure.ExternalServices
                 // 1. Tìm đúng đơn duyệt trung tâm bằng cặp trùng khớp
                 var request = (await _requestRepo.FindAsync(r =>
                     r.ModuleCode == moduleCode &&
-                    r.ReferenceId == referenceId, ct)).FirstOrDefault();
+                    r.ReferenceId == referenceId &&
+                    r.Status == ApprovalStatus.Pending, ct)).FirstOrDefault();
 
-                if (request == null || request.Status != ApprovalStatus.Pending)
+                if (request == null)
                     throw new InvalidOperationException("Yêu cầu duyệt không tồn tại hoặc đã được đóng.");
 
                 // 2. Tìm đúng bước duyệt hiện tại của đơn tổng thể này

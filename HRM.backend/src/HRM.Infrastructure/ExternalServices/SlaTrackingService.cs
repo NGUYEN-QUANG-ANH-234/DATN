@@ -23,7 +23,11 @@ namespace HRM.backend.src.HRM.Infrastructure.ExternalServices
         public async Task CreateTaskAsync(SlaModuleType module, int referenceId, CancellationToken ct = default)
         {
             var configs = await _slaConfigUseCase.GetSLAConfigsAsync(ct);
-            var moduleConfig = configs.FirstOrDefault(c => c.ModuleCode == module.ToString());
+            var moduleConfig = configs.FirstOrDefault(c =>
+                string.Equals(c.ModuleCode, module.ToString(), StringComparison.OrdinalIgnoreCase));
+
+            if (moduleConfig is { IsActive: false })
+                return;
 
             int timeValue;
             string unit;

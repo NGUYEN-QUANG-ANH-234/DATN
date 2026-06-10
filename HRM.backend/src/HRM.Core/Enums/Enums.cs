@@ -18,7 +18,43 @@ namespace HRM.backend.src.HRM.Core.Enums
     public enum Gender { Male, Female, Other }
     public enum EmployeeStatus { Probation, Official, OnMaternityLeave, Resigned, Terminated, Dismissed }
     public enum ContractType { Probation, Definite, Indefinite, PartTime }
-    public enum ContractStatus { Draft, PendingDept, PendingHR, Negotiating, PendingDirector, Rejected, Active, Liquidating, Expired, Draft_Cancelled }
+    public enum ContractLegalDocumentType { ProbationContract, FixedTermLaborContract, IndefiniteTermLaborContract, ContractAddendum }
+    public enum ContractChangeFlowType { Addendum, NewContract, PolicyUpdate, TemporaryDecision, NotAllowed }
+    public enum ContractChangeType
+    {
+        BasicSalaryChange,
+        InsuranceSalaryChange,
+        DepartmentChangePermanent,
+        PositionChangePermanent,
+        JobLevelChangePermanent,
+        EmployeeTypeChangePermanent,
+        ContractEndDateChange,
+        ContractStartDateChange,
+        ContractTypeChange,
+        RenewExpiredContract,
+        KpiFormulaChange,
+        PayrollPolicyChange,
+        TemporaryDepartmentAssignment,
+        TemporaryPositionAssignment,
+        Unknown
+    }
+    public enum ContractStatus
+    {
+        Draft,
+        PendingDept,
+        PendingHR,
+        Negotiating,
+        PendingDirector,
+        ApprovedByDirector,
+        Rejected,
+        Active,
+        Liquidating,
+        Expired,
+        Draft_Cancelled,
+        PendingManagerContentReview,
+        PendingEmployee,
+        PendingHRRevision
+    }
 
     public enum DependentRelation { Child, Parent, Spouse, Other }
     public enum EmployeeType { Intern, Official, Probation, PartTime, Contractual }
@@ -103,6 +139,15 @@ namespace HRM.backend.src.HRM.Core.Enums
         ManualAdjusted
     }
     public enum AttendancePayrollApprovalStatus { Draft, PendingHRReview, Approved, Rejected, Locked }
+    public enum CompanyCalendarDayType
+    {
+        PublicHoliday,
+        CompanyHoliday,
+        CompensatoryWorkingDay,
+        CompensatoryDayOff,
+        SpecialPaidLeave,
+        UnpaidCompanyClosure
+    }
     public enum LeaveCategory
     {
         AnnualPaid,
@@ -204,8 +249,9 @@ namespace HRM.backend.src.HRM.Core.Enums
     public enum PayrollStatus { Draft, Calculated, HRReviewed, PendingApproval, Approved, Locked, Finalized, Paid, Cancelled }
     public enum SalaryVariableDataType { Number, Money, Hours, Days, Percent }
     public enum SalaryAggregationType { Latest, Sum, Count, MonthlyTotal, Manual }
-    public enum PayrollPolicyType { Overtime, PitTax, Insurance, Allowance, Deduction, Seniority }
+    public enum PayrollPolicyType { Overtime, PitTax, Insurance, Allowance, Deduction, Seniority, MinimumWage, KpiBonus }
     public enum PayrollPolicyValueType { RatePercent, Amount, Bracket, Formula }
+    public enum PolicyVersionStatus { Draft, Active, Archived }
     public enum PayrollAccessScope { All, Department, Individual }
     public enum PayBasis { Monthly, Daily, Hourly, FixedPackage }
     public enum TaxMethod { Progressive, Flat10Percent, NonResident20Percent, None }
@@ -226,6 +272,9 @@ namespace HRM.backend.src.HRM.Core.Enums
     public enum FinalSettlementStatus { Draft, Calculated, PendingApproval, Approved, Locked, Paid, Cancelled }
     public enum EmploymentServicePeriodType { Probation, OfficialWork, UnpaidLeave, MaternityLeave, SickLeave, Suspension, UnemploymentInsurance, PriorSeverancePaid }
     public enum ExternalTimesheetImportStatus { Draft, Imported, Validated, Approved, Rejected, PayrollImported, Cancelled }
+    public enum ProjectBonusImportStatus { Draft, PendingReview, Approved, Rejected, Cancelled }
+    public enum ProjectBonusLineValidationStatus { Pending, Valid, Invalid }
+    public enum ContractAddendumType { SalaryAdjustment, Extension, InternalTransfer, SeniorAppointment, Other }
     public enum ContractAddendumDetailValueType { Text, Money, Date, Number, Json, Boolean }
 
     // ==========================================
@@ -262,7 +311,8 @@ namespace HRM.backend.src.HRM.Core.Enums
         PendingCurrentManagerOpinion,
         PendingEmployeeNotification,
         PendingEmployeeExplanation,
-        PendingManagerReview
+        PendingManagerReview,
+        ContractRevisionClosed
     }
 
     public enum PersonnelChangeConsentStatus

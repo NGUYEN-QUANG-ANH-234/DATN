@@ -24,11 +24,20 @@ namespace HRM.backend.src.HRM.Application.Handlers
                     ct);
             }
 
-            if (string.Equals(notification.Status, "Negotiating", StringComparison.OrdinalIgnoreCase) &&
-                notification.ContractId.HasValue)
+            if (IsRevisionRequested(notification.Status))
             {
                 return _contractFlowService.MarkContractFlowNegotiatingAsync(
-                    notification.ContractId.Value,
+                    notification.ContractId,
+                    notification.ContractAddendumId,
+                    notification.Note,
+                    ct);
+            }
+
+            if (IsRevisionClosed(notification.Status))
+            {
+                return _contractFlowService.MarkContractFlowRevisionClosedAsync(
+                    notification.ContractId,
+                    notification.ContractAddendumId,
                     notification.Note,
                     ct);
             }
@@ -37,6 +46,19 @@ namespace HRM.backend.src.HRM.Application.Handlers
                 notification.ContractId,
                 notification.ContractAddendumId,
                 ct);
+        }
+
+        private static bool IsRevisionRequested(string? status)
+        {
+            return string.Equals(status, "Negotiating", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(status, "RevisionRequested", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(status, "RevisionRequired", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsRevisionClosed(string? status)
+        {
+            return string.Equals(status, "NotAgreed", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(status, "RevisionClosed", StringComparison.OrdinalIgnoreCase);
         }
     }
 }

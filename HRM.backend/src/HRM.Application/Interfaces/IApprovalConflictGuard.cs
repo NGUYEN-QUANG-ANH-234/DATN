@@ -7,6 +7,7 @@ namespace HRM.backend.src.HRM.Application.Interfaces
         Task<bool> IsEmployeeInRoleAsync(int employeeId, string roleName, CancellationToken ct = default);
         Task<bool> HasAlternativeHrApproverAsync(int employeeId, CancellationToken ct = default);
         Task<int> GetDirectorAccountIdAsync(CancellationToken ct = default);
+        Task<int> GetAlternativeDirectorApproverAsync(int employeeId, CancellationToken ct = default);
         Task EnsureNotSelfApprovalForEmployeeAsync(int employeeId, int approverAccountId, CancellationToken ct = default);
         void EnsureNotSelfApproval(int? targetAccountId, int approverAccountId);
     }

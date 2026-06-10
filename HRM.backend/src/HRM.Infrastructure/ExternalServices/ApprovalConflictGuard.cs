@@ -20,14 +20,13 @@ namespace HRM.backend.src.HRM.Infrastructure.ExternalServices
         public async Task<bool> RequiresDirectorApprovalAsync(int employeeId, CancellationToken ct = default)
         {
             var roleName = await GetEmployeeRoleNameAsync(employeeId, ct);
-
             return IsSpecialApprovalRole(roleName);
         }
 
         public async Task<string?> GetEmployeeRoleNameAsync(int employeeId, CancellationToken ct = default)
         {
             var employee = await _employeeRepo.GetProfileByIdAsync(employeeId, ct)
-                ?? throw new InvalidOperationException("Không tìm thấy hồ sơ nhân sự.");
+                ?? throw new InvalidOperationException("Khong tim thay ho so nhan su.");
 
             if (!employee.AccountId.HasValue)
                 return null;
@@ -45,7 +44,7 @@ namespace HRM.backend.src.HRM.Infrastructure.ExternalServices
         public async Task<bool> HasAlternativeHrApproverAsync(int employeeId, CancellationToken ct = default)
         {
             var employee = await _employeeRepo.GetProfileByIdAsync(employeeId, ct)
-                ?? throw new InvalidOperationException("Không tìm thấy hồ sơ nhân sự.");
+                ?? throw new InvalidOperationException("Khong tim thay ho so nhan su.");
 
             var hrAccountIds = await _accountRepo.GetAccountIdsByRoleAsync("HR", ct);
             return hrAccountIds.Any(id => !employee.AccountId.HasValue || id != employee.AccountId.Value);
@@ -57,15 +56,34 @@ namespace HRM.backend.src.HRM.Infrastructure.ExternalServices
             var directorId = directorIds.FirstOrDefault();
 
             if (directorId == 0)
-                throw new InvalidOperationException("Hệ thống chưa có tài khoản Giám đốc để xử lý phê duyệt đặc biệt.");
+                throw new InvalidOperationException("He thong chua co tai khoan Giam doc de xu ly phe duyet dac biet.");
 
             return directorId;
+        }
+
+        public async Task<int> GetAlternativeDirectorApproverAsync(int employeeId, CancellationToken ct = default)
+        {
+            var employee = await _employeeRepo.GetProfileByIdAsync(employeeId, ct)
+                ?? throw new InvalidOperationException("Khong tim thay ho so nhan su.");
+
+            var excludedAccountId = employee.AccountId;
+            var directorIds = await _accountRepo.GetAccountIdsByRoleAsync("Director", ct);
+            var directorId = directorIds.FirstOrDefault(id => !excludedAccountId.HasValue || id != excludedAccountId.Value);
+            if (directorId != 0)
+                return directorId;
+
+            var adminIds = await _accountRepo.GetAccountIdsByRoleAsync("Admin", ct);
+            var adminId = adminIds.FirstOrDefault(id => !excludedAccountId.HasValue || id != excludedAccountId.Value);
+            if (adminId != 0)
+                return adminId;
+
+            throw new InvalidOperationException("Chua co Giam doc khac hoac Admin de duyet thay cho ho so cua nguoi giu vai tro Giam doc.");
         }
 
         public async Task EnsureNotSelfApprovalForEmployeeAsync(int employeeId, int approverAccountId, CancellationToken ct = default)
         {
             var employee = await _employeeRepo.GetProfileByIdAsync(employeeId, ct)
-                ?? throw new InvalidOperationException("Không tìm thấy hồ sơ nhân sự.");
+                ?? throw new InvalidOperationException("Khong tim thay ho so nhan su.");
 
             EnsureNotSelfApproval(employee.AccountId, approverAccountId);
         }
@@ -73,7 +91,7 @@ namespace HRM.backend.src.HRM.Infrastructure.ExternalServices
         public void EnsureNotSelfApproval(int? targetAccountId, int approverAccountId)
         {
             if (targetAccountId.HasValue && targetAccountId.Value == approverAccountId)
-                throw new UnauthorizedAccessException("Không được tự phê duyệt yêu cầu liên quan đến chính mình.");
+                throw new UnauthorizedAccessException("Khong duoc tu phe duyet yeu cau lien quan den chinh minh.");
         }
 
         private static bool IsSpecialApprovalRole(string? roleName)

@@ -39,7 +39,8 @@ namespace HRM.backend.src.HRM.Application.Handlers
 
             if (notification.ModuleType == SlaModuleType.ContractRenewal)
             {
-                if (contract.Status != ContractStatus.Draft &&
+                if (contract.Status != ContractStatus.PendingEmployee &&
+                    contract.Status != ContractStatus.Draft &&
                     contract.Status != ContractStatus.Negotiating)
                 {
                     return;

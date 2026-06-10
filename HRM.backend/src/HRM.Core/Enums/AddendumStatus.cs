@@ -8,6 +8,8 @@ namespace HRM.backend.src.HRM.Core.Enums
         Rejected = 3,
         PendingDept = 4,
         PendingHR = 5,
-        PendingEmployee = 6
+        PendingEmployee = 6,
+        ApprovedByDirector = 7,
+        PendingHRRevision = 8
     }
 }
