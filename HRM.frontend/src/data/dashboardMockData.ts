@@ -110,7 +110,7 @@ export const recentActivities = [
 export const announcements = [
   {
     title: "Lịch nghỉ lễ 30/04 - 01/05",
-    content: "Văn phòng tạm nghỉ theo lịch công ty. Các đơn OT cần gửi trước 17:00.",
+    content: "Văn phòng tạm nghỉ theo lịch công ty. Các yêu cầu làm thêm cần gửi trước 17:00.",
     tag: "Thông báo",
   },
   {
