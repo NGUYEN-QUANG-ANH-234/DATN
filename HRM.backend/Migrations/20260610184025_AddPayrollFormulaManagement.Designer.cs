@@ -4,6 +4,7 @@ using HRM.backend.src.HRM.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace HRM.backend.Migrations
 {
     [DbContext(typeof(MyDbContext))]
-    partial class MyDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260610184025_AddPayrollFormulaManagement")]
+    partial class AddPayrollFormulaManagement
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -2468,12 +2471,6 @@ namespace HRM.backend.Migrations
                     b.Property<decimal?>("AdvancePayment")
                         .HasColumnType("DECIMAL(15,2)");
 
-                    b.Property<DateTime?>("ApprovedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<int?>("ApprovedByAccountId")
-                        .HasColumnType("int");
-
                     b.Property<decimal?>("BaseSalary")
                         .HasColumnType("DECIMAL(15,2)");
 
@@ -2538,19 +2535,9 @@ namespace HRM.backend.Migrations
                     b.Property<string>("PolicySnapshotJson")
                         .HasColumnType("longtext");
 
-                    b.Property<string>("ReviewNote")
-                        .HasMaxLength(1000)
-                        .HasColumnType("varchar(1000)");
-
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("VARCHAR(50)");
-
-                    b.Property<DateTime?>("SubmittedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<int?>("SubmittedByAccountId")
-                        .HasColumnType("int");
 
                     b.Property<decimal?>("TaxDeductionFamily")
                         .HasColumnType("DECIMAL(15,2)");
@@ -2578,13 +2565,9 @@ namespace HRM.backend.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ApprovedByAccountId");
-
                     b.HasIndex("CalculatedByAccountId");
 
                     b.HasIndex("LockedByAccountId");
-
-                    b.HasIndex("SubmittedByAccountId");
 
                     b.HasIndex("EmployeeId", "Month", "Year")
                         .HasDatabaseName("IX_payrolls_Employee_Period");
@@ -6767,15 +6750,9 @@ namespace HRM.backend.Migrations
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.Payroll", b =>
                 {
-                    b.HasOne("HRM.backend.src.HRM.Core.Entities.System.Account", "ApprovedByAccount")
-                        .WithMany()
-                        .HasForeignKey("ApprovedByAccountId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
                     b.HasOne("HRM.backend.src.HRM.Core.Entities.System.Account", "CalculatedByAccount")
                         .WithMany()
-                        .HasForeignKey("CalculatedByAccountId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .HasForeignKey("CalculatedByAccountId");
 
                     b.HasOne("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.Employee", "Employee")
                         .WithMany()
@@ -6784,23 +6761,13 @@ namespace HRM.backend.Migrations
 
                     b.HasOne("HRM.backend.src.HRM.Core.Entities.System.Account", "LockedByAccount")
                         .WithMany()
-                        .HasForeignKey("LockedByAccountId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("HRM.backend.src.HRM.Core.Entities.System.Account", "SubmittedByAccount")
-                        .WithMany()
-                        .HasForeignKey("SubmittedByAccountId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("ApprovedByAccount");
+                        .HasForeignKey("LockedByAccountId");
 
                     b.Navigation("CalculatedByAccount");
 
                     b.Navigation("Employee");
 
                     b.Navigation("LockedByAccount");
-
-                    b.Navigation("SubmittedByAccount");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.PayrollAdjustment", b =>

@@ -4,6 +4,7 @@ using HRM.backend.src.HRM.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace HRM.backend.Migrations
 {
     [DbContext(typeof(MyDbContext))]
-    partial class MyDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260610161052_EnhanceExternalTimesheetImportWorkflow")]
+    partial class EnhanceExternalTimesheetImportWorkflow
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1633,9 +1636,8 @@ namespace HRM.backend.Migrations
 
                     b.Property<string>("ValidationStatus")
                         .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("VARCHAR(50)")
-                        .HasDefaultValue("Valid");
+                        .HasDefaultValue("Valid")
+                        .HasColumnType("VARCHAR(50)");
 
                     b.Property<DateTime>("WorkDate")
                         .HasColumnType("datetime(6)");
@@ -2468,12 +2470,6 @@ namespace HRM.backend.Migrations
                     b.Property<decimal?>("AdvancePayment")
                         .HasColumnType("DECIMAL(15,2)");
 
-                    b.Property<DateTime?>("ApprovedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<int?>("ApprovedByAccountId")
-                        .HasColumnType("int");
-
                     b.Property<decimal?>("BaseSalary")
                         .HasColumnType("DECIMAL(15,2)");
 
@@ -2538,19 +2534,9 @@ namespace HRM.backend.Migrations
                     b.Property<string>("PolicySnapshotJson")
                         .HasColumnType("longtext");
 
-                    b.Property<string>("ReviewNote")
-                        .HasMaxLength(1000)
-                        .HasColumnType("varchar(1000)");
-
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("VARCHAR(50)");
-
-                    b.Property<DateTime?>("SubmittedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<int?>("SubmittedByAccountId")
-                        .HasColumnType("int");
 
                     b.Property<decimal?>("TaxDeductionFamily")
                         .HasColumnType("DECIMAL(15,2)");
@@ -2578,13 +2564,9 @@ namespace HRM.backend.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ApprovedByAccountId");
-
                     b.HasIndex("CalculatedByAccountId");
 
                     b.HasIndex("LockedByAccountId");
-
-                    b.HasIndex("SubmittedByAccountId");
 
                     b.HasIndex("EmployeeId", "Month", "Year")
                         .HasDatabaseName("IX_payrolls_Employee_Period");
@@ -2841,22 +2823,10 @@ namespace HRM.backend.Migrations
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<DateTime?>("ActivatedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<int?>("ActivatedByAccountId")
-                        .HasColumnType("int");
-
                     b.Property<DateTime?>("ApprovedAt")
                         .HasColumnType("datetime(6)");
 
                     b.Property<int?>("ApprovedByAccountId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("ArchivedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<int?>("ArchivedByAccountId")
                         .HasColumnType("int");
 
                     b.Property<string>("ContractType")
@@ -2866,9 +2836,6 @@ namespace HRM.backend.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime(6)")
                         .HasDefaultValue(new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified));
-
-                    b.Property<int?>("CreatedByAccountId")
-                        .HasColumnType("int");
 
                     b.Property<DateTime?>("DeadlineAt")
                         .HasColumnType("datetime(6)");
@@ -2918,22 +2885,9 @@ namespace HRM.backend.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("varchar(1000)");
 
-                    b.Property<string>("ReviewNote")
-                        .HasMaxLength(1000)
-                        .HasColumnType("varchar(1000)");
-
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("VARCHAR(50)");
-
-                    b.Property<DateTime?>("SubmittedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<int?>("SubmittedByAccountId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime(6)");
 
                     b.Property<int>("Version")
                         .ValueGeneratedOnAdd()
@@ -5808,16 +5762,6 @@ namespace HRM.backend.Migrations
                     b.Property<int>("ActualOtMinutes")
                         .HasColumnType("int");
 
-                    b.Property<string>("ApprovalStatus")
-                        .IsRequired()
-                        .HasColumnType("VARCHAR(50)");
-
-                    b.Property<DateTime?>("ApprovedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<int?>("ApprovedByAccountId")
-                        .HasColumnType("int");
-
                     b.Property<int>("EarlyLeaveMinutes")
                         .HasColumnType("int");
 
@@ -5833,27 +5777,11 @@ namespace HRM.backend.Migrations
                     b.Property<int>("LateMinutes")
                         .HasColumnType("int");
 
-                    b.Property<DateTime?>("LockedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<int?>("LockedByAccountId")
-                        .HasColumnType("int");
-
                     b.Property<byte>("Month")
                         .HasColumnType("tinyint unsigned");
 
                     b.Property<decimal>("PayableWorkHours")
                         .HasColumnType("DECIMAL(15,2)");
-
-                    b.Property<string>("PeriodNote")
-                        .HasMaxLength(500)
-                        .HasColumnType("varchar(500)");
-
-                    b.Property<DateTime?>("SubmittedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<int?>("SubmittedByAccountId")
-                        .HasColumnType("int");
 
                     b.Property<decimal>("WorkDays")
                         .HasColumnType("DECIMAL(15,2)");
@@ -5868,9 +5796,6 @@ namespace HRM.backend.Migrations
 
                     b.HasIndex("EmployeeId", "Month", "Year")
                         .IsUnique();
-
-                    b.HasIndex("Month", "Year", "ApprovalStatus", "IsPayrollLocked")
-                        .HasDatabaseName("IX_attendance_summaries_Period_Status_Locked");
 
                     b.ToTable("attendance_summaries");
                 });
@@ -6031,18 +5956,8 @@ namespace HRM.backend.Migrations
                     b.Property<DateTime?>("EndDate")
                         .HasColumnType("datetime(6)");
 
-                    b.Property<bool>("IsPayrollLocked")
-                        .HasColumnType("tinyint(1)");
-
                     b.Property<int?>("LeaveTypeId")
                         .HasColumnType("int");
-
-                    b.Property<DateTime?>("PayrollLockedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<string>("PayrollPeriod")
-                        .HasMaxLength(7)
-                        .HasColumnType("varchar(7)");
 
                     b.Property<string>("Reason")
                         .HasColumnType("longtext");
@@ -6057,9 +5972,6 @@ namespace HRM.backend.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("LeaveTypeId");
-
-                    b.HasIndex("PayrollPeriod", "IsPayrollLocked")
-                        .HasDatabaseName("IX_leave_requests_PayrollPeriod_Locked");
 
                     b.HasIndex("EmployeeId", "LeaveTypeId", "StartDate", "EndDate")
                         .IsUnique()
@@ -6767,15 +6679,9 @@ namespace HRM.backend.Migrations
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.Payroll", b =>
                 {
-                    b.HasOne("HRM.backend.src.HRM.Core.Entities.System.Account", "ApprovedByAccount")
-                        .WithMany()
-                        .HasForeignKey("ApprovedByAccountId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
                     b.HasOne("HRM.backend.src.HRM.Core.Entities.System.Account", "CalculatedByAccount")
                         .WithMany()
-                        .HasForeignKey("CalculatedByAccountId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .HasForeignKey("CalculatedByAccountId");
 
                     b.HasOne("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.Employee", "Employee")
                         .WithMany()
@@ -6784,23 +6690,13 @@ namespace HRM.backend.Migrations
 
                     b.HasOne("HRM.backend.src.HRM.Core.Entities.System.Account", "LockedByAccount")
                         .WithMany()
-                        .HasForeignKey("LockedByAccountId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("HRM.backend.src.HRM.Core.Entities.System.Account", "SubmittedByAccount")
-                        .WithMany()
-                        .HasForeignKey("SubmittedByAccountId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("ApprovedByAccount");
+                        .HasForeignKey("LockedByAccountId");
 
                     b.Navigation("CalculatedByAccount");
 
                     b.Navigation("Employee");
 
                     b.Navigation("LockedByAccount");
-
-                    b.Navigation("SubmittedByAccount");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.PayrollAdjustment", b =>

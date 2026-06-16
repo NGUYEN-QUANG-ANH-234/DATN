@@ -194,6 +194,7 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
             modelBuilder.Entity<CompanyCalendar>().HasIndex(c => new { c.Year, c.Status, c.EffectiveFrom }).HasDatabaseName("IX_company_calendars_Year_Status_EffectiveFrom");
             modelBuilder.Entity<CompanyCalendarDay>().HasIndex(d => new { d.CalendarId, d.Date }).IsUnique().HasDatabaseName("UX_company_calendar_days_Calendar_Date");
             modelBuilder.Entity<LeaveRequest>().HasIndex(l => new { l.EmployeeId, l.LeaveTypeId, l.StartDate, l.EndDate }).IsUnique().HasDatabaseName("UX_leave_requests_EmployeeId_LeaveTypeId_StartDate_EndDate");
+            modelBuilder.Entity<LeaveRequest>().HasIndex(l => new { l.PayrollPeriod, l.IsPayrollLocked }).HasDatabaseName("IX_leave_requests_PayrollPeriod_Locked");
             modelBuilder.Entity<OvertimeRequest>().HasIndex(o => new { o.EmployeeId, o.WorkDate, o.StartTime, o.EndTime }).IsUnique().HasDatabaseName("UX_overtime_requests_EmployeeId_WorkDate_StartTime_EndTime");
             modelBuilder.Entity<OvertimeRequest>().HasIndex(o => new { o.EmployeeId, o.StartAt, o.EndAt }).HasDatabaseName("IX_overtime_requests_EmployeeId_StartAt_EndAt");
             modelBuilder.Entity<OvertimeSegment>().HasIndex(o => new { o.OvertimeRequestId, o.SegmentStartAt }).HasDatabaseName("IX_overtime_segments_Request_Start");
@@ -768,6 +769,10 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
                 .IsUnique();
 
             modelBuilder.Entity<AttendanceSummary>()
+                .HasIndex(s => new { s.Month, s.Year, s.ApprovalStatus, s.IsPayrollLocked })
+                .HasDatabaseName("IX_attendance_summaries_Period_Status_Locked");
+
+            modelBuilder.Entity<AttendanceSummary>()
                 .HasOne(s => s.Employee)
                 .WithMany()
                 .HasForeignKey(s => s.EmployeeId)
@@ -790,6 +795,30 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
                 .WithMany()
                 .HasForeignKey(p => p.EmployeeId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Payroll>()
+                .HasOne(p => p.CalculatedByAccount)
+                .WithMany()
+                .HasForeignKey(p => p.CalculatedByAccountId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<Payroll>()
+                .HasOne(p => p.SubmittedByAccount)
+                .WithMany()
+                .HasForeignKey(p => p.SubmittedByAccountId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<Payroll>()
+                .HasOne(p => p.ApprovedByAccount)
+                .WithMany()
+                .HasForeignKey(p => p.ApprovedByAccountId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<Payroll>()
+                .HasOne(p => p.LockedByAccount)
+                .WithMany()
+                .HasForeignKey(p => p.LockedByAccountId)
+                .OnDelete(DeleteBehavior.SetNull);
 
             modelBuilder.Entity<Payroll>()
                 .HasMany(p => p.Details)
@@ -850,6 +879,12 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
                 .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<ExternalTimesheetImport>()
+                .HasOne(i => i.ApprovedByAccount)
+                .WithMany()
+                .HasForeignKey(i => i.ApprovedByAccountId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<ExternalTimesheetImport>()
                 .HasMany(i => i.Lines)
                 .WithOne(l => l.Import)
                 .HasForeignKey(l => l.ImportId)
@@ -866,6 +901,10 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
                 .WithMany()
                 .HasForeignKey(l => l.PayrollId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<ExternalTimesheetLine>()
+                .Property(l => l.ValidationStatus)
+                .HasDefaultValue(ProjectBonusLineValidationStatus.Valid);
 
             modelBuilder.Entity<ProjectBonusImportBatch>()
                 .HasOne(b => b.UploadedByAccount)
@@ -1281,7 +1320,7 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
                 {
                     Id = 14,
                     Code = "EXTERNAL_TIMESHEET_PAY",
-                    Name = "Thu nhập từ timesheet ngoài",
+                    Name = "Thu nhập cộng tác viên",
                     ComponentGroup = SalaryComponentGroup.BaseSalary,
                     IsIncome = true,
                     IsTaxable = true,
