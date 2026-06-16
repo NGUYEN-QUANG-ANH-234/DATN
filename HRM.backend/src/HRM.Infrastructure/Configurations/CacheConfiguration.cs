@@ -1,6 +1,6 @@
-﻿using HRM.backend.src.HRM.Application.Interfaces;
-using HRM.backend.src.HRM.Core.Entities.System;
+using HRM.backend.src.HRM.Application.Interfaces;
 using HRM.backend.src.HRM.Infrastructure.ExternalServices;
+using StackExchange.Redis;
 
 namespace HRM.backend.src.HRM.Infrastructure.Configurations;
 
@@ -8,18 +8,28 @@ public static class CacheConfiguration
 {
     public static IServiceCollection AddCacheConfig(this IServiceCollection services, IConfiguration configuration)
     {
-        // Lấy từ ConnectionStrings (đã map từ appsettings hoặc .env)
         var redisUrl = configuration.GetConnectionString("Redis");
+
+        if (string.IsNullOrWhiteSpace(redisUrl))
+        {
+            services.AddDistributedMemoryCache();
+            services.AddSingleton<IAppCache, RedisAppCache>();
+            services.AddSingleton<ILockService, LockService>();
+            return services;
+        }
+
+        var redisOptions = ConfigurationOptions.Parse(redisUrl);
+        redisOptions.AbortOnConnectFail = false;
 
         services.AddStackExchangeRedisCache(options =>
         {
-            options.Configuration = redisUrl;
+            options.ConfigurationOptions = redisOptions;
             options.InstanceName = "HRMHICAS_Cache_";
         });
 
-        // AppCache có thể là Singleton vì nó quản lý kết nối chung
+        services.AddSingleton<IConnectionMultiplexer>(_ => ConnectionMultiplexer.Connect(redisOptions));
         services.AddSingleton<IAppCache, RedisAppCache>();
-        services.AddSingleton<ILockService, LockService>();
+        services.AddSingleton<ILockService, RedisDistributedLockService>();
 
         return services;
     }

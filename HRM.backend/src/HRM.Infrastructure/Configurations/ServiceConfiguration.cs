@@ -96,7 +96,9 @@ namespace HRM.backend.src.HRM.Infrastructure.Configurations
             services.AddScoped<IPayrollSnapshotWriter, PayrollSnapshotWriter>();
             services.AddScoped<IPayrollCalculationUseCase, PayrollCalculationUseCase>();
             services.AddScoped<IPayrollAccessUseCase, PayrollAccessUseCase>();
+            services.AddScoped<IPayrollFormulaManagementUseCase, PayrollFormulaManagementUseCase>();
             services.AddScoped<IProjectBonusImportUseCase, ProjectBonusImportUseCase>();
+            services.AddScoped<IExternalTimesheetImportUseCase, ExternalTimesheetImportUseCase>();
             services.AddScoped<IPayrollSourceRegistry, PayrollSourceRegistry>();
             services.AddScoped<IPayrollSourceProvider, ContractPayrollSourceProvider>();
             services.AddScoped<IPayrollSourceProvider, AttendancePayrollSourceProvider>();

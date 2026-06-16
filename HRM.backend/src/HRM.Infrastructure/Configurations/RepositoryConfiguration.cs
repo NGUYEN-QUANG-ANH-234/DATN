@@ -95,7 +95,9 @@ namespace HRM.backend.src.HRM.Infrastructure.Configurations
 
             // Payroll
             services.AddScoped<IPayrollRepository, PayrollRepository>();
+            services.AddScoped<IPayrollFormulaRepository, PayrollFormulaRepository>();
             services.AddScoped<IProjectBonusImportRepository, ProjectBonusImportRepository>();
+            services.AddScoped<IExternalTimesheetImportRepository, ExternalTimesheetImportRepository>();
 
             // Personnel Changes
             services.AddScoped<IPersonnelChangeRepository, PersonnelChangeRepository>();
