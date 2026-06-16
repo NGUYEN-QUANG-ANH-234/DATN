@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { onboardingApi } from "../api/onboardingApi";
 import type { PendingOnboardingRequest } from "../types/onboarding";
 
@@ -13,20 +13,22 @@ export const useHrOnboardingReview = () => {
       const res = await onboardingApi.getPendingRequests();
       setRequests(res.data || []);
     } catch (error) {
-      console.error("Lỗi tải danh sách Onboarding:", error);
+      console.error("Lỗi tải danh sách onboarding:", error);
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchRequests();
+    void fetchRequests();
   }, [fetchRequests]);
 
   const executeReview = async (
     id: number,
     isApproved: boolean,
     roleId?: number,
+    departmentId?: number,
+    positionId?: number,
     rejectReason?: string,
   ) => {
     setProcessingId(id);
@@ -34,13 +36,15 @@ export const useHrOnboardingReview = () => {
       const response: unknown = await onboardingApi.reviewRequest(id, {
         isApproved,
         roleId,
+        departmentId,
+        positionId,
         rejectReason,
       });
-      alert(
-        "✅ " + (response as { message?: string; Message?: string })?.message ||
-          (response as { message?: string; Message?: string })?.Message ||
-          "Thao tác thành công!",
-      );
+      const message =
+        (response as { message?: string; Message?: string })?.message ||
+        (response as { message?: string; Message?: string })?.Message ||
+        "Thao tác thành công.";
+      alert(`✅ ${message}`);
       setRequests((prev) => prev.filter((r) => r.id !== id));
       return true;
     } catch (error: unknown) {
@@ -56,7 +60,7 @@ export const useHrOnboardingReview = () => {
           }
         ).response?.data?.Message ||
         "Có lỗi xảy ra khi duyệt.";
-      alert("❌ " + errMsg);
+      alert(`❌ ${errMsg}`);
       return false;
     } finally {
       setProcessingId(null);

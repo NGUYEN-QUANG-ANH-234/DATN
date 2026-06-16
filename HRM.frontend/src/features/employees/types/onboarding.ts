@@ -24,6 +24,11 @@ export interface SubmitOnboardingFormState {
 export interface PendingOnboardingRequest {
   id: number;
   candidateId: number;
+  recruitmentRequestId?: number;
+  departmentId?: number;
+  departmentName?: string;
+  positionId?: number;
+  positionName?: string;
   requestedDataJson: string; // Chứa dữ liệu cá nhân dạng JSON
   status: string; // Pending_HR, Completed, Rejected
   createdAt: string;
@@ -33,4 +38,6 @@ export interface ReviewOnboardingDto {
   isApproved: boolean;
   rejectReason?: string;
   roleId?: number; // 3: HR, 4: Manager, 5: Employee, 6: Collaborator, 7: Intern
+  departmentId?: number;
+  positionId?: number;
 }
