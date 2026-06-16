@@ -11,7 +11,7 @@ export const roleLabel = (role?: string | null) => {
   const map: Record<string, string> = {
     Admin: "Quản trị",
     HR: "HR",
-    Manager: "Quản lý",
+    Manager: "Trưởng phòng",
     Director: "Giám đốc",
     Employee: "Nhân viên",
     Intern: "Thực tập sinh",
@@ -48,6 +48,7 @@ export const moduleTone = (module: ApprovalModule) => {
     LEAVE: "bg-rose-50 text-rose-700 border-rose-200",
     PAYROLL: "bg-lime-50 text-lime-700 border-lime-200",
     PERSONNEL_CHANGE: "bg-sky-50 text-sky-700 border-sky-200",
+    PERFORMANCE: "bg-teal-50 text-teal-700 border-teal-200",
   };
 
   return map[module];
@@ -56,17 +57,26 @@ export const moduleTone = (module: ApprovalModule) => {
 export const statusLabel = (status: string) => {
   const map: Record<string, string> = {
     Pending: "Đang chờ duyệt",
+    NeedMoreInfo: "Cần bổ sung thông tin",
+    PendingReview: "Chờ duyệt",
+    Validated: "Đã kiểm tra dữ liệu",
     PendingHR: "Chờ HR",
     Pending_HR: "Chờ HR",
-    PendingDept: "Chờ Trưởng phòng",
-    PendingManager: "Chờ Trưởng phòng",
-    PendingEmployee: "Chờ người lao động xác nhận",
-    PendingDirector: "Chờ Giám đốc",
-    PendingApproval: "Chờ phê duyệt",
+    PendingHRReview: "Chờ HR kiểm tra",
+    PendingDept: "Chờ trưởng phòng",
+    PendingManager: "Chờ trưởng phòng",
+    PendingManagerReview: "Chờ trưởng phòng duyệt",
     PendingCurrentManagerOpinion: "Chờ quản lý hiện tại",
+    PendingEmployee: "Chờ người lao động xác nhận",
+    PendingEmployeeConsent: "Chờ nhân viên xác nhận",
     PendingEmployeeNotification: "Chờ thông báo nhân viên",
     PendingEmployeeExplanation: "Chờ nhân viên giải trình",
-    PendingManagerReview: "Chờ quản lý duyệt",
+    PendingDirector: "Chờ giám đốc",
+    PendingDirectorApproval: "Chờ giám đốc duyệt",
+    PendingApproval: "Chờ phê duyệt",
+    RevisionRequired: "Cần bổ sung",
+    PendingManagerContentReview: "Chờ trưởng phòng xem nội dung",
+    PendingHRRevision: "Chờ HR chỉnh sửa",
     Draft: "Bản nháp",
     Calculated: "Đã tính",
     HRReviewed: "HR đã kiểm tra",
@@ -87,11 +97,15 @@ export const statusLabel = (status: string) => {
     ContractAccepted: "Hợp đồng đã chấp thuận",
     ContractRejected: "Hợp đồng bị từ chối",
     New: "Mới nộp",
-    Interview_Pending: "Chờ Trưởng phòng",
-    Interview_Passed: "Chờ Giám đốc",
+    Interview_Pending: "Chờ trưởng phòng",
+    Interview_Passed: "Chờ giám đốc",
     Offer: "Đã chốt offer",
     Cancelled: "Đã hủy",
     SLA_Expired: "Quá hạn SLA",
+    PendingEvaluation: "Chờ chấm KPI",
+    ReworkRequired: "Cần cập nhật lại",
+    Evaluated: "Đã chốt KPI",
+    AutoEvaluated: "Tự động chốt KPI",
   };
 
   return map[status] || status;

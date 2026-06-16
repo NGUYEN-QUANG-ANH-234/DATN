@@ -10,7 +10,8 @@ export type ApprovalModule =
   | "OVERTIME"
   | "LEAVE"
   | "PAYROLL"
-  | "PERSONNEL_CHANGE";
+  | "PERSONNEL_CHANGE"
+  | "PERFORMANCE";
 
 export type ApprovalActionKind =
   | "approve"
@@ -23,6 +24,7 @@ export interface ApprovalAction {
   kind: ApprovalActionKind;
   label: string;
   tone?: "primary" | "danger" | "secondary";
+  requiresNote?: boolean;
   run: (note?: string) => Promise<unknown> | unknown;
 }
 
@@ -56,7 +58,22 @@ export interface TrackingItem {
   scopeLabel: string;
 }
 
+export type PendingApprovalActionDto = {
+  kind: ApprovalActionKind | string;
+  label: string;
+  tone?: "primary" | "danger" | "secondary" | string;
+  requiresNote?: boolean;
+  endpoint?: string;
+  method?: string;
+};
+
+export type PendingApprovalDetailFieldDto = {
+  label: string;
+  value?: string | null;
+};
+
 export type PendingApprovalDto = {
+  approvalRequestId?: number;
   moduleCode: string;
   referenceId: number;
   level: number;
@@ -68,6 +85,12 @@ export type PendingApprovalDto = {
   quantity?: number;
   deadline?: string;
   cvFilePath?: string;
+  status?: string;
+  statusLabel?: string;
+  detailRoute?: string;
+  detailTitle?: string;
+  actions?: PendingApprovalActionDto[];
+  detailFields?: PendingApprovalDetailFieldDto[];
 };
 
 export type RoleOption = {
@@ -107,4 +130,5 @@ export const APPROVAL_MODULES: Array<{
   { value: "LEAVE", label: "Nghỉ phép" },
   { value: "PAYROLL", label: "Lương" },
   { value: "PERSONNEL_CHANGE", label: "Biến động nhân sự" },
+  { value: "PERFORMANCE", label: "Hiệu suất" },
 ];

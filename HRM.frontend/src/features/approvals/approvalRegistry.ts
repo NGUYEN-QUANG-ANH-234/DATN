@@ -1,10 +1,6 @@
 import type { ApprovalModule } from "./types";
 
-export type ApprovalWorkflowModule =
-  | ApprovalModule
-  | "PAYROLL"
-  | "PERSONNEL_CHANGE"
-  | "PERFORMANCE";
+export type ApprovalWorkflowModule = ApprovalModule;
 
 export type ApprovalWorkflowScope =
   | "central-inbox"
@@ -41,22 +37,22 @@ export const LEGACY_APPROVAL_REDIRECTS: Array<{
   {
     from: "/recruitment/approval-inbox",
     to: getApprovalRedirect("RECRUITMENT"),
-    reason: "Chuyển các yêu cầu tuyển dụng cần duyệt về trang Phê duyệt.",
+    reason: "Các yêu cầu tuyển dụng cần duyệt được xử lý tại trang Phê duyệt.",
   },
   {
     from: "/employee-contract/profile-review",
     to: getApprovalRedirect("PROFILE"),
-    reason: "Chuyển các thay đổi hồ sơ cần duyệt về trang Phê duyệt.",
+    reason: "Các thay đổi hồ sơ cần duyệt được xử lý tại trang Phê duyệt.",
   },
   {
     from: "/employee-contract/director-contract-approval",
     to: getApprovalRedirect("CONTRACT"),
-    reason: "Chuyển hợp đồng cần duyệt về trang Phê duyệt.",
+    reason: "Hợp đồng cần duyệt được xử lý tại trang Phê duyệt.",
   },
   {
     from: "/attendance-leave/overtime-approvals",
     to: getApprovalRedirect("OVERTIME"),
-    reason: "Chuyển yêu cầu làm thêm cần duyệt về trang Phê duyệt.",
+    reason: "Yêu cầu làm thêm giờ cần duyệt được xử lý tại trang Phê duyệt.",
   },
 ];
 
@@ -88,7 +84,7 @@ export const APPROVAL_WORKFLOW_MAP: ApprovalWorkflowMapItem[] = [
     legacyRoutes: [],
     scope: "central-inbox",
     status: "active",
-    note: "HR tiếp tục sàng lọc ứng viên tại trang Ứng viên.",
+    note: "HR tiếp tục sàng lọc và theo dõi ứng viên tại trang Ứng viên.",
   },
   {
     workflowKey: "PROFILE_UPDATE",
@@ -139,8 +135,13 @@ export const APPROVAL_WORKFLOW_MAP: ApprovalWorkflowMapItem[] = [
     moduleLabel: "Hợp đồng",
     ownerArea: "Hồ sơ và hợp đồng",
     creators: ["Employee", "Manager", "HR"],
-    approvers: ["HR", "Director"],
-    pendingStatuses: ["PendingHR", "PendingDirector", "ContractNegotiating"],
+    approvers: ["Manager", "Employee", "Director"],
+    pendingStatuses: [
+      "PendingManagerContentReview",
+      "PendingEmployee",
+      "PendingDirector",
+      "PendingHRRevision",
+    ],
     approveRoute: getApprovalRedirect("CONTRACT"),
     legacyRoutes: [
       "/employee-contract/director-contract-approval",
@@ -157,8 +158,8 @@ export const APPROVAL_WORKFLOW_MAP: ApprovalWorkflowMapItem[] = [
     moduleLabel: "Phụ lục",
     ownerArea: "Hồ sơ và hợp đồng",
     creators: ["HR"],
-    approvers: ["Manager", "HR", "Director"],
-    pendingStatuses: ["PendingDept", "PendingHR", "PendingDirector"],
+    approvers: ["Manager", "Employee", "Director"],
+    pendingStatuses: ["PendingDept", "PendingEmployee", "PendingDirector", "PendingHRRevision"],
     approveRoute: getApprovalRedirect("ADDENDUM"),
     legacyRoutes: [],
     scope: "module-adapter",
@@ -174,10 +175,7 @@ export const APPROVAL_WORKFLOW_MAP: ApprovalWorkflowMapItem[] = [
     approvers: ["Manager", "HR", "Director"],
     pendingStatuses: ["PendingManager", "PendingHR", "PendingDirector"],
     approveRoute: getApprovalRedirect("OVERTIME"),
-    legacyRoutes: [
-      "/attendance-leave/overtime-approvals",
-      "/attendance/overtime-approvals",
-    ],
+    legacyRoutes: ["/attendance-leave/overtime-approvals", "/attendance/overtime-approvals"],
     scope: "module-adapter",
     status: "active",
   },
@@ -203,11 +201,12 @@ export const APPROVAL_WORKFLOW_MAP: ApprovalWorkflowMapItem[] = [
     ownerArea: "Lương",
     creators: ["HR"],
     approvers: ["Director"],
-    pendingStatuses: ["PendingDirector"],
-    approveRoute: "/approvals",
+    pendingStatuses: ["PendingDirectorApproval"],
+    approveRoute: getApprovalRedirect("PAYROLL"),
     legacyRoutes: [],
-    scope: "planned",
-    status: "planned",
+    scope: "module-adapter",
+    status: "active",
+    note: "Chưa có endpoint duyệt công thức dùng chung; vẫn theo dõi trong kế hoạch chuẩn hóa payroll.",
   },
   {
     workflowKey: "PAYROLL_RUN_APPROVAL",
@@ -217,11 +216,12 @@ export const APPROVAL_WORKFLOW_MAP: ApprovalWorkflowMapItem[] = [
     ownerArea: "Lương",
     creators: ["HR"],
     approvers: ["Director"],
-    pendingStatuses: ["PendingDirector"],
-    approveRoute: "/approvals",
+    pendingStatuses: ["PendingApproval"],
+    approveRoute: getApprovalRedirect("PAYROLL"),
     legacyRoutes: [],
-    scope: "planned",
-    status: "planned",
+    scope: "module-adapter",
+    status: "active",
+    note: "Workspace đã gom bảng lương chờ xử lý; thao tác chốt chi tiết vẫn ở trang Lương.",
   },
   {
     workflowKey: "PROJECT_BONUS_IMPORT",
@@ -232,11 +232,26 @@ export const APPROVAL_WORKFLOW_MAP: ApprovalWorkflowMapItem[] = [
     creators: ["HR", "Accountant"],
     approvers: ["Director"],
     pendingStatuses: ["PendingReview"],
-    approveRoute: "/approvals?module=PAYROLL",
+    approveRoute: getApprovalRedirect("PAYROLL"),
     legacyRoutes: [],
-    scope: "central-inbox",
+    scope: "module-adapter",
     status: "active",
-    note: "HR/Kế toán import thưởng dự án; Giám đốc duyệt trước khi payroll sử dụng.",
+    note: "Batch thưởng dự án được duyệt trước khi đưa vào payroll.",
+  },
+  {
+    workflowKey: "EXTERNAL_TIMESHEET_IMPORT",
+    workflowName: "Duyệt giờ công cộng tác viên",
+    module: "PAYROLL",
+    moduleLabel: "Lương",
+    ownerArea: "Lương",
+    creators: ["HR", "Accountant"],
+    approvers: ["Director"],
+    pendingStatuses: ["Validated"],
+    approveRoute: getApprovalRedirect("PAYROLL"),
+    legacyRoutes: [],
+    scope: "module-adapter",
+    status: "active",
+    note: "Batch giờ công cộng tác viên được duyệt trước khi đưa vào payroll.",
   },
   {
     workflowKey: "PERSONNEL_CHANGE_APPROVAL",
@@ -249,27 +264,29 @@ export const APPROVAL_WORKFLOW_MAP: ApprovalWorkflowMapItem[] = [
     pendingStatuses: [
       "PendingHRReview",
       "PendingManagerReview",
+      "PendingCurrentManagerOpinion",
       "PendingEmployeeConsent",
       "PendingDirectorApproval",
     ],
-    approveRoute: "/approvals",
+    approveRoute: getApprovalRedirect("PERSONNEL_CHANGE"),
     legacyRoutes: [],
-    scope: "planned",
-    status: "planned",
-    note: "Theo dõi hồ sơ tại trang Biến động nhân sự.",
+    scope: "module-adapter",
+    status: "active",
+    note: "Workspace đã gom các bước xem xét, xác nhận và duyệt chính của biến động nhân sự.",
   },
   {
     workflowKey: "PERFORMANCE_APPROVAL",
-    workflowName: "Duyệt đánh giá hiệu suất và kỷ luật",
+    workflowName: "Chấm điểm KPI",
     module: "PERFORMANCE",
-    moduleLabel: "Hiệu suất và kỷ luật",
+    moduleLabel: "Hiệu suất",
     ownerArea: "Hiệu suất và đào tạo",
-    creators: ["Manager", "HR"],
+    creators: ["Employee"],
     approvers: ["Manager", "HR", "Director"],
-    pendingStatuses: ["Pending", "PendingDirector"],
-    approveRoute: "/approvals",
+    pendingStatuses: ["PendingEvaluation", "ReworkRequired"],
+    approveRoute: getApprovalRedirect("PERFORMANCE"),
     legacyRoutes: [],
-    scope: "planned",
-    status: "planned",
+    scope: "module-adapter",
+    status: "partial",
+    note: "Workspace hiển thị KPI chờ chấm; form chấm điểm chi tiết vẫn nằm ở trang Đánh giá KPI.",
   },
 ];

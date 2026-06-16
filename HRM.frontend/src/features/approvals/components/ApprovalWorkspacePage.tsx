@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Building2,
@@ -32,8 +32,9 @@ import { overtimeApi } from "../../attendance/api/overtimeApi";
 import { leaveRequestApi } from "../../attendance/api/leaveRequestApi";
 import { accountApi } from "../../system/api/accountApi";
 import { payrollApi } from "../../payroll/api/payrollApi";
-import { formatMoney } from "../../payroll/utils";
+import { formatMoney, formatNumber } from "../../payroll/utils";
 import { personnelChangeApi } from "../../personnel-change/api/personnelChangeApi";
+import { performanceApi, type PerformanceEvaluation } from "../../tasks/api/performanceApi";
 import type { PendingProfileRequest } from "../../employees/types/profileRequest";
 import type { PendingDependentRequest } from "../../employees/types/dependent";
 import type { PendingOnboardingRequest } from "../../employees/types/onboarding";
@@ -42,7 +43,10 @@ import type { ContractAddendumDto } from "../../employees/api/contractAddendumAp
 import type { OvertimeRequest } from "../../attendance/api/overtimeApi";
 import type { LeaveRequest } from "../../attendance/api/leaveRequestApi";
 import type {
+  ExternalTimesheetImportBatch,
   PayrollAdjustment,
+  PayrollFormula,
+  PayrollRunSummary,
   ProjectBonusImportBatch,
   SalarySlip,
 } from "../../payroll/types/payroll";
@@ -59,6 +63,7 @@ import type {
   ApprovalModule,
   ApprovalAction,
   PendingApprovalDto,
+  PendingApprovalActionDto,
   RoleOption,
   ApprovalWorkspaceFilters,
 } from "../types";
@@ -162,6 +167,38 @@ const currentPayrollPeriod = () => {
   };
 };
 
+type OnboardingDepartmentOption = {
+  id: number;
+  deptName: string;
+  children?: OnboardingDepartmentOption[];
+};
+
+type OnboardingPositionOption = {
+  id: number;
+  title: string;
+};
+
+type OnboardingReviewSelection = {
+  roleId?: number;
+  departmentId?: number;
+  positionId?: number;
+};
+
+const flattenDepartments = (
+  nodes: OnboardingDepartmentOption[] = [],
+): OnboardingDepartmentOption[] =>
+  nodes.flatMap((node) => [
+    { id: node.id, deptName: node.deptName },
+    ...flattenDepartments(node.children || []),
+  ]);
+
+const unwrapLookupList = <T,>(value: unknown): T[] => {
+  if (Array.isArray(value)) return value as T[];
+
+  const response = value as { data?: T[]; Data?: T[] };
+  return response?.data || response?.Data || [];
+};
+
 export const ApprovalWorkspacePage = () => {
   const { user } = useCurrentUser();
   const role = getRole(user?.role);
@@ -187,9 +224,13 @@ export const ApprovalWorkspacePage = () => {
     module: moduleFromQuery,
   }));
   const [roleOptions, setRoleOptions] = useState<RoleOption[]>([]);
-  const [onboardingRoleById, setOnboardingRoleById] = useState<
-    Record<number, number>
-  >({});
+  const onboardingReviewSelectionsRef = useRef<Record<number, OnboardingReviewSelection>>({});
+  const [onboardingDepartments, setOnboardingDepartments] = useState<
+    OnboardingDepartmentOption[]
+  >([]);
+  const [onboardingPositions, setOnboardingPositions] = useState<
+    OnboardingPositionOption[]
+  >([]);
 
   const setFilters = useCallback(
     (next: ApprovalWorkspaceFilters) => {
@@ -228,6 +269,7 @@ export const ApprovalWorkspacePage = () => {
         loadLeaveApprovals(next),
         loadPayrollWorkItems(next),
         loadPersonnelChangeApprovals(next),
+        loadPerformanceApprovals(next),
       ]);
 
       setItems(next);
@@ -249,7 +291,18 @@ export const ApprovalWorkspacePage = () => {
         if (item.moduleCode.startsWith("CONTRACT")) return;
 
         const module = mapCentralModule(item.moduleCode);
-        target.push({
+        const detailFields: Array<[string, string | number | null | undefined]> =
+          item.detailFields && item.detailFields.length > 0
+            ? item.detailFields.map((field) => [field.label, field.value] as [string, string | null | undefined])
+            : [
+                ["Mã tham chiếu", `#${item.referenceId}`],
+                ["Cấp duyệt", String(item.level)],
+                ["Vị trí", item.positionName],
+                ["Phòng ban", item.departmentName],
+                ["Số lượng", item.quantity ? `${item.quantity} nhân sự` : undefined],
+                ["Mô tả", item.description],
+              ];
+        const centralItem: ApprovalItem = {
           id: `central-${item.moduleCode}-${item.referenceId}`,
           module,
           moduleLabel: moduleLabel(module),
@@ -258,7 +311,7 @@ export const ApprovalWorkspacePage = () => {
           subtitle: centralSubtitle(item),
           owner: item.title,
           department: item.departmentName,
-          status: "Pending",
+          status: item.status || "Pending",
           statusLabel: `Cấp duyệt ${item.level}`,
           date: item.createdAt,
           deadline: item.deadline,
@@ -278,7 +331,12 @@ export const ApprovalWorkspacePage = () => {
             centralAction(item, true),
             centralAction(item, false),
           ],
-        });
+        };
+
+        centralItem.statusLabel = item.statusLabel || `Chờ duyệt cấp ${item.level}`;
+        centralItem.details = <DetailFieldGrid fields={detailFields} />;
+        centralItem.actions = buildCentralActions(item);
+        target.push(centralItem);
       });
     } catch {
       // Một số role không có quyền đọc inbox chung. Bỏ qua để các luồng riêng vẫn hiện.
@@ -378,7 +436,10 @@ export const ApprovalWorkspacePage = () => {
     try {
       const res = await onboardingApi.getPendingRequests();
       unwrapData<PendingOnboardingRequest>(res).forEach((item) => {
-        const selectedRoleId = onboardingRoleById[item.id] || defaultEmployeeRoleId;
+        const selection = onboardingReviewSelectionsRef.current[item.id] || {};
+        const selectedRoleId = selection.roleId || defaultEmployeeRoleId;
+        const selectedDepartmentId = selection.departmentId || item.departmentId || "";
+        const selectedPositionId = selection.positionId || item.positionId || "";
 
         target.push({
           id: `onboarding-${item.id}`,
@@ -386,34 +447,90 @@ export const ApprovalWorkspacePage = () => {
           moduleLabel: "Tiếp nhận hồ sơ",
           source: "ONBOARDING",
           title: `Thiết lập hồ sơ mới #${item.id}`,
-          subtitle: `Ứng viên #${item.candidateId}`,
+          subtitle: [
+            `Ứng viên #${item.candidateId}`,
+            item.positionName,
+            item.departmentName,
+          ].filter(Boolean).join(" · "),
+          owner: readOnboardingText(item.requestedDataJson, "FullName"),
+          department: item.departmentName,
           status: item.status,
           statusLabel: statusLabel(item.status),
           date: item.createdAt,
           details: (
             <div className="space-y-3">
               <JsonPreview value={item.requestedDataJson} />
-              <label className="block">
-                <span className="mb-1 block text-xs font-semibold uppercase text-gray-500">
-                  Vai trò khi kích hoạt
-                </span>
-                <select
-                  className={fieldClass}
-                  value={selectedRoleId}
-                  onChange={(event) =>
-                    setOnboardingRoleById((prev) => ({
-                      ...prev,
-                      [item.id]: Number(event.target.value),
-                    }))
-                  }
-                >
-                  {normalizedRoleOptions.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <DetailFieldGrid
+                fields={[
+                  ["Phòng ban đề xuất", item.departmentName],
+                  ["Vị trí đề xuất", item.positionName],
+                  ["Yêu cầu tuyển dụng", item.recruitmentRequestId ? `#${item.recruitmentRequestId}` : undefined],
+                ]}
+              />
+              <div className="grid gap-3 md:grid-cols-3">
+                <label className="block">
+                  <span className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+                    Vai trò khi kích hoạt
+                  </span>
+                  <select
+                    className={fieldClass}
+                    defaultValue={selectedRoleId}
+                    onChange={(event) =>
+                      setOnboardingReviewSelection(item.id, {
+                        roleId: Number(event.target.value),
+                      })
+                    }
+                  >
+                    {normalizedRoleOptions.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+                    Phòng ban *
+                  </span>
+                  <select
+                    className={fieldClass}
+                    defaultValue={selectedDepartmentId}
+                    onChange={(event) =>
+                      setOnboardingReviewSelection(item.id, {
+                        departmentId: toOptionalNumber(event.target.value),
+                      })
+                    }
+                  >
+                    <option value="">Chọn phòng ban</option>
+                    {onboardingDepartments.map((department) => (
+                      <option key={department.id} value={department.id}>
+                        {department.deptName}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+                    Vị trí *
+                  </span>
+                  <select
+                    className={fieldClass}
+                    defaultValue={selectedPositionId}
+                    onChange={(event) =>
+                      setOnboardingReviewSelection(item.id, {
+                        positionId: toOptionalNumber(event.target.value),
+                      })
+                    }
+                  >
+                    <option value="">Chọn vị trí</option>
+                    {onboardingPositions.map((position) => (
+                      <option key={position.id} value={position.id}>
+                        {position.title}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
             </div>
           ),
           actions: [
@@ -421,11 +538,7 @@ export const ApprovalWorkspacePage = () => {
               kind: "approve",
               label: "Kích hoạt",
               tone: "primary",
-              run: () =>
-                onboardingApi.reviewRequest(item.id, {
-                  isApproved: true,
-                  roleId: onboardingRoleById[item.id] || defaultEmployeeRoleId,
-                }),
+              run: () => submitOnboardingApproval(item),
             },
             {
               kind: "reject",
@@ -633,20 +746,25 @@ export const ApprovalWorkspacePage = () => {
 
     const { month, year, period } = currentPayrollPeriod();
 
-    try {
-      const slipsRes = await payrollApi.getSalarySlips(period);
-      const slips = (slipsRes.data ?? []).filter((item) =>
-        ["PendingApproval", "HRReviewed"].includes(item.status),
-      );
-
-      slips.forEach((item) => {
-        target.push(mapPayrollSlipItem(item, period));
-      });
-    } catch {
-      // Skip salary items when the current role cannot view them.
-    }
-
     if (["Admin", "Director"].includes(role)) {
+      try {
+        const payrollRunsRes = await payrollApi.getPendingPayrollRuns();
+        (payrollRunsRes.data ?? []).forEach((item) => {
+          target.push(mapPayrollRunItem(item));
+        });
+      } catch {
+        // Skip payroll run approvals when the current role cannot approve payroll.
+      }
+
+      try {
+        const formulasRes = await payrollApi.getPayrollFormulas("PendingDirectorApproval");
+        (formulasRes.data ?? []).forEach((item) => {
+          target.push(mapPayrollFormulaItem(item));
+        });
+      } catch {
+        // Skip payroll formula approvals when the current role cannot approve payroll formulas.
+      }
+
       try {
         const projectBonusRes = await payrollApi.getPendingProjectBonusImports();
         (projectBonusRes.data ?? []).forEach((item) => {
@@ -654,6 +772,15 @@ export const ApprovalWorkspacePage = () => {
         });
       } catch {
         // Skip project bonus imports when the current role cannot approve payroll inputs.
+      }
+
+      try {
+        const timesheetRes = await payrollApi.getPendingExternalTimesheetImports();
+        (timesheetRes.data ?? []).forEach((item) => {
+          target.push(mapExternalTimesheetImportItem(item));
+        });
+      } catch {
+        // Skip external timesheet imports when the current role cannot approve payroll inputs.
       }
     }
 
@@ -695,6 +822,19 @@ export const ApprovalWorkspacePage = () => {
     );
   };
 
+  const loadPerformanceApprovals = async (target: ApprovalItem[]) => {
+    if (!["Admin", "Manager", "HR", "Director"].includes(role)) return;
+
+    try {
+      const res = await performanceApi.getPending();
+      (res.data ?? []).forEach((item) => {
+        target.push(mapPerformanceEvaluationItem(item));
+      });
+    } catch {
+      // Some roles do not have permission to evaluate KPI.
+    }
+  };
+
   const normalizedRoleOptions = useMemo(() => {
     if (roleOptions.length === 0) {
       return [{ id: 5, name: "Employee" }];
@@ -706,13 +846,52 @@ export const ApprovalWorkspacePage = () => {
     }));
   }, [roleOptions]);
 
+  const setOnboardingReviewSelection = (
+    requestId: number,
+    patch: OnboardingReviewSelection,
+  ) => {
+    onboardingReviewSelectionsRef.current[requestId] = {
+      ...(onboardingReviewSelectionsRef.current[requestId] || {}),
+      ...patch,
+    };
+  };
+
+  const submitOnboardingApproval = (item: PendingOnboardingRequest) => {
+    const selection = onboardingReviewSelectionsRef.current[item.id] || {};
+    const roleId = selection.roleId || defaultEmployeeRoleId;
+    const departmentId = selection.departmentId || item.departmentId;
+    const positionId = selection.positionId || item.positionId;
+
+    if (!departmentId || !positionId) {
+      throw new Error("Vui lòng chọn phòng ban và vị trí trước khi kích hoạt nhân viên.");
+    }
+
+    return onboardingApi.reviewRequest(item.id, {
+      isApproved: true,
+      roleId,
+      departmentId,
+      positionId,
+    });
+  };
+
   useEffect(() => {
     if (!["Admin", "HR"].includes(role)) return;
 
-    accountApi
-      .getSystemRoles()
-      .then((res: unknown) => setRoleOptions(unwrapData<RoleOption>(res)))
-      .catch(() => setRoleOptions([]));
+    void Promise.all([
+      accountApi.getSystemRoles(),
+      recruitmentApi.getDepartmentsTree(),
+      recruitmentApi.getPositions(),
+    ])
+      .then(([rolesRes, departmentsRes, positionsRes]) => {
+        setRoleOptions(unwrapData<RoleOption>(rolesRes));
+        setOnboardingDepartments(flattenDepartments(unwrapLookupList<OnboardingDepartmentOption>(departmentsRes)));
+        setOnboardingPositions(unwrapLookupList<OnboardingPositionOption>(positionsRes));
+      })
+      .catch(() => {
+        setRoleOptions([]);
+        setOnboardingDepartments([]);
+        setOnboardingPositions([]);
+      });
   }, [role]);
 
   useEffect(() => {
@@ -819,7 +998,7 @@ export const ApprovalWorkspacePage = () => {
       action.kind === "reject"
         ? "Xác nhận từ chối"
         : action.kind === "revision"
-          ? "Yêu cầu chỉnh sửa"
+          ? "Yêu cầu bổ sung/chỉnh sửa"
           : "Xác nhận xử lý",
       `Bạn muốn ${action.label.toLowerCase()} yêu cầu "${item.title}"?`,
       async () => {
@@ -862,12 +1041,17 @@ export const ApprovalWorkspacePage = () => {
     if (!pendingAction) return;
 
     const note = actionNote.trim();
-    if ((pendingAction.action.kind === "reject" || pendingAction.action.kind === "revision") && !note) {
+    const requiresNote =
+      pendingAction.action.requiresNote ||
+      pendingAction.action.kind === "reject" ||
+      pendingAction.action.kind === "revision";
+
+    if (requiresNote && !note) {
       triggerAlert(
         "error",
         "Thiếu ghi chú",
         pendingAction.action.kind === "revision"
-          ? "Vui lòng nhập nội dung cần chỉnh sửa trước khi gửi."
+          ? "Vui lòng nhập nội dung cần bổ sung hoặc chỉnh sửa trước khi gửi."
           : "Vui lòng nhập lý do từ chối trước khi gửi.",
       );
       return;
@@ -966,19 +1150,64 @@ export const ApprovalWorkspacePage = () => {
   function centralAction(
     item: PendingApprovalDto,
     isApproved: boolean,
+    action: "approve" | "reject" | "revision" = isApproved ? "approve" : "reject",
+    label?: string,
   ): ApprovalAction {
     return {
-      kind: isApproved ? "approve" : "reject",
-      label: isApproved ? "Duyệt" : "Từ chối",
-      tone: isApproved ? "primary" : "danger",
+      kind: action,
+      label: label || (isApproved ? "Duyệt" : action === "revision" ? "Yêu cầu bổ sung" : "Từ chối"),
+      tone: isApproved ? "primary" : action === "revision" ? "secondary" : "danger",
+      requiresNote: action !== "approve",
       run: (note) =>
         recruitmentApi.reviewRequest({
           moduleCode: item.moduleCode,
           referenceId: item.referenceId,
           isApproved,
+          action,
           note: note || "",
         }),
     };
+  }
+
+  function buildCentralActions(item: PendingApprovalDto): ApprovalAction[] {
+    const backendActions = item.actions || [];
+    if (backendActions.length === 0) {
+      return [
+        centralAction(item, true),
+        centralAction(item, false),
+      ];
+    }
+
+    return backendActions
+      .map((action) => mapBackendApprovalAction(item, action))
+      .filter((action): action is ApprovalAction => Boolean(action));
+  }
+
+  function mapBackendApprovalAction(
+    item: PendingApprovalDto,
+    action: PendingApprovalActionDto,
+  ): ApprovalAction | null {
+    if (action.kind === "open") {
+      const route = action.endpoint || item.detailRoute;
+      if (!route) return null;
+
+      return {
+        kind: "open",
+        label: action.label || "Xem chi tiết",
+        tone: "secondary",
+        run: () => navigate(route),
+      };
+    }
+
+    if (action.kind === "approve") {
+      return centralAction(item, true, "approve", action.label);
+    }
+
+    if (action.kind === "reject" || action.kind === "revision") {
+      return centralAction(item, false, action.kind, action.label);
+    }
+
+    return null;
   }
 
   function mapOvertimeItem(
@@ -1223,6 +1452,86 @@ export const ApprovalWorkspacePage = () => {
     };
   }
 
+  function mapPayrollRunItem(item: PayrollRunSummary): ApprovalItem {
+    return {
+      id: `payroll-run-${item.month}-${item.year}`,
+      module: "PAYROLL",
+      moduleLabel: "Lương",
+      source: "PAYROLL_RUN_APPROVAL",
+      title: `Bảng lương ${item.period}`,
+      subtitle: `${formatNumber(item.slipCount)} phiếu - ${formatMoney(item.netSalary)} thực nhận`,
+      owner: item.submittedByAccountId ? `Tài khoản #${item.submittedByAccountId}` : "HR/Kế toán",
+      status: item.status,
+      statusLabel: item.statusText || statusLabel(item.status),
+      date: item.submittedAt || item.calculatedAt,
+      details: (
+        <DetailFieldGrid
+          fields={[
+            ["Kỳ lương", item.period],
+            ["Số phiếu", formatNumber(item.slipCount)],
+            ["Tổng thu nhập", formatMoney(item.grossIncome)],
+            ["Tổng thực nhận", formatMoney(item.netSalary)],
+            ["Chi phí công ty", formatMoney(item.totalCompanyCost)],
+            ["Ngày tổng hợp", formatDate(item.calculatedAt)],
+            ["Ngày gửi duyệt", formatDate(item.submittedAt)],
+            ["Ngày duyệt", formatDate(item.approvedAt)],
+            ["Trạng thái", item.statusText || statusLabel(item.status)],
+            ["Ghi chú duyệt", item.reviewNote],
+          ]}
+        />
+      ),
+      actions: [
+        {
+          kind: "approve",
+          label: "Duyệt",
+          tone: "primary",
+          run: (note) =>
+            payrollApi.reviewPayrollRun({
+              month: item.month,
+              year: item.year,
+              isApproved: true,
+              requestRevision: false,
+              note: note || "",
+            }),
+        },
+        {
+          kind: "revision",
+          label: "Yêu cầu bổ sung",
+          tone: "secondary",
+          requiresNote: true,
+          run: (note) =>
+            payrollApi.reviewPayrollRun({
+              month: item.month,
+              year: item.year,
+              isApproved: false,
+              requestRevision: true,
+              note: note || "",
+            }),
+        },
+        {
+          kind: "reject",
+          label: "Từ chối",
+          tone: "danger",
+          requiresNote: true,
+          run: (note) =>
+            payrollApi.reviewPayrollRun({
+              month: item.month,
+              year: item.year,
+              isApproved: false,
+              requestRevision: false,
+              note: note || "",
+            }),
+        },
+        {
+          kind: "open",
+          label: "Mở bảng lương",
+          tone: "secondary",
+          run: () => navigate("/payroll/payroll-aggregation"),
+        },
+      ],
+    };
+  }
+
   function mapPayrollSlipItem(item: SalarySlip, period: string): ApprovalItem {
     return {
       id: `payroll-slip-${item.id}`,
@@ -1260,6 +1569,8 @@ export const ApprovalWorkspacePage = () => {
     };
   }
 
+  void mapPayrollSlipItem;
+
   function mapPayrollAdjustmentItem(item: PayrollAdjustment, period: string): ApprovalItem {
     return {
       id: `payroll-adjustment-${item.id}`,
@@ -1292,6 +1603,98 @@ export const ApprovalWorkspacePage = () => {
           label: "Mở điều chỉnh",
           tone: "secondary",
           run: () => navigate("/payroll/adjustments"),
+        },
+      ],
+    };
+  }
+
+  function mapPayrollFormulaItem(item: PayrollFormula): ApprovalItem {
+    const previewLines = item.lines?.slice(0, 8) ?? [];
+
+    return {
+      id: `payroll-formula-${item.id}`,
+      module: "PAYROLL",
+      moduleLabel: "Lương",
+      source: "PAYROLL_FORMULA_APPROVAL",
+      title: `Công thức lương: ${item.formulaName}`,
+      subtitle: `${item.formulaCode} - v${item.version}${item.versionCode ? ` - ${item.versionCode}` : ""}`,
+      owner: item.submittedAt ? "HR/Kế toán" : undefined,
+      status: item.status,
+      statusLabel: item.statusText || statusLabel(item.status),
+      date: item.submittedAt || item.createdAt,
+      deadline: item.deadlineAt,
+      details: (
+        <div className="space-y-4">
+          <DetailFieldGrid
+            fields={[
+              ["Mã công thức", item.formulaCode],
+              ["Tên công thức", item.formulaName],
+              ["Phiên bản", `v${item.version}`],
+              ["Mã phiên bản", item.versionCode],
+              ["Hiệu lực từ", formatDate(item.effectiveFrom)],
+              ["Hiệu lực đến", item.effectiveTo ? formatDate(item.effectiveTo) : "Không giới hạn"],
+              ["Số dòng", item.lines?.length ?? 0],
+              ["Trạng thái", item.statusText || statusLabel(item.status)],
+              ["Ghi chú duyệt", item.reviewNote],
+            ]}
+          />
+
+          {previewLines.length > 0 ? (
+            <div className="rounded-[var(--radius-lg)] border border-[var(--hicas-border)] bg-white">
+              <div className="border-b border-[var(--hicas-border)] px-4 py-3 text-sm font-semibold text-[var(--hicas-text-main)]">
+                Dòng công thức
+              </div>
+              <div className="divide-y divide-[var(--hicas-border)]">
+                {previewLines.map((line) => (
+                  <div
+                    key={`${line.calculationOrder}-${line.componentCode}`}
+                    className="grid gap-2 px-4 py-3 text-sm md:grid-cols-[80px_1fr_1.4fr]"
+                  >
+                    <span className="font-semibold text-[var(--hicas-text-secondary)]">
+                      #{line.calculationOrder}
+                    </span>
+                    <span className="font-semibold text-[var(--hicas-text-main)]">
+                      {line.componentName || line.componentCode}
+                    </span>
+                    <code className="break-all rounded bg-[var(--hicas-bg-soft)] px-2 py-1 text-xs text-[var(--hicas-text-main)]">
+                      {line.expression}
+                    </code>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ),
+      actions: [
+        {
+          kind: "approve",
+          label: "Duyệt",
+          tone: "primary",
+          run: (note) =>
+            payrollApi.reviewPayrollFormula(item.id, {
+              isApproved: true,
+              requestRevision: false,
+              note: note || "",
+            }),
+        },
+        {
+          kind: "revision",
+          label: "Yêu cầu chỉnh sửa",
+          tone: "secondary",
+          requiresNote: true,
+          run: (note) =>
+            payrollApi.reviewPayrollFormula(item.id, {
+              isApproved: false,
+              requestRevision: true,
+              note: note || "",
+            }),
+        },
+        {
+          kind: "open",
+          label: "Mở công thức",
+          tone: "secondary",
+          run: () => navigate("/payroll/salary-formula"),
         },
       ],
     };
@@ -1380,9 +1783,145 @@ export const ApprovalWorkspacePage = () => {
         },
         {
           kind: "open",
-          label: "Mở khu vực lương",
+          label: "Mở thưởng dự án",
           tone: "secondary",
-          run: () => navigate("/payroll/payroll-aggregation"),
+          run: () => navigate("/payroll/project-bonuses"),
+        },
+      ],
+    };
+  }
+
+  function mapExternalTimesheetImportItem(item: ExternalTimesheetImportBatch): ApprovalItem {
+    const previewLines = item.lines?.slice(0, 6) ?? [];
+
+    return {
+      id: `external-timesheet-import-${item.id}`,
+      module: "PAYROLL",
+      moduleLabel: "Lương",
+      source: "EXTERNAL_TIMESHEET_IMPORT",
+      title: `Giờ công cộng tác viên ${item.payrollPeriod}`,
+      subtitle: `${item.validRows} dòng hợp lệ - ${formatNumber(item.totalHours)} giờ - ${formatMoney(item.totalAmount)}`,
+      owner: item.importedByName || `Tài khoản #${item.importedByAccountId}`,
+      status: item.status,
+      statusLabel: item.statusText || statusLabel(item.status),
+      date: item.importedAt,
+      details: (
+        <div className="space-y-4">
+          <DetailFieldGrid
+            fields={[
+              ["Kỳ lương", item.payrollPeriod],
+              ["Nguồn dữ liệu", item.sourceSystem],
+              ["File import", item.fileName],
+              ["Người import", item.importedByName || `#${item.importedByAccountId}`],
+              ["Số dòng hợp lệ", item.validRows],
+              ["Dòng lỗi", item.errorRows],
+              ["Tổng giờ", formatNumber(item.totalHours)],
+              ["Tổng tiền", formatMoney(item.totalAmount)],
+              ["Trạng thái", item.statusText || statusLabel(item.status)],
+              ["Ghi chú", item.note],
+            ]}
+          />
+
+          {previewLines.length > 0 ? (
+            <div className="rounded-[var(--radius-lg)] border border-[var(--hicas-border)] bg-white">
+              <div className="border-b border-[var(--hicas-border)] px-4 py-3 text-sm font-semibold text-[var(--hicas-text-main)]">
+                Dòng giờ công trong batch
+              </div>
+              <div className="divide-y divide-[var(--hicas-border)]">
+                {previewLines.map((line) => (
+                  <div
+                    key={`${line.rowNumber}-${line.collaboratorCode}-${line.projectCode}-${line.taskCode}`}
+                    className="grid gap-2 px-4 py-3 text-sm md:grid-cols-[1.2fr_1fr_auto]"
+                  >
+                    <div>
+                      <p className="font-semibold text-[var(--hicas-text-main)]">
+                        {line.collaboratorName || line.collaboratorCode}
+                      </p>
+                      <p className="text-[var(--hicas-text-secondary)]">
+                        {line.collaboratorCode} - {line.workDateText || line.workDate}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-[var(--hicas-text-main)]">{line.projectCode}</p>
+                      <p className="text-[var(--hicas-text-secondary)]">{line.taskCode || "Không có mã công việc"}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-semibold text-[var(--hicas-orange)]">{formatMoney(line.amount)}</p>
+                      <p className="text-xs text-[var(--hicas-text-secondary)]">
+                        {formatNumber(line.approvedHours)} giờ
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ),
+      actions: [
+        {
+          kind: "approve",
+          label: "Duyệt",
+          tone: "primary",
+          run: (note) =>
+            payrollApi.reviewExternalTimesheetImport(item.id, {
+              isApproved: true,
+              note: note || "",
+            }),
+        },
+        {
+          kind: "reject",
+          label: "Từ chối",
+          tone: "danger",
+          run: (note) =>
+            payrollApi.reviewExternalTimesheetImport(item.id, {
+              isApproved: false,
+              note: note || "",
+            }),
+        },
+        {
+          kind: "open",
+          label: "Mở giờ công CTV",
+          tone: "secondary",
+          run: () => navigate("/payroll/external-timesheets"),
+        },
+      ],
+    };
+  }
+
+  function mapPerformanceEvaluationItem(item: PerformanceEvaluation): ApprovalItem {
+    return {
+      id: `performance-${item.id}`,
+      module: "PERFORMANCE",
+      moduleLabel: "Hiệu suất",
+      source: "PERFORMANCE_APPROVAL",
+      title: `Chấm KPI: ${item.employeeName}`,
+      subtitle: `Kỳ ${item.period} - ${item.details.length} chỉ tiêu`,
+      owner: item.employeeName,
+      department: item.departmentName,
+      status: item.status,
+      statusLabel: statusLabel(item.status),
+      date: item.period,
+      details: (
+        <DetailFieldGrid
+          fields={[
+            ["Nhân sự", item.employeeName],
+            ["Phòng ban", item.departmentName],
+            ["Kỳ KPI", item.period],
+            ["Số chỉ tiêu", item.details.length],
+            ["Tổng trọng số", `${formatNumber(item.totalWeight)}%`],
+            ["Điểm trừ hệ thống", formatNumber(item.systemPenaltyPoint)],
+            ["Điểm hiện tại", formatNumber(item.totalScore)],
+            ["Phiên bản chấm điểm", item.scoringVersion],
+          ]}
+        />
+      ),
+      actions: [
+        {
+          kind: "open",
+          label: "Mở chấm KPI",
+          tone: "secondary",
+          run: () => navigate("/tasks/performance-evaluation"),
         },
       ],
     };
@@ -2378,12 +2917,12 @@ const ApprovalActionNoteDialog = ({
   const { item, action } = pendingAction;
   const isReject = action.kind === "reject";
   const isRevision = action.kind === "revision";
-  const requiresNote = isReject || isRevision;
-  const title = isReject ? "Từ chối yêu cầu" : isRevision ? "Yêu cầu chỉnh sửa" : "Xử lý phê duyệt";
+  const requiresNote = action.requiresNote || isReject || isRevision;
+  const title = isReject ? "Từ chối yêu cầu" : isRevision ? "Yêu cầu bổ sung/chỉnh sửa" : "Xử lý phê duyệt";
   const helper = isReject
     ? "Nhập lý do từ chối để người gửi biết."
     : isRevision
-      ? "Nhập nội dung cần chỉnh sửa để HR cập nhật lại hồ sơ."
+      ? "Nhập nội dung cần bổ sung hoặc chỉnh sửa để người phụ trách cập nhật lại hồ sơ."
       : "Có thể ghi chú điều kiện hoặc nhận xét trước khi duyệt.";
 
   return (
@@ -2524,6 +3063,9 @@ const JsonPreview = ({ value }: { value: string }) => {
 const mapCentralModule = (moduleCode: string): ApprovalModule => {
   if (moduleCode === "CANDIDATE") return "CANDIDATE";
   if (moduleCode.startsWith("CONTRACT")) return "CONTRACT";
+  if (moduleCode.startsWith("PAYROLL") || moduleCode.includes("BONUS") || moduleCode.includes("TIMESHEET")) return "PAYROLL";
+  if (moduleCode.startsWith("PERSONNEL_CHANGE")) return "PERSONNEL_CHANGE";
+  if (moduleCode.startsWith("PERFORMANCE") || moduleCode.startsWith("KPI")) return "PERFORMANCE";
   return "RECRUITMENT";
 };
 
@@ -2531,6 +3073,8 @@ const moduleLabel = (module: ApprovalModule) =>
   APPROVAL_MODULES.find((item) => item.value === module)?.label || module;
 
 const centralTitle = (item: PendingApprovalDto) => {
+  if (item.title) return item.title;
+
   if (item.moduleCode === "RECRUITMENT") {
     return `Nhu cầu tuyển dụng${item.quantity ? ` ${item.quantity} nhân sự` : ""}`;
   }
@@ -2548,6 +3092,21 @@ const dependentActionLabel = (actionType: string) => {
   if (actionType === "UPDATE") return "Cập nhật";
   if (actionType === "DEACTIVATE") return "Ngừng hiệu lực";
   return actionType;
+};
+
+const toOptionalNumber = (value: string) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+};
+
+const readOnboardingText = (jsonString: string, key: string) => {
+  try {
+    const parsed = JSON.parse(jsonString) as Record<string, unknown>;
+    const value = parsed?.[key];
+    return typeof value === "string" && value.trim() ? value.trim() : undefined;
+  } catch {
+    return undefined;
+  }
 };
 
 const getErrorMessage = (error: unknown) =>
