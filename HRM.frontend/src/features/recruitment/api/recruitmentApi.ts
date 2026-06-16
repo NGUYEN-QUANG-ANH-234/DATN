@@ -19,6 +19,7 @@ export const recruitmentApi = {
     moduleCode: string;
     referenceId: number;
     isApproved: boolean;
+    action?: "approve" | "reject" | "revision";
     note?: string;
   }) => {
     return await axiosClient.post("/approvals/process", payload);
