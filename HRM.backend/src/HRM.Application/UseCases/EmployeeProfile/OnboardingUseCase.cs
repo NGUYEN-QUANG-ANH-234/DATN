@@ -3,10 +3,13 @@ using HRM.backend.src.HRM.Application.DTOs.Events;
 using HRM.backend.src.HRM.Application.Interfaces;
 using HRM.backend.src.HRM.Application.Interfaces.EmployeeProfile.Usecases;
 using HRM.backend.src.HRM.Core.Entities.EmployeeProfile;
+using HRM.backend.src.HRM.Core.Entities.Recruitment;
 using HRM.backend.src.HRM.Core.Entities.System;
 using HRM.backend.src.HRM.Core.Enums;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.EmployeeProfile;
+using HRM.backend.src.HRM.Core.Interfaces.Repositories.Organization;
+using HRM.backend.src.HRM.Core.Interfaces.Repositories.Recruitment;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.System;
 using MediatR;
 using System.Text.Json;
@@ -18,6 +21,9 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
         private readonly IBaseRepository<OnboardingRequest> _onboardingRepo;
         private readonly IEmployeeRepository _employeeRepo;
         private readonly IAccountRepository _accountRepo;
+        private readonly ICandidateRepository _candidateRepo;
+        private readonly IDepartmentRepository _departmentRepo;
+        private readonly IPositionRepository _positionRepo;
         private readonly IStorageService _storageService;
         private readonly ISlaTrackingService _slaTrackingService;
         private readonly IAuditLogRepository _auditLogRepo;
@@ -29,6 +35,9 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
             IBaseRepository<OnboardingRequest> onboardingRepo,
             IEmployeeRepository employeeRepo,
             IAccountRepository accountRepo,
+            ICandidateRepository candidateRepo,
+            IDepartmentRepository departmentRepo,
+            IPositionRepository positionRepo,
             IStorageService storageService,
             ISlaTrackingService slaTrackingService,
             IAuditLogRepository auditLogRepo,
@@ -39,6 +48,9 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
             _onboardingRepo = onboardingRepo;
             _employeeRepo = employeeRepo;
             _accountRepo = accountRepo;
+            _candidateRepo = candidateRepo;
+            _departmentRepo = departmentRepo;
+            _positionRepo = positionRepo;
             _storageService = storageService;
             _slaTrackingService = slaTrackingService;
             _auditLogRepo = auditLogRepo;
@@ -119,6 +131,22 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                     if (!dto.RoleId.HasValue)
                         throw new ArgumentException("Vui lòng chỉ định vai trò (Role) hệ thống cho nhân viên mới.");
 
+                    var candidate = (await _candidateRepo.GetCandidatesWithDetailsAsync(new List<int> { request.CandidateId }, innerCt))
+                        .FirstOrDefault();
+                    if (candidate == null)
+                        throw new InvalidOperationException("Không tìm thấy ứng viên liên kết với hồ sơ onboarding.");
+
+                    var resolvedDepartmentId = dto.DepartmentId ?? candidate?.RecruitmentRequest?.DeptId;
+                    var resolvedPositionId = dto.PositionId ?? candidate?.RecruitmentRequest?.PositionId;
+
+                    if (!resolvedDepartmentId.HasValue || resolvedDepartmentId.Value <= 0)
+                        throw new ArgumentException("Vui lòng chọn phòng ban trước khi kích hoạt nhân viên.");
+
+                    if (!resolvedPositionId.HasValue || resolvedPositionId.Value <= 0)
+                        throw new ArgumentException("Vui lòng chọn vị trí/chức danh trước khi kích hoạt nhân viên.");
+
+                    await ValidateInitialOrganizationAsync(resolvedDepartmentId.Value, resolvedPositionId.Value, innerCt);
+
                     var data = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(request.RequestedDataJson,
                         new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
@@ -168,6 +196,9 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
 
                         Type = empType, // Đồng bộ loại hình nhân sự
                         Status = EmployeeStatus.Probation,
+                        DeptId = resolvedDepartmentId.Value,
+                        PositionId = resolvedPositionId.Value,
+                        JoinedDate = DateTime.UtcNow.Date,
 
                         Gender = data.ContainsKey("Gender") && int.TryParse(data["Gender"].GetString(), out int g) ? (Gender)g : null,
                         BirthDate = data.ContainsKey("BirthDate") && DateTime.TryParse(data["BirthDate"].GetString(), out DateTime dob) ? dob : null,
@@ -179,10 +210,17 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                     await _employeeRepo.AddAsync(employee, innerCt);
 
                     // 3. Hoàn tất quy trình
+                    candidate!.Status = CandidateStatus.Hired;
+                    await _candidateRepo.UpdateAsync(candidate, innerCt);
+
                     request.Status = OnboardingStatus.Completed;
                     await _onboardingRepo.UpdateAsync(request, innerCt);
 
-                    await _auditLogRepo.LogSystemEventAsync("HR_Approve_And_Activate_Employee", 0, "onboarding", $"Kích hoạt nhân viên {empCode} với RoleId {dto.RoleId.Value}");
+                    await _auditLogRepo.LogSystemEventAsync(
+                        "HR_Approve_And_Activate_Employee",
+                        0,
+                        "onboarding",
+                        $"Kích hoạt nhân viên {empCode} với RoleId {dto.RoleId.Value}, DeptId {resolvedDepartmentId.Value}, PositionId {resolvedPositionId.Value}");
                     await _unitOfWork.CommitAsync(innerCt);
 
                     await _mediator.Publish(new OnboardingCompletedEvent
@@ -207,16 +245,47 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                 r => r.Status == OnboardingStatus.Pending_HR,
                 ct);
 
-            return requests
-                .OrderBy(r => r.CreatedAt)
-                .Select(r => new PendingOnboardingRequestDto
+            var orderedRequests = requests.OrderBy(r => r.CreatedAt).ToList();
+            var candidateIds = orderedRequests
+                .Select(r => r.CandidateId)
+                .Distinct()
+                .ToList();
+            var candidates = candidateIds.Count == 0
+                ? new Dictionary<int, Candidate>()
+                : (await _candidateRepo.GetCandidatesWithDetailsAsync(candidateIds, ct))
+                    .ToDictionary(c => c.Id);
+
+            return orderedRequests
+                .Select(r =>
                 {
-                    Id = r.Id,
-                    CandidateId = r.CandidateId,
-                    RequestedDataJson = r.RequestedDataJson,
-                    Status = r.Status.ToString(),
-                    CreatedAt = r.CreatedAt
+                    candidates.TryGetValue(r.CandidateId, out var candidate);
+                    var recruitmentRequest = candidate?.RecruitmentRequest;
+
+                    return new PendingOnboardingRequestDto
+                    {
+                        Id = r.Id,
+                        CandidateId = r.CandidateId,
+                        RecruitmentRequestId = candidate?.RecruitmentRequestId,
+                        DepartmentId = recruitmentRequest?.DeptId,
+                        DepartmentName = recruitmentRequest?.Department?.DeptName,
+                        PositionId = recruitmentRequest?.PositionId,
+                        PositionName = recruitmentRequest?.Position?.Title,
+                        RequestedDataJson = r.RequestedDataJson,
+                        Status = r.Status.ToString(),
+                        CreatedAt = r.CreatedAt
+                    };
                 });
+        }
+
+        private async Task ValidateInitialOrganizationAsync(int departmentId, int positionId, CancellationToken ct)
+        {
+            var department = await _departmentRepo.GetByIdAsync(departmentId, ct);
+            if (department == null || department.Status != DeptStatus.Active)
+                throw new ArgumentException("Phòng ban được chọn không tồn tại hoặc đã ngừng hoạt động.");
+
+            var position = await _positionRepo.GetByIdAsync(positionId, ct);
+            if (position == null || !position.IsActive)
+                throw new ArgumentException("Vị trí/chức danh được chọn không tồn tại hoặc đã ngừng sử dụng.");
         }
     }
 }

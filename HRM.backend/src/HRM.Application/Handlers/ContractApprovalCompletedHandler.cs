@@ -42,10 +42,11 @@ namespace HRM.backend.src.HRM.Application.Handlers
             if (notification.ModuleCode == "CONTRACT_DEPT")
             {
                 var isApproved = notification.FinalStatus == ApprovalStatus.Approved;
+                var needsRevision = notification.FinalStatus == ApprovalStatus.NeedMoreInfo;
                 var isContentReview = contract.Status == ContractStatus.PendingManagerContentReview;
                 contract.Status = isApproved
                     ? isContentReview ? ContractStatus.PendingEmployee : ContractStatus.PendingHR
-                    : isContentReview ? ContractStatus.PendingHRRevision : ContractStatus.Rejected;
+                    : (needsRevision || isContentReview) ? ContractStatus.PendingHRRevision : ContractStatus.Rejected;
 
                 if (!isApproved)
                     contract.NegotiationNote = notification.Note;
@@ -55,13 +56,17 @@ namespace HRM.backend.src.HRM.Application.Handlers
                     "CONTRACT_DEPT_REVIEWED",
                     0,
                     "contract",
-                    $"Dept reviewed contract ID {contract.Id}: {(isApproved ? "approved" : isContentReview ? "requested changes" : "rejected")}");
+                    $"Dept reviewed contract ID {contract.Id}: {(isApproved ? "approved" : needsRevision || isContentReview ? "requested changes" : "rejected")}");
                 await _unitOfWork.CommitAsync(ct);
                 return;
             }
 
             var approvedByDirector = notification.FinalStatus == ApprovalStatus.Approved;
-            contract.Status = approvedByDirector ? ContractStatus.ApprovedByDirector : ContractStatus.PendingHRRevision;
+            contract.Status = approvedByDirector
+                ? ContractStatus.ApprovedByDirector
+                : notification.FinalStatus == ApprovalStatus.NeedMoreInfo
+                    ? ContractStatus.PendingHRRevision
+                    : ContractStatus.Rejected;
             if (!approvedByDirector)
                 contract.NegotiationNote = notification.Note;
 

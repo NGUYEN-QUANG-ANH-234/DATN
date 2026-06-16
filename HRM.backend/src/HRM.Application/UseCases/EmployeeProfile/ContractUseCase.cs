@@ -172,7 +172,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                     contractId,
                     approverAccountId,
                     actorRoleName,
-                    dto.IsApproved,
+                    isContentRevision ? ApprovalWorkflowAction.RequestRevision : dto.IsApproved ? ApprovalWorkflowAction.Approve : ApprovalWorkflowAction.Reject,
                     note,
                     innerCt);
                 return true;
@@ -417,7 +417,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                     contractId,
                     approverAccountId,
                     actorRoleName,
-                    dto.IsApproved,
+                    dto.IsApproved ? ApprovalWorkflowAction.Approve : ApprovalWorkflowAction.RequestRevision,
                     note,
                     innerCt);
                 return true;

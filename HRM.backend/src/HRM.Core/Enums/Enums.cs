@@ -245,8 +245,19 @@ namespace HRM.backend.src.HRM.Core.Enums
     // ==========================================
     // MODULE 7: Payroll
     // ==========================================
-    public enum FormulaStatus { Pending, Approved, Rejected, Expired }
-    public enum PayrollStatus { Draft, Calculated, HRReviewed, PendingApproval, Approved, Locked, Finalized, Paid, Cancelled }
+    public enum FormulaStatus
+    {
+        Pending,
+        Approved,
+        Rejected,
+        Expired,
+        Draft,
+        PendingDirectorApproval,
+        RevisionRequired,
+        Active,
+        Archived
+    }
+    public enum PayrollStatus { Draft, Calculated, HRReviewed, PendingApproval, Approved, Locked, Finalized, Paid, Cancelled, RevisionRequired, Rejected }
     public enum SalaryVariableDataType { Number, Money, Hours, Days, Percent }
     public enum SalaryAggregationType { Latest, Sum, Count, MonthlyTotal, Manual }
     public enum PayrollPolicyType { Overtime, PitTax, Insurance, Allowance, Deduction, Seniority, MinimumWage, KpiBonus }
@@ -402,5 +413,6 @@ namespace HRM.backend.src.HRM.Core.Enums
     // ==========================================
     // Multi Phrase Approval (Dùng chung cho nhiều module có luồng phê duyệt nhiều cấp)
     // ==========================================
-    public enum ApprovalStatus { Pending, Approved, Rejected }
+    public enum ApprovalStatus { Pending, Approved, Rejected, NeedMoreInfo }
+    public enum ApprovalWorkflowAction { Approve, Reject, RequestRevision }
 }

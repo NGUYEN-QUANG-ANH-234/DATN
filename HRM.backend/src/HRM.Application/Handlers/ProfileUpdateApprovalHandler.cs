@@ -37,6 +37,16 @@ namespace HRM.backend.src.HRM.Application.Handlers
             var requestEntity = await _profileRequestRepo.GetByIdAsync(notification.ReferenceId, ct);
             if (requestEntity == null) return;
 
+            if (notification.FinalStatus == ApprovalStatus.NeedMoreInfo)
+            {
+                await _auditLogRepo.LogSystemEventAsync(
+                    "PROFILE_UPDATE_NEED_MORE_INFO",
+                    requestEntity.EmployeeId,
+                    "employee_profile",
+                    $"Yêu cầu cập nhật hồ sơ ID {requestEntity.Id} cần bổ sung thông tin.");
+                return;
+            }
+
             // 1. Nếu bị từ chối ở bất kỳ cấp nào
             if (notification.FinalStatus == ApprovalStatus.Rejected)
             {

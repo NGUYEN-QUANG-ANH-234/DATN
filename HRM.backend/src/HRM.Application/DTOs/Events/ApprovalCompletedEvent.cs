@@ -8,6 +8,7 @@ namespace HRM.backend.src.HRM.Application.DTOs.Events
         public required string ModuleCode { get; set; }
         public int ReferenceId { get; set; }
         public ApprovalStatus FinalStatus { get; set; }
+        public ApprovalWorkflowAction Action { get; set; }
         public string? Note { get; set; }
     }
 

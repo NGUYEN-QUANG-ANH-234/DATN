@@ -34,12 +34,19 @@
         public bool IsApproved { get; set; }
         public string? RejectReason { get; set; }
         public int? RoleId { get; set; }
+        public int? DepartmentId { get; set; }
+        public int? PositionId { get; set; }
     }
 
     public class PendingOnboardingRequestDto
     {
         public int Id { get; set; }
         public int CandidateId { get; set; }
+        public int? RecruitmentRequestId { get; set; }
+        public int? DepartmentId { get; set; }
+        public string? DepartmentName { get; set; }
+        public int? PositionId { get; set; }
+        public string? PositionName { get; set; }
         public string RequestedDataJson { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
