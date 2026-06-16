@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useCurrentUser } from "../../../core/auth/hooks/useCurrentUser";
 import { useNotification } from "../../../core/context/NotificationContext";
 import { payrollApi } from "../api/payrollApi";
-import type { PayrollCalculationResult, PayrollPreflight } from "../types/payroll";
+import type { PayrollCalculationResult, PayrollPreflight, PayrollRunSummary } from "../types/payroll";
 import { useSalarySlips } from "./useSalarySlips";
 
 export const usePayrollAggregation = (month: number, year: number, period: string) => {
@@ -13,8 +13,14 @@ export const usePayrollAggregation = (month: number, year: number, period: strin
   const [preflightLoading, setPreflightLoading] = useState(false);
   const [preflight, setPreflight] = useState<PayrollPreflight | null>(null);
   const [calculationResult, setCalculationResult] = useState<PayrollCalculationResult | null>(null);
+  const [runSummary, setRunSummary] = useState<PayrollRunSummary | null>(null);
+  const [runActionLoading, setRunActionLoading] = useState(false);
 
   const canManagePayroll = useMemo(() => {
+    return ["Admin", "HR"].includes(user?.role || "");
+  }, [user?.role]);
+
+  const canViewPayrollRun = useMemo(() => {
     return ["Admin", "HR", "Director"].includes(user?.role || "");
   }, [user?.role]);
 
@@ -36,9 +42,25 @@ export const usePayrollAggregation = (month: number, year: number, period: strin
     }
   };
 
+  const loadRunSummary = async () => {
+    if (!canViewPayrollRun) {
+      setRunSummary(null);
+      return;
+    }
+
+    try {
+      const response = await payrollApi.getPayrollRunSummary(month, year);
+      setRunSummary(response.data);
+    } catch (error) {
+      console.error(error);
+      setRunSummary(null);
+    }
+  };
+
   useEffect(() => {
     void loadPreflight();
-  }, [month, year, canManagePayroll]);
+    void loadRunSummary();
+  }, [month, year, canManagePayroll, canViewPayrollRun]);
 
   const calculatePayroll = async () => {
     if (!canManagePayroll) {
@@ -73,6 +95,7 @@ export const usePayrollAggregation = (month: number, year: number, period: strin
       );
       await salarySlipsState.loadSlips();
       await loadPreflight();
+      await loadRunSummary();
     } catch (error) {
       console.error(error);
       triggerAlert(
@@ -85,15 +108,85 @@ export const usePayrollAggregation = (month: number, year: number, period: strin
     }
   };
 
+  const submitPayrollRun = async () => {
+    if (!canManagePayroll) return;
+
+    setRunActionLoading(true);
+    try {
+      const response = await payrollApi.submitPayrollRun(month, year);
+      setRunSummary(response.data);
+      triggerAlert(
+        "success",
+        "Đã gửi duyệt bảng lương",
+        response.message || `Bảng lương ${period} đã được gửi tới Giám đốc.`,
+      );
+      await salarySlipsState.loadSlips();
+      await loadRunSummary();
+    } catch (error) {
+      console.error(error);
+      triggerAlert(
+        "error",
+        "Không thể gửi duyệt bảng lương",
+        "Vui lòng kiểm tra trạng thái kỳ lương trước khi gửi duyệt.",
+      );
+    } finally {
+      setRunActionLoading(false);
+    }
+  };
+
+  const lockPayrollRun = async () => {
+    if (!canManagePayroll) return;
+
+    setRunActionLoading(true);
+    try {
+      const response = await payrollApi.lockPayrollRun(month, year);
+      setRunSummary(response.data);
+      triggerAlert(
+        "success",
+        "Đã chốt bảng lương",
+        response.message || `Bảng lương ${period} đã được chốt và khóa.`,
+      );
+      await salarySlipsState.loadSlips();
+      await loadPreflight();
+      await loadRunSummary();
+    } catch (error) {
+      console.error(error);
+      triggerAlert(
+        "error",
+        "Không thể chốt bảng lương",
+        "Chỉ có thể chốt sau khi bảng lương đã được duyệt.",
+      );
+    } finally {
+      setRunActionLoading(false);
+    }
+  };
+
+  const currentStatus = String(runSummary?.status || "");
+  const canSubmitPayroll =
+    canManagePayroll &&
+    salarySlipsState.slips.length > 0 &&
+    ["Calculated", "HRReviewed", "RevisionRequired"].includes(currentStatus);
+  const canLockPayroll =
+    canManagePayroll &&
+    salarySlipsState.slips.length > 0 &&
+    currentStatus === "Approved";
+
   return {
     ...salarySlipsState,
     calculating,
     preflightLoading,
     preflight,
     calculationResult,
+    runSummary,
+    runActionLoading,
     canManagePayroll,
     canCalculatePayroll: canManagePayroll && (preflight?.canCalculate ?? true),
+    canSubmitPayroll,
+    canLockPayroll,
     loadPreflight,
+    loadRunSummary,
     calculatePayroll,
+    submitPayrollRun,
+    lockPayrollRun,
   };
 };

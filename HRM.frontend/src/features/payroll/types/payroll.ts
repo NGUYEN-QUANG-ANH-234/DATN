@@ -9,7 +9,9 @@ export type PayrollStatus =
   | "Locked"
   | "Finalized"
   | "Paid"
-  | "Cancelled";
+  | "Cancelled"
+  | "RevisionRequired"
+  | "Rejected";
 
 export interface SalarySlipDetail {
   id: number;
@@ -24,6 +26,7 @@ export interface SalarySlipDetail {
   isInsuranceBased: boolean;
   note?: string | null;
   projectBonusSources?: ProjectBonusSource[];
+  externalTimesheetSources?: ExternalTimesheetSource[];
 }
 
 export interface ProjectBonusSource {
@@ -40,6 +43,24 @@ export interface ProjectBonusSource {
   taxable: boolean;
   insuranceContributable: boolean;
   reason?: string | null;
+  note?: string | null;
+}
+
+export interface ExternalTimesheetSource {
+  id: number;
+  importId: number;
+  fileName?: string | null;
+  payrollPeriod?: string | null;
+  approvedAt?: string | null;
+  collaboratorEmployeeId?: number | null;
+  collaboratorCode: string;
+  collaboratorName?: string | null;
+  workDate: string;
+  projectCode: string;
+  taskCode: string;
+  approvedHours: number;
+  hourlyRate: number;
+  amount: number;
   note?: string | null;
 }
 
@@ -81,8 +102,40 @@ export interface SalarySlip {
   totalCompanyCost: number;
   status: PayrollStatus;
   calculatedAt?: string | null;
+  submittedAt?: string | null;
+  approvedAt?: string | null;
   lockedAt?: string | null;
+  reviewNote?: string | null;
   details: SalarySlipDetail[];
+}
+
+export interface PayrollRunSummary {
+  month: number;
+  year: number;
+  period: string;
+  status: PayrollStatus;
+  statusText: string;
+  slipCount: number;
+  grossIncome: number;
+  netSalary: number;
+  totalCompanyCost: number;
+  calculatedAt?: string | null;
+  submittedAt?: string | null;
+  approvedAt?: string | null;
+  lockedAt?: string | null;
+  submittedByAccountId?: number | null;
+  approvedByAccountId?: number | null;
+  lockedByAccountId?: number | null;
+  reviewNote?: string | null;
+  slips: SalarySlip[];
+}
+
+export interface PayrollRunReviewRequest {
+  month: number;
+  year: number;
+  isApproved: boolean;
+  requestRevision?: boolean;
+  note?: string | null;
 }
 
 export interface PayrollCalculationResult {
@@ -233,6 +286,179 @@ export interface CancelProjectBonusImportRequest {
   note?: string | null;
 }
 
+export type ExternalTimesheetImportStatus =
+  | "Draft"
+  | "Imported"
+  | "Validated"
+  | "Approved"
+  | "Rejected"
+  | "PayrollImported"
+  | "Cancelled";
+
+export interface ExternalTimesheetImportLine {
+  id: number;
+  rowNumber: number;
+  collaboratorEmployeeId?: number | null;
+  collaboratorCode: string;
+  collaboratorName?: string | null;
+  workDate?: string | null;
+  workDateText: string;
+  projectCode: string;
+  taskCode: string;
+  approvedHours: number;
+  hourlyRate: number;
+  amount: number;
+  note?: string | null;
+  validationStatus: string;
+  isValid: boolean;
+  errorMessage?: string | null;
+}
+
+export interface ExternalTimesheetImportBatch {
+  id: number;
+  importMonth: number;
+  importYear: number;
+  payrollPeriod: string;
+  sourceSystem: string;
+  fileName: string;
+  status: ExternalTimesheetImportStatus | string;
+  statusText: string;
+  totalRows: number;
+  validRows: number;
+  errorRows: number;
+  totalHours: number;
+  totalAmount: number;
+  importedByAccountId: number;
+  importedByName?: string | null;
+  importedAt: string;
+  approvedByAccountId?: number | null;
+  approvedByName?: string | null;
+  approvedAt?: string | null;
+  note?: string | null;
+  lines: ExternalTimesheetImportLine[];
+}
+
+export interface ExternalTimesheetImportPreview {
+  importMonth: number;
+  importYear: number;
+  payrollPeriod: string;
+  sourceSystem: string;
+  fileName: string;
+  overwrite: boolean;
+  canSave: boolean;
+  totalRows: number;
+  validRows: number;
+  errorRows: number;
+  totalHours: number;
+  totalAmount: number;
+  globalErrors: string[];
+  lines: ExternalTimesheetImportLine[];
+}
+
+export interface ReviewExternalTimesheetImportRequest {
+  isApproved: boolean;
+  note?: string | null;
+}
+
+export interface CancelExternalTimesheetImportRequest {
+  note?: string | null;
+}
+
+export type PayrollFormulaStatus =
+  | "Pending"
+  | "Approved"
+  | "Rejected"
+  | "Expired"
+  | "Draft"
+  | "PendingDirectorApproval"
+  | "RevisionRequired"
+  | "Active"
+  | "Archived";
+
+export interface PayrollFormulaLine {
+  id?: number;
+  salaryComponentTypeId?: number | null;
+  componentCode: string;
+  componentName?: string | null;
+  expression: string;
+  calculationOrder: number;
+  isGrossComponent: boolean;
+  isTaxable: boolean;
+  isInsuranceBased: boolean;
+  isDeduction: boolean;
+  isSnapshotRequired: boolean;
+  note?: string | null;
+}
+
+export interface PayrollFormula {
+  id: number;
+  formulaCode: string;
+  formulaName: string;
+  expression?: string | null;
+  isActive: boolean;
+  contractType?: string | null;
+  payBasis?: string | null;
+  employeeType?: string | null;
+  deptId?: number | null;
+  positionId?: number | null;
+  jobLevelId?: number | null;
+  version: number;
+  versionCode?: string | null;
+  effectiveFrom: string;
+  effectiveTo?: string | null;
+  status: PayrollFormulaStatus | string;
+  statusText: string;
+  deadlineAt?: string | null;
+  submittedAt?: string | null;
+  approvedAt?: string | null;
+  activatedAt?: string | null;
+  archivedAt?: string | null;
+  rejectReason?: string | null;
+  reviewNote?: string | null;
+  createdAt: string;
+  updatedAt?: string | null;
+  lines: PayrollFormulaLine[];
+}
+
+export interface UpsertPayrollFormulaRequest {
+  formulaCode: string;
+  formulaName: string;
+  expression?: string | null;
+  contractType?: string | null;
+  payBasis?: string | null;
+  employeeType?: string | null;
+  deptId?: number | null;
+  positionId?: number | null;
+  jobLevelId?: number | null;
+  versionCode?: string | null;
+  effectiveFrom: string;
+  effectiveTo?: string | null;
+  lines: PayrollFormulaLine[];
+}
+
+export interface PayrollFormulaReviewRequest {
+  isApproved: boolean;
+  requestRevision?: boolean;
+  note?: string | null;
+}
+
+export interface PayrollFormulaValidationResult {
+  isValid: boolean;
+  errors: string[];
+  warnings: string[];
+}
+
+export interface PayrollFormulaVariable {
+  code: string;
+  source: string;
+  description: string;
+  module?: string | null;
+  dataType?: string | null;
+  aggregationType?: string | null;
+  isPeriodBased: boolean;
+  isActive: boolean;
+}
+
 export interface CreatePayrollAdjustmentRequest {
   employeeId: number;
   adjustmentType: PayrollAdjustmentType;
@@ -245,29 +471,6 @@ export interface CreatePayrollAdjustmentRequest {
   isInsuranceBased: boolean;
   isDeduction: boolean;
   reason: string;
-}
-
-export interface ExternalTimesheetLinePreview {
-  rowNumber: number;
-  collaboratorCode: string;
-  collaboratorName: string;
-  workDate: string;
-  projectCode: string;
-  taskCode: string;
-  approvedHours: number;
-  hourlyRate: number;
-  amount: number;
-  note?: string;
-}
-
-export interface ExternalTimesheetImportState {
-  fileName: string;
-  sourceSystem: string;
-  importMonth: number;
-  importYear: number;
-  lines: ExternalTimesheetLinePreview[];
-  totalHours: number;
-  totalAmount: number;
 }
 
 export interface PayrollFormulaPreviewLine {
@@ -342,5 +545,5 @@ export interface PayrollAdjustmentTableProps {
 }
 
 export interface ExternalTimesheetPreviewTableProps {
-  lines: ExternalTimesheetLinePreview[];
+  lines: ExternalTimesheetImportLine[];
 }
