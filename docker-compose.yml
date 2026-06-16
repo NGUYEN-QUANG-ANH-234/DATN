@@ -1,0 +1,96 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: hicas-hrm-mysql
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-change-root-password}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-hrm_hicas}
+      MYSQL_USER: ${MYSQL_USER:-hrm_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-change-db-password}
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u$${MYSQL_USER} -p$${MYSQL_PASSWORD} --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: hicas-hrm-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: HRM.backend/Dockerfile
+    container_name: hicas-hrm-backend
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__DefaultConnection: Server=mysql;Port=3306;Database=${MYSQL_DATABASE:-hrm_hicas};User=${MYSQL_USER:-hrm_user};Password=${MYSQL_PASSWORD:-change-db-password};AllowPublicKeyRetrieval=True;SslMode=None;CharSet=utf8mb4;
+      ConnectionStrings__Redis: redis:6379
+      JwtSettings__SecretKey: ${JWT_SECRET_KEY:-change-this-development-jwt-secret-key-at-least-32-chars}
+      JwtSettings__Issuer: ${JWT_ISSUER:-HRM.backend}
+      JwtSettings__Audience: ${JWT_AUDIENCE:-UserClient}
+      JwtSettings__AccessTokenExpirationMinutes: ${JWT_ACCESS_TOKEN_MINUTES:-60}
+      JwtSettings__RefreshTokenExpirationDays: ${JWT_REFRESH_TOKEN_DAYS:-7}
+      GoogleSettings__ClientId: ${GOOGLE_CLIENT_ID:-}
+      GoogleSettings__ClientSecret: ${GOOGLE_CLIENT_SECRET:-}
+      EmailSettings__Host: ${EMAIL_HOST:-smtp.gmail.com}
+      EmailSettings__Port: ${EMAIL_PORT:-587}
+      EmailSettings__SenderName: ${EMAIL_SENDER_NAME:-HICAS HRM System}
+      EmailSettings__SenderEmail: ${EMAIL_SENDER_EMAIL:-}
+      EmailSettings__Password: ${EMAIL_PASSWORD:-}
+      Auth__RefreshCookie__Secure: ${AUTH_REFRESH_COOKIE_SECURE:-false}
+      Cors__AllowedOrigins__0: http://localhost:8080
+      Cors__AllowedOrigins__1: http://127.0.0.1:8080
+      Cors__AllowedOrigins__2: http://localhost:5173
+      Cors__AllowedOrigins__3: https://localhost:5173
+    ports:
+      - "5107:8080"
+    volumes:
+      - backend-wwwroot:/app/wwwroot
+      - backend-logs:/app/Logs
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: HRM.frontend/Dockerfile
+      args:
+        VITE_API_BASE_URL: /api/v1
+        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:-}
+    container_name: hicas-hrm-frontend
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+
+volumes:
+  mysql-data:
+  redis-data:
+  backend-wwwroot:
+  backend-logs:
