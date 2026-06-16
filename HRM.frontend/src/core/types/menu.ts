@@ -235,6 +235,11 @@ export const MENU_ITEMS: MenuItem[] = [
     icon: "payroll",
     children: [
       {
+        path: "/payroll/my-salary",
+        label: "Lương của tôi",
+        roles: ROLE_GROUPS.payrollSlips,
+      },
+      {
         path: "/payroll/salary-formula",
         label: "Công thức lương",
         roles: ROLE_GROUPS.payrollSensitive,
@@ -246,12 +251,17 @@ export const MENU_ITEMS: MenuItem[] = [
       },
       {
         path: "/payroll/payslip",
-        label: "Phiếu lương",
-        roles: ROLE_GROUPS.payrollSlips,
+        label: "Tra cứu phiếu lương",
+        roles: ["Admin", "HR", "Manager", "Director"],
       },
       {
         path: "/payroll/adjustments",
         label: "Điều chỉnh lương",
+        roles: ROLE_GROUPS.payrollAdjustments,
+      },
+      {
+        path: "/payroll/project-bonuses",
+        label: "Thưởng dự án",
         roles: ROLE_GROUPS.payrollAdjustments,
       },
       {

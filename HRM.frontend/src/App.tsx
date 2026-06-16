@@ -56,6 +56,7 @@ import {
 } from "./features/tasks";
 import {
   ExternalTimesheetImportPage,
+  MySalaryPage,
   PayrollAdjustmentPage,
   PayrollAggregationPage,
   PayslipLookupPage,
@@ -126,6 +127,7 @@ const PERFORMANCE_ROUTES = [
 ];
 
 const PAYROLL_ROUTES = [
+  "/payroll/my-salary",
   "/payroll/salary-formula",
   "/payroll/payroll-aggregation",
   "/payroll/payslip",
@@ -285,6 +287,7 @@ function App() {
               />
 
               <Route path="/payroll" element={<RoleRedirect candidates={PAYROLL_ROUTES} />} />
+              <Route path="/payroll/my-salary" element={<MySalaryPage />} />
               <Route path="/payroll/salary-formula" element={<SalaryFormulaPage />} />
               <Route path="/payroll/payroll-aggregation" element={<PayrollAggregationPage />} />
               <Route path="/payroll/payslip" element={<PayslipLookupPage />} />
