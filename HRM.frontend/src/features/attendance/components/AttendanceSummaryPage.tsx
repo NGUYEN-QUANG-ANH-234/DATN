@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { Download } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Download, Lock, RefreshCcw, Send, ShieldCheck } from "lucide-react";
 import { Button, Card, DataTable, StatusBadge } from "../../../components/ui";
 import type { DataTableColumn } from "../../../components/ui";
 import { FeaturePage } from "../../../core/components/FeatureShell";
@@ -11,6 +11,8 @@ import {
 } from "../api/attendanceSummaryApi";
 
 const now = new Date();
+
+type PeriodStatus = "Draft" | "PendingHRReview" | "Approved" | "Locked" | "Empty";
 
 export const AttendanceSummaryPage = () => {
   const { triggerAlert } = useNotification();
@@ -35,21 +37,33 @@ export const AttendanceSummaryPage = () => {
     void fetchData();
   }, [fetchData]);
 
-  const generate = async () => {
+  const periodStatus = useMemo(() => resolvePeriodStatus(summaries), [summaries]);
+  const canGenerate = periodStatus === "Draft" || periodStatus === "Empty";
+  const canSubmit = periodStatus === "Draft" && summaries.length > 0;
+  const canApprove = periodStatus === "PendingHRReview";
+  const canLock = periodStatus === "Approved";
+
+  const runPeriodAction = async (
+    action: "generate" | "submit" | "approve" | "lock",
+  ) => {
     setLoading(true);
     try {
-      const res = await attendanceSummaryApi.generateMonthly(month, year);
+      const res =
+        action === "generate"
+          ? await attendanceSummaryApi.generateMonthly(month, year)
+          : action === "submit"
+            ? await attendanceSummaryApi.submitMonthly(month, year)
+            : action === "approve"
+              ? await attendanceSummaryApi.approveMonthly(month, year)
+              : await attendanceSummaryApi.lockMonthly(month, year);
+
       setSummaries(res.data || []);
-      triggerAlert(
-        "success",
-        "Đã tổng hợp bảng công",
-        res.message || "Dữ liệu bảng công đã được cập nhật.",
-      );
+      triggerAlert("success", successTitle[action], res.message || successMessage[action]);
     } catch (error) {
       triggerAlert(
         "error",
-        "Không thể tổng hợp bảng công",
-        error instanceof Error ? error.message : "Đã có lỗi xảy ra.",
+        errorTitle[action],
+        error instanceof Error ? error.message : "Vui lòng thử lại sau.",
       );
     } finally {
       setLoading(false);
@@ -93,7 +107,11 @@ export const AttendanceSummaryPage = () => {
         </div>
       ),
     },
-    { key: "department", header: "Phòng ban", render: (item) => item.departmentName || "Chưa có phòng ban" },
+    {
+      key: "department",
+      header: "Phòng ban",
+      render: (item) => item.departmentName || "Chưa có phòng ban",
+    },
     { key: "workDays", header: "Ngày công", render: (item) => item.workDays },
     { key: "workedHours", header: "Giờ làm", render: (item) => `${item.workedHours.toFixed(2)} giờ` },
     {
@@ -102,33 +120,31 @@ export const AttendanceSummaryPage = () => {
       render: (item) => (
         <div>
           <p>{item.payableWorkHours.toFixed(2)} giờ</p>
-          <p className="text-xs text-[var(--hicas-text-secondary)]">Quy đổi ngày công</p>
+          <p className="text-xs text-[var(--hicas-text-secondary)]">Quy đổi từ ngày công</p>
         </div>
       ),
     },
     { key: "late", header: "Đi muộn", render: (item) => formatMinutes(item.lateMinutes) },
     { key: "early", header: "Về sớm", render: (item) => formatMinutes(item.earlyLeaveMinutes) },
-    { key: "ot", header: "Làm thêm hợp lệ", render: (item) => formatMinutes(item.actualOtMinutes) },
+    { key: "ot", header: "Làm thêm", render: (item) => formatMinutes(item.actualOtMinutes) },
     {
       key: "status",
       header: "Trạng thái",
-      render: (item) => (
-        <StatusBadge
-          status={item.isPayrollLocked ? "PayrollLocked" : "Open"}
-          label={item.isPayrollLocked ? "Đã khóa lương" : "Có thể cập nhật"}
-        />
-      ),
+      render: (item) => {
+        const status = item.isPayrollLocked ? "Locked" : item.approvalStatus;
+        return <StatusBadge status={status} label={getApprovalStatusLabel(status)} />;
+      },
     },
   ];
 
   return (
     <FeaturePage
-      title="Tổng hợp bảng công"
-      description="Tổng hợp ngày công, đi muộn, về sớm và giờ làm thêm hợp lệ."
+      title="Bảng công tháng"
+      description="Tổng hợp, gửi duyệt và khóa kỳ công trước khi tính lương."
       width="wide"
     >
-      <Card title="Kỳ tổng hợp">
-        <div className="grid gap-4 md:grid-cols-[160px_160px_auto_auto]">
+      <Card title="Kỳ công">
+        <div className="grid gap-4 xl:grid-cols-[150px_150px_minmax(220px,1fr)_auto]">
           <label className="block">
             <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--hicas-text-secondary)]">
               Tháng
@@ -155,26 +171,70 @@ export const AttendanceSummaryPage = () => {
               className="hicas-input w-full"
             />
           </label>
-          <div className="flex items-end">
-            <Button type="button" disabled={loading} isLoading={loading} onClick={generate}>
-              Tổng hợp lại
-            </Button>
+          <div className="rounded-[var(--radius-md)] border border-[var(--hicas-border)] bg-[var(--hicas-surface-muted)] px-4 py-3">
+            <span className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--hicas-text-secondary)]">
+              Trạng thái kỳ công
+            </span>
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              <StatusBadge status={periodStatus} label={getPeriodStatusLabel(periodStatus)} />
+              <span className="text-sm text-[var(--hicas-text-secondary)]">
+                {summaries.length > 0
+                  ? `${summaries.length} nhân sự trong kỳ ${String(month).padStart(2, "0")}/${year}`
+                  : "Chưa có dữ liệu cho kỳ này"}
+              </span>
+            </div>
           </div>
-          <div className="flex items-end">
+          <div className="flex flex-wrap items-end justify-start gap-2 xl:justify-end">
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={loading || !canGenerate}
+              isLoading={loading && canGenerate}
+              onClick={() => runPeriodAction("generate")}
+              iconLeft={<RefreshCcw size={16} />}
+            >
+              Tổng hợp
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={loading || !canSubmit}
+              onClick={() => runPeriodAction("submit")}
+              iconLeft={<Send size={16} />}
+            >
+              Gửi chốt
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={loading || !canApprove}
+              onClick={() => runPeriodAction("approve")}
+              iconLeft={<ShieldCheck size={16} />}
+            >
+              Duyệt
+            </Button>
+            <Button
+              type="button"
+              disabled={loading || !canLock}
+              onClick={() => runPeriodAction("lock")}
+              iconLeft={<Lock size={16} />}
+            >
+              Khóa kỳ
+            </Button>
             <Button
               type="button"
               variant="secondary"
               disabled={loading || summaries.length === 0}
               onClick={exportExcel}
+              iconLeft={<Download size={16} />}
             >
-              <Download size={16} />
               Xuất Excel
             </Button>
           </div>
         </div>
       </Card>
 
-      <Card title="Bảng công tổng hợp">
+      <Card title="Chi tiết bảng công">
         <DataTable
           columns={columns}
           data={summaries}
@@ -186,6 +246,67 @@ export const AttendanceSummaryPage = () => {
       </Card>
     </FeaturePage>
   );
+};
+
+const successTitle = {
+  generate: "Đã tổng hợp bảng công",
+  submit: "Đã gửi chốt bảng công",
+  approve: "Đã duyệt bảng công",
+  lock: "Đã khóa kỳ công",
+};
+
+const successMessage = {
+  generate: "Dữ liệu bảng công đã được cập nhật.",
+  submit: "Kỳ công đã được gửi sang bước duyệt.",
+  approve: "Kỳ công đã được duyệt và sẵn sàng khóa.",
+  lock: "Dữ liệu công, OT và nghỉ phép liên quan đã được khóa cho payroll.",
+};
+
+const errorTitle = {
+  generate: "Không thể tổng hợp bảng công",
+  submit: "Không thể gửi chốt bảng công",
+  approve: "Không thể duyệt bảng công",
+  lock: "Không thể khóa kỳ công",
+};
+
+const resolvePeriodStatus = (summaries: AttendanceSummary[]): PeriodStatus => {
+  if (summaries.length === 0) return "Empty";
+  if (summaries.every((item) => item.isPayrollLocked || item.approvalStatus === "Locked")) return "Locked";
+  if (summaries.every((item) => item.approvalStatus === "Approved")) return "Approved";
+  if (summaries.some((item) => item.approvalStatus === "PendingHRReview")) return "PendingHRReview";
+  return "Draft";
+};
+
+const getPeriodStatusLabel = (status: PeriodStatus) => {
+  switch (status) {
+    case "Draft":
+      return "Bản nháp";
+    case "PendingHRReview":
+      return "Chờ duyệt";
+    case "Approved":
+      return "Đã duyệt";
+    case "Locked":
+      return "Đã khóa";
+    default:
+      return "Chưa có dữ liệu";
+  }
+};
+
+const getApprovalStatusLabel = (status: string) => {
+  switch (status) {
+    case "Draft":
+      return "Bản nháp";
+    case "PendingHRReview":
+      return "Chờ duyệt";
+    case "Approved":
+      return "Đã duyệt";
+    case "Locked":
+      return "Đã khóa";
+    case "Rejected":
+      return "Từ chối";
+    default:
+      return "Đang xử lý";
+  }
 };
 
 const formatMinutes = (value: number) => {
@@ -220,7 +341,7 @@ const buildExcelHtml = (
           <td>${item.earlyLeaveMinutes}</td>
           <td>${item.actualOtMinutes}</td>
           <td>${formatMinutesAsHours(item.actualOtMinutes)}</td>
-          <td>${item.isPayrollLocked ? "Đã khóa lương" : "Có thể cập nhật"}</td>
+          <td>${item.isPayrollLocked ? "Đã khóa" : getApprovalStatusLabel(item.approvalStatus)}</td>
           <td>${formatDateTime(item.generatedAt, "")}</td>
         </tr>`,
     )
@@ -239,7 +360,7 @@ const buildExcelHtml = (
       </head>
       <body>
         <table>
-          <tr><td class="title" colspan="16">Bảng công tổng hợp tháng ${String(month).padStart(2, "0")}/${year}</td></tr>
+          <tr><td class="title" colspan="16">Bảng công tháng ${String(month).padStart(2, "0")}/${year}</td></tr>
           <tr><td colspan="16">Ngày xuất: ${formatDateTime(new Date())}</td></tr>
           <tr>
             <th>STT</th>
@@ -254,8 +375,8 @@ const buildExcelHtml = (
             <th>Giờ tính lương</th>
             <th>Đi muộn (phút)</th>
             <th>Về sớm (phút)</th>
-            <th>Làm thêm hợp lệ (phút)</th>
-            <th>Làm thêm hợp lệ (giờ)</th>
+            <th>Làm thêm (phút)</th>
+            <th>Làm thêm (giờ)</th>
             <th>Trạng thái</th>
             <th>Ngày tổng hợp</th>
           </tr>
