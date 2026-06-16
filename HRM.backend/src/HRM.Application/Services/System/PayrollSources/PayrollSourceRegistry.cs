@@ -116,8 +116,8 @@ namespace HRM.backend.src.HRM.Application.Services.System.PayrollSources
             Source("overtime_hours", "Tổng giờ tăng ca", "Tăng ca", SalaryVariableDataType.Hours, SalaryAggregationType.MonthlyTotal, true),
             Source("overtime_base_amount", "Tiền gốc tăng ca", "Tăng ca", SalaryVariableDataType.Money, SalaryAggregationType.MonthlyTotal, true),
             Source("overtime_premium_amount", "Tiền phần hệ số tăng ca", "Tăng ca", SalaryVariableDataType.Money, SalaryAggregationType.MonthlyTotal, true),
-            Source("external_timesheet_hours", "Số giờ timesheet ngoài", "Tăng ca", SalaryVariableDataType.Hours, SalaryAggregationType.MonthlyTotal, true),
-            Source("external_timesheet_amount", "Thu nhập timesheet ngoài", "Tăng ca", SalaryVariableDataType.Money, SalaryAggregationType.MonthlyTotal, true)
+            Source("external_timesheet_hours", "Số giờ cộng tác viên đã duyệt", "Lương", SalaryVariableDataType.Hours, SalaryAggregationType.MonthlyTotal, true),
+            Source("external_timesheet_amount", "Thu nhập cộng tác viên đã duyệt", "Lương", SalaryVariableDataType.Money, SalaryAggregationType.MonthlyTotal, true)
         };
     }
 

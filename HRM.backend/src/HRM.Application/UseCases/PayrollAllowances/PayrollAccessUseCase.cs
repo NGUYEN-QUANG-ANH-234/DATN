@@ -56,6 +56,25 @@ namespace HRM.backend.src.HRM.Application.UseCases.PayrollAllowances
             return PayrollSlipMapper.Map(slip);
         }
 
+        public async Task<List<SalarySlipDto>> GetMySalarySlipsAsync(int accountId, string? period, byte? month, short? year, CancellationToken ct = default)
+        {
+            var resolved = ResolvePeriod(period, month, year);
+            var context = await ResolveIndividualAccessContextAsync(accountId, ct);
+            var slips = await _payrollRepo.GetByEmployeePeriodAsync(context.EmployeeId!.Value, resolved.Month, resolved.Year, ct);
+
+            return slips.Select(p => PayrollSlipMapper.Map(p, includeDetails: false)).ToList();
+        }
+
+        public async Task<SalarySlipDto> GetMySalarySlipDetailAsync(int accountId, int slipId, CancellationToken ct = default)
+        {
+            var context = await ResolveIndividualAccessContextAsync(accountId, ct);
+            var slip = await _payrollRepo.GetDetailAsync(slipId, ct)
+                ?? throw new InvalidOperationException("Khong tim thay phieu luong.");
+
+            EnsureSlipAccess(slip, context);
+            return PayrollSlipMapper.Map(slip);
+        }
+
         public async Task<SalarySlipExportResultDto> GenerateSalarySlipFilesAsync(int accountId, string role, string? email, SalarySlipExportRequestDto dto, CancellationToken ct = default)
         {
             if (dto.SlipIds.Count == 0)
@@ -100,6 +119,14 @@ namespace HRM.backend.src.HRM.Application.UseCases.PayrollAllowances
 
                 return new PayrollAccessContext(PayrollAccessScope.Department, employee.Id, employee.DeptId);
             }
+
+            return new PayrollAccessContext(PayrollAccessScope.Individual, employee.Id, employee.DeptId);
+        }
+
+        private async Task<PayrollAccessContext> ResolveIndividualAccessContextAsync(int accountId, CancellationToken ct)
+        {
+            var employee = await _employeeRepo.GetByAccountIdAsync(accountId, ct)
+                ?? throw new UnauthorizedAccessException("Tai khoan chua lien ket ho so nhan vien.");
 
             return new PayrollAccessContext(PayrollAccessScope.Individual, employee.Id, employee.DeptId);
         }

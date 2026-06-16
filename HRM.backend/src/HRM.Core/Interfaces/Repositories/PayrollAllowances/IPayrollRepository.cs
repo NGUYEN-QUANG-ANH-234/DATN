@@ -39,9 +39,12 @@ namespace HRM.backend.src.HRM.Core.Interfaces.Repositories.PayrollAllowances
         Task<bool> HasLockedPayrollAsync(byte month, short year, CancellationToken ct = default);
         Task ReplaceDraftsAsync(byte month, short year, IEnumerable<Payroll> payrolls, CancellationToken ct = default);
         Task<List<Payroll>> GetByPeriodAsync(byte month, short year, CancellationToken ct = default);
+        Task<List<Payroll>> GetTrackedByPeriodAsync(byte month, short year, CancellationToken ct = default);
+        Task<List<Payroll>> GetByStatusAsync(PayrollStatus status, CancellationToken ct = default);
         Task<List<Payroll>> GetByDepartmentPeriodAsync(int deptId, byte month, short year, CancellationToken ct = default);
         Task<List<Payroll>> GetByEmployeePeriodAsync(int employeeId, byte month, short year, CancellationToken ct = default);
         Task<Payroll?> GetDetailAsync(int id, CancellationToken ct = default);
         Task<List<Payroll>> GetDetailsByIdsAsync(IEnumerable<int> ids, CancellationToken ct = default);
+        void UpdateRange(IEnumerable<Payroll> payrolls);
     }
 }

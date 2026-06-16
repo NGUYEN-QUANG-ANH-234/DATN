@@ -54,9 +54,19 @@ namespace HRM.backend.src.HRM.Core.Entities.PayrollAllowances
         public int? CalculatedByAccountId { get; set; }
         [ForeignKey("CalculatedByAccountId")] public virtual Account? CalculatedByAccount { get; set; }
 
+        public DateTime? SubmittedAt { get; set; }
+        public int? SubmittedByAccountId { get; set; }
+        [ForeignKey("SubmittedByAccountId")] public virtual Account? SubmittedByAccount { get; set; }
+
+        public DateTime? ApprovedAt { get; set; }
+        public int? ApprovedByAccountId { get; set; }
+        [ForeignKey("ApprovedByAccountId")] public virtual Account? ApprovedByAccount { get; set; }
+
         public DateTime? LockedAt { get; set; }
         public int? LockedByAccountId { get; set; }
         [ForeignKey("LockedByAccountId")] public virtual Account? LockedByAccount { get; set; }
+
+        [StringLength(1000)] public string? ReviewNote { get; set; }
 
         public virtual ICollection<PayrollDetail> Details { get; set; } = new List<PayrollDetail>();
         public virtual ICollection<PayrollContractSegment> ContractSegments { get; set; } = new List<PayrollContractSegment>();

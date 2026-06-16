@@ -28,7 +28,10 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.PayrollAll
                     .ThenInclude(e => e.Position)
                 .Include(s => s.Employee)
                     .ThenInclude(e => e.JobLevel)
-                .Where(s => s.Month == month && s.Year == year)
+                .Where(s => s.Month == month &&
+                            s.Year == year &&
+                            s.IsPayrollLocked &&
+                            s.ApprovalStatus == AttendancePayrollApprovalStatus.Locked)
                 .AsNoTracking()
                 .ToListAsync(ct);
         }
@@ -126,7 +129,7 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.PayrollAll
                 .Include(f => f.Lines.OrderBy(l => l.CalculationOrder))
                     .ThenInclude(l => l.SalaryComponentType)
                 .Where(f => f.IsActive &&
-                            f.Status == FormulaStatus.Approved &&
+                            (f.Status == FormulaStatus.Approved || f.Status == FormulaStatus.Active) &&
                             f.EffectiveFrom.Date <= effectiveDate.Date &&
                             (!f.EffectiveTo.HasValue || f.EffectiveTo.Value.Date >= effectiveDate.Date))
                 .AsNoTracking()
@@ -440,6 +443,25 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.PayrollAll
                 .ToListAsync(ct);
         }
 
+        public async Task<List<Payroll>> GetTrackedByPeriodAsync(byte month, short year, CancellationToken ct = default)
+        {
+            return await BuildSlipQuery()
+                .Where(p => p.Month == month && p.Year == year)
+                .OrderBy(p => p.Employee!.FullName)
+                .ToListAsync(ct);
+        }
+
+        public async Task<List<Payroll>> GetByStatusAsync(PayrollStatus status, CancellationToken ct = default)
+        {
+            return await BuildSlipQuery()
+                .Where(p => p.Status == status)
+                .OrderByDescending(p => p.Year)
+                .ThenByDescending(p => p.Month)
+                .ThenBy(p => p.Employee!.FullName)
+                .AsNoTracking()
+                .ToListAsync(ct);
+        }
+
         public async Task<List<Payroll>> GetByDepartmentPeriodAsync(int deptId, byte month, short year, CancellationToken ct = default)
         {
             return await BuildSlipQuery()
@@ -472,6 +494,11 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.PayrollAll
                 .Where(p => list.Contains(p.Id))
                 .AsNoTracking()
                 .ToListAsync(ct);
+        }
+
+        public void UpdateRange(IEnumerable<Payroll> payrolls)
+        {
+            _context.Payrolls.UpdateRange(payrolls);
         }
 
         private IQueryable<Payroll> BuildSlipQuery()

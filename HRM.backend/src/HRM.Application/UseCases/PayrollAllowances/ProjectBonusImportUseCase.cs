@@ -1,7 +1,9 @@
 using System.Globalization;
 using System.Text;
 using HRM.backend.src.HRM.Application.DTOs.PayrollAllowances;
+using HRM.backend.src.HRM.Application.Interfaces;
 using HRM.backend.src.HRM.Application.Interfaces.PayrollAllowances.Usecases;
+using HRM.backend.src.HRM.Application.Services.System;
 using HRM.backend.src.HRM.Core.Entities.EmployeeProfile;
 using HRM.backend.src.HRM.Core.Entities.PayrollAllowances;
 using HRM.backend.src.HRM.Core.Enums;
@@ -19,6 +21,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.PayrollAllowances
         private readonly IEmployeeRepository _employeeRepo;
         private readonly IPayrollRepository _payrollRepo;
         private readonly IAuditLogRepository _auditRepo;
+        private readonly ILockService _lockService;
         private readonly IUnitOfWork _unitOfWork;
 
         public ProjectBonusImportUseCase(
@@ -26,12 +29,14 @@ namespace HRM.backend.src.HRM.Application.UseCases.PayrollAllowances
             IEmployeeRepository employeeRepo,
             IPayrollRepository payrollRepo,
             IAuditLogRepository auditRepo,
+            ILockService lockService,
             IUnitOfWork unitOfWork)
         {
             _projectBonusRepo = projectBonusRepo;
             _employeeRepo = employeeRepo;
             _payrollRepo = payrollRepo;
             _auditRepo = auditRepo;
+            _lockService = lockService;
             _unitOfWork = unitOfWork;
         }
 
@@ -43,6 +48,18 @@ namespace HRM.backend.src.HRM.Application.UseCases.PayrollAllowances
         }
 
         public async Task<ProjectBonusImportBatchDto> ImportAsync(ProjectBonusImportRequestDto dto, int actorAccountId, string actorRole, CancellationToken ct = default)
+        {
+            EnsureImporter(actorRole);
+            ValidatePeriod(dto.PeriodMonth, dto.PeriodYear);
+
+            return await _lockService.GetWithLockAsync(
+                LockKeys.ProjectBonusPeriod(dto.PeriodMonth, dto.PeriodYear),
+                innerCt => ImportCoreAsync(dto, actorAccountId, actorRole, innerCt),
+                TimeSpan.FromSeconds(30),
+                ct);
+        }
+
+        private async Task<ProjectBonusImportBatchDto> ImportCoreAsync(ProjectBonusImportRequestDto dto, int actorAccountId, string actorRole, CancellationToken ct = default)
         {
             EnsureImporter(actorRole);
             var result = await BuildValidatedImportAsync(dto, ct);
@@ -119,6 +136,16 @@ namespace HRM.backend.src.HRM.Application.UseCases.PayrollAllowances
         public async Task<ProjectBonusImportBatchDto> SubmitAsync(int id, int actorAccountId, string actorRole, CancellationToken ct = default)
         {
             EnsureImporter(actorRole);
+            return await _lockService.GetWithLockAsync(
+                LockKeys.ProjectBonusBatch(id),
+                innerCt => SubmitCoreAsync(id, actorAccountId, actorRole, innerCt),
+                TimeSpan.FromSeconds(20),
+                ct);
+        }
+
+        private async Task<ProjectBonusImportBatchDto> SubmitCoreAsync(int id, int actorAccountId, string actorRole, CancellationToken ct = default)
+        {
+            EnsureImporter(actorRole);
             var batch = await _projectBonusRepo.GetTrackedDetailAsync(id, ct)
                 ?? throw new KeyNotFoundException("Không tìm thấy batch thưởng dự án.");
 
@@ -141,6 +168,16 @@ namespace HRM.backend.src.HRM.Application.UseCases.PayrollAllowances
         }
 
         public async Task<ProjectBonusImportBatchDto> DirectorReviewAsync(int id, ReviewProjectBonusImportDto dto, int actorAccountId, string actorRole, CancellationToken ct = default)
+        {
+            EnsureDirector(actorRole);
+            return await _lockService.GetWithLockAsync(
+                LockKeys.ProjectBonusBatch(id),
+                innerCt => DirectorReviewCoreAsync(id, dto, actorAccountId, actorRole, innerCt),
+                TimeSpan.FromSeconds(20),
+                ct);
+        }
+
+        private async Task<ProjectBonusImportBatchDto> DirectorReviewCoreAsync(int id, ReviewProjectBonusImportDto dto, int actorAccountId, string actorRole, CancellationToken ct = default)
         {
             EnsureDirector(actorRole);
             var batch = await _projectBonusRepo.GetTrackedDetailAsync(id, ct)
@@ -167,6 +204,16 @@ namespace HRM.backend.src.HRM.Application.UseCases.PayrollAllowances
         }
 
         public async Task<ProjectBonusImportBatchDto> CancelAsync(int id, int actorAccountId, string actorRole, string? note, CancellationToken ct = default)
+        {
+            EnsureImporter(actorRole);
+            return await _lockService.GetWithLockAsync(
+                LockKeys.ProjectBonusBatch(id),
+                innerCt => CancelCoreAsync(id, actorAccountId, actorRole, note, innerCt),
+                TimeSpan.FromSeconds(20),
+                ct);
+        }
+
+        private async Task<ProjectBonusImportBatchDto> CancelCoreAsync(int id, int actorAccountId, string actorRole, string? note, CancellationToken ct = default)
         {
             EnsureImporter(actorRole);
             var batch = await _projectBonusRepo.GetTrackedDetailAsync(id, ct)

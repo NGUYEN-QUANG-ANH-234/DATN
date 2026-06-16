@@ -39,6 +39,25 @@ namespace HRM.backend.src.HRM.API.Controllers.PayrollAllowances
             }
         }
 
+        [HttpGet("my")]
+        [RequirePermission("SALARY_SLIP_VIEW", GroupName = SystemModules.SalaryBonus, Description = "Xem phiếu lương cá nhân")]
+        public async Task<IActionResult> GetMy([FromQuery] string? period, [FromQuery] byte? month, [FromQuery] short? year, CancellationToken ct)
+        {
+            try
+            {
+                var data = await _accessUseCase.GetMySalarySlipsAsync(User.GetAccountIdOrThrow(), period, month, year, ct);
+                return Ok(new { Success = true, Data = data });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new { Success = false, Message = ex.Message });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { Success = false, Message = ex.Message });
+            }
+        }
+
         [HttpGet("{id:int}")]
         [RequirePermission("SALARY_SLIP_VIEW", GroupName = SystemModules.SalaryBonus, Description = "Xem chi tiết phiếu lương")]
         public async Task<IActionResult> GetDetail(int id, CancellationToken ct)
@@ -46,6 +65,25 @@ namespace HRM.backend.src.HRM.API.Controllers.PayrollAllowances
             try
             {
                 var data = await _accessUseCase.GetSalarySlipDetailAsync(User.GetAccountIdOrThrow(), GetRole(), id, ct);
+                return Ok(new { Success = true, Data = data });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new { Success = false, Message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return NotFound(new { Success = false, Message = ex.Message });
+            }
+        }
+
+        [HttpGet("my/{id:int}")]
+        [RequirePermission("SALARY_SLIP_VIEW", GroupName = SystemModules.SalaryBonus, Description = "Xem chi tiết phiếu lương cá nhân")]
+        public async Task<IActionResult> GetMyDetail(int id, CancellationToken ct)
+        {
+            try
+            {
+                var data = await _accessUseCase.GetMySalarySlipDetailAsync(User.GetAccountIdOrThrow(), id, ct);
                 return Ok(new { Success = true, Data = data });
             }
             catch (UnauthorizedAccessException ex)

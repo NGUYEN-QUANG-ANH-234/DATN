@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using HRM.backend.src.HRM.Core.Entities.EmployeeProfile;
+using HRM.backend.src.HRM.Core.Enums;
 
 namespace HRM.backend.src.HRM.Core.Entities.PayrollAllowances
 {
@@ -12,10 +13,13 @@ namespace HRM.backend.src.HRM.Core.Entities.PayrollAllowances
         public int ImportId { get; set; }
         [ForeignKey("ImportId")] public virtual ExternalTimesheetImport Import { get; set; } = null!;
 
+        public int RowNumber { get; set; }
+
         public int? CollaboratorEmployeeId { get; set; }
         [ForeignKey("CollaboratorEmployeeId")] public virtual Employee? CollaboratorEmployee { get; set; }
 
         [StringLength(50)] public string? CollaboratorCode { get; set; }
+        [StringLength(200)] public string? CollaboratorNameSnapshot { get; set; }
 
         public DateTime WorkDate { get; set; }
         [StringLength(80)] public string? ProjectCode { get; set; }
@@ -28,6 +32,9 @@ namespace HRM.backend.src.HRM.Core.Entities.PayrollAllowances
         public bool IsPayrollImported { get; set; }
         public int? PayrollId { get; set; }
         [ForeignKey("PayrollId")] public virtual Payroll? Payroll { get; set; }
+
+        public ProjectBonusLineValidationStatus ValidationStatus { get; set; } = ProjectBonusLineValidationStatus.Valid;
+        [StringLength(1000)] public string? ErrorMessage { get; set; }
 
         [StringLength(1000)] public string? Note { get; set; }
     }

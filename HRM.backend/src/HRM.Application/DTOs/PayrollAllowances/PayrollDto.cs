@@ -93,8 +93,40 @@ namespace HRM.backend.src.HRM.Application.DTOs.PayrollAllowances
         public decimal TotalCompanyCost { get; set; }
         public PayrollStatus Status { get; set; }
         public DateTime? CalculatedAt { get; set; }
+        public DateTime? SubmittedAt { get; set; }
+        public DateTime? ApprovedAt { get; set; }
         public DateTime? LockedAt { get; set; }
+        public string? ReviewNote { get; set; }
         public List<SalarySlipDetailDto> Details { get; set; } = new();
+    }
+
+    public class PayrollRunReviewDto
+    {
+        public bool IsApproved { get; set; }
+        public bool RequestRevision { get; set; }
+        public string? Note { get; set; }
+    }
+
+    public class PayrollRunSummaryDto
+    {
+        public byte Month { get; set; }
+        public short Year { get; set; }
+        public string Period { get; set; } = string.Empty;
+        public PayrollStatus Status { get; set; }
+        public string StatusText { get; set; } = string.Empty;
+        public int SlipCount { get; set; }
+        public decimal GrossIncome { get; set; }
+        public decimal NetSalary { get; set; }
+        public decimal TotalCompanyCost { get; set; }
+        public DateTime? CalculatedAt { get; set; }
+        public DateTime? SubmittedAt { get; set; }
+        public DateTime? ApprovedAt { get; set; }
+        public DateTime? LockedAt { get; set; }
+        public int? SubmittedByAccountId { get; set; }
+        public int? ApprovedByAccountId { get; set; }
+        public int? LockedByAccountId { get; set; }
+        public string? ReviewNote { get; set; }
+        public List<SalarySlipDto> Slips { get; set; } = new();
     }
 
     public class SalarySlipDetailDto
@@ -111,6 +143,7 @@ namespace HRM.backend.src.HRM.Application.DTOs.PayrollAllowances
         public bool IsInsuranceBased { get; set; }
         public string? Note { get; set; }
         public List<ProjectBonusPayrollSourceDto> ProjectBonusSources { get; set; } = new();
+        public List<ExternalTimesheetPayrollSourceDto> ExternalTimesheetSources { get; set; } = new();
     }
 
     public class ProjectBonusPayrollSourceDto
@@ -128,6 +161,25 @@ namespace HRM.backend.src.HRM.Application.DTOs.PayrollAllowances
         public bool Taxable { get; set; }
         public bool InsuranceContributable { get; set; }
         public string? Reason { get; set; }
+        public string? Note { get; set; }
+    }
+
+    public class ExternalTimesheetPayrollSourceDto
+    {
+        public int Id { get; set; }
+        public int ImportId { get; set; }
+        public string? FileName { get; set; }
+        public string? PayrollPeriod { get; set; }
+        public DateTime? ApprovedAt { get; set; }
+        public int? CollaboratorEmployeeId { get; set; }
+        public string CollaboratorCode { get; set; } = string.Empty;
+        public string? CollaboratorName { get; set; }
+        public DateTime WorkDate { get; set; }
+        public string ProjectCode { get; set; } = string.Empty;
+        public string TaskCode { get; set; } = string.Empty;
+        public decimal ApprovedHours { get; set; }
+        public decimal HourlyRate { get; set; }
+        public decimal Amount { get; set; }
         public string? Note { get; set; }
     }
 

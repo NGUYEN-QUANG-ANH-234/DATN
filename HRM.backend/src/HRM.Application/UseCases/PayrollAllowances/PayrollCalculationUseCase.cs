@@ -1,6 +1,8 @@
 using HRM.backend.src.HRM.Application.DTOs.PayrollAllowances;
+using HRM.backend.src.HRM.Application.Interfaces;
 using HRM.backend.src.HRM.Application.Interfaces.PayrollAllowances.Services;
 using HRM.backend.src.HRM.Application.Interfaces.PayrollAllowances.Usecases;
+using HRM.backend.src.HRM.Application.Services.System;
 using HRM.backend.src.HRM.Core.Enums;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.PayrollAllowances;
@@ -70,6 +72,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.PayrollAllowances
         private readonly IPayrollSnapshotWriter _snapshotWriter;
         private readonly IAuditLogRepository _auditRepo;
         private readonly ICompanyCalendarRepository _companyCalendarRepo;
+        private readonly ILockService _lockService;
         private readonly IUnitOfWork _unitOfWork;
 
         public PayrollCalculationUseCase(
@@ -82,6 +85,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.PayrollAllowances
             IPayrollSnapshotWriter snapshotWriter,
             IAuditLogRepository auditRepo,
             ICompanyCalendarRepository companyCalendarRepo,
+            ILockService lockService,
             IUnitOfWork unitOfWork)
         {
             _payrollRepo = payrollRepo;
@@ -93,6 +97,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.PayrollAllowances
             _snapshotWriter = snapshotWriter;
             _auditRepo = auditRepo;
             _companyCalendarRepo = companyCalendarRepo;
+            _lockService = lockService;
             _unitOfWork = unitOfWork;
         }
 
@@ -204,6 +209,18 @@ namespace HRM.backend.src.HRM.Application.UseCases.PayrollAllowances
             EnsurePayrollOperator(actorRole);
             ValidatePeriod(dto.Month, dto.Year);
 
+            return await _lockService.GetWithLockAsync(
+                LockKeys.PayrollRun(dto.Month, dto.Year),
+                innerCt => ExecuteCalculationCoreAsync(dto, actorAccountId, actorRole, innerCt),
+                TimeSpan.FromSeconds(30),
+                ct);
+        }
+
+        private async Task<PayrollCalculationResultDto> ExecuteCalculationCoreAsync(PayrollPeriodDto dto, int actorAccountId, string actorRole, CancellationToken ct = default)
+        {
+            EnsurePayrollOperator(actorRole);
+            ValidatePeriod(dto.Month, dto.Year);
+
             var preflight = await GetPreflightAsync(dto, actorRole, ct);
             if (!preflight.CanCalculate)
                 throw new InvalidOperationException(string.Join(" ", preflight.Errors));
@@ -256,6 +273,186 @@ namespace HRM.backend.src.HRM.Application.UseCases.PayrollAllowances
                 Warnings = warnings,
                 Payrolls = savedPayrolls.Select(p => PayrollSlipMapper.Map(p)).ToList()
             };
+        }
+
+        public async Task<PayrollRunSummaryDto> GetPayrollRunSummaryAsync(PayrollPeriodDto dto, string actorRole, CancellationToken ct = default)
+        {
+            EnsurePayrollViewer(actorRole);
+            ValidatePeriod(dto.Month, dto.Year);
+
+            var payrolls = await _payrollRepo.GetByPeriodAsync(dto.Month, dto.Year, ct);
+            return MapPayrollRunSummary(payrolls, dto.Month, dto.Year, includeSlips: true);
+        }
+
+        public async Task<List<PayrollRunSummaryDto>> GetPendingPayrollRunsAsync(string actorRole, CancellationToken ct = default)
+        {
+            EnsurePayrollApprover(actorRole);
+
+            var pending = await _payrollRepo.GetByStatusAsync(PayrollStatus.PendingApproval, ct);
+            return pending
+                .Where(p => p.Month.HasValue && p.Year.HasValue)
+                .GroupBy(p => new { Month = p.Month!.Value, Year = p.Year!.Value })
+                .OrderByDescending(g => g.Key.Year)
+                .ThenByDescending(g => g.Key.Month)
+                .Select(g => MapPayrollRunSummary(g.ToList(), g.Key.Month, g.Key.Year, includeSlips: false))
+                .ToList();
+        }
+
+        public async Task<PayrollRunSummaryDto> SubmitPayrollRunAsync(PayrollPeriodDto dto, int actorAccountId, string actorRole, CancellationToken ct = default)
+        {
+            EnsurePayrollOperator(actorRole);
+            ValidatePeriod(dto.Month, dto.Year);
+
+            return await _lockService.GetWithLockAsync(
+                LockKeys.PayrollRun(dto.Month, dto.Year),
+                innerCt => SubmitPayrollRunCoreAsync(dto, actorAccountId, actorRole, innerCt),
+                TimeSpan.FromSeconds(20),
+                ct);
+        }
+
+        private async Task<PayrollRunSummaryDto> SubmitPayrollRunCoreAsync(PayrollPeriodDto dto, int actorAccountId, string actorRole, CancellationToken ct = default)
+        {
+            EnsurePayrollOperator(actorRole);
+            ValidatePeriod(dto.Month, dto.Year);
+
+            var payrolls = await _payrollRepo.GetTrackedByPeriodAsync(dto.Month, dto.Year, ct);
+            if (payrolls.Count == 0)
+                throw new InvalidOperationException("Chua co bang luong nhap de gui duyet.");
+
+            if (payrolls.Any(IsLockedStatus))
+                throw new InvalidOperationException("Ky luong da khoa/chot, khong the gui duyet lai.");
+
+            if (payrolls.Any(p => p.Status == PayrollStatus.Approved || p.Status == PayrollStatus.PendingApproval))
+                throw new InvalidOperationException("Bang luong dang cho duyet hoac da duoc duyet.");
+
+            if (payrolls.Any(p => p.Status != PayrollStatus.Calculated &&
+                                  p.Status != PayrollStatus.HRReviewed &&
+                                  p.Status != PayrollStatus.RevisionRequired))
+                throw new InvalidOperationException("Chi bang luong da tong hop hoac can bo sung moi duoc gui duyet.");
+
+            var now = DateTime.UtcNow;
+            foreach (var payroll in payrolls)
+            {
+                payroll.Status = PayrollStatus.PendingApproval;
+                payroll.SubmittedByAccountId = actorAccountId;
+                payroll.SubmittedAt = now;
+                payroll.ApprovedByAccountId = null;
+                payroll.ApprovedAt = null;
+                payroll.ReviewNote = null;
+            }
+
+            await _auditRepo.LogSystemEventAsync(
+                "PAYROLL_RUN_SUBMITTED",
+                actorAccountId,
+                "payrolls",
+                $"Submitted payroll run {dto.Month:00}/{dto.Year} for approval. Count={payrolls.Count}.");
+            await _unitOfWork.CommitAsync(ct);
+
+            return MapPayrollRunSummary(payrolls, dto.Month, dto.Year, includeSlips: true);
+        }
+
+        public async Task<PayrollRunSummaryDto> DirectorReviewPayrollRunAsync(PayrollPeriodDto dto, PayrollRunReviewDto review, int actorAccountId, string actorRole, CancellationToken ct = default)
+        {
+            EnsurePayrollApprover(actorRole);
+            ValidatePeriod(dto.Month, dto.Year);
+
+            return await _lockService.GetWithLockAsync(
+                LockKeys.PayrollRun(dto.Month, dto.Year),
+                innerCt => DirectorReviewPayrollRunCoreAsync(dto, review, actorAccountId, actorRole, innerCt),
+                TimeSpan.FromSeconds(20),
+                ct);
+        }
+
+        private async Task<PayrollRunSummaryDto> DirectorReviewPayrollRunCoreAsync(PayrollPeriodDto dto, PayrollRunReviewDto review, int actorAccountId, string actorRole, CancellationToken ct = default)
+        {
+            EnsurePayrollApprover(actorRole);
+            ValidatePeriod(dto.Month, dto.Year);
+
+            var payrolls = await _payrollRepo.GetTrackedByPeriodAsync(dto.Month, dto.Year, ct);
+            if (payrolls.Count == 0)
+                throw new InvalidOperationException("Khong tim thay bang luong can duyet.");
+
+            if (payrolls.Any(p => p.Status != PayrollStatus.PendingApproval))
+                throw new InvalidOperationException("Chi co the xu ly bang luong dang cho phe duyet.");
+
+            var note = review.Note?.Trim();
+            if (!review.IsApproved && string.IsNullOrWhiteSpace(note))
+                throw new ArgumentException("Can nhap ghi chu khi tu choi hoac yeu cau bo sung.");
+
+            var now = DateTime.UtcNow;
+            var nextStatus = review.IsApproved
+                ? PayrollStatus.Approved
+                : review.RequestRevision
+                    ? PayrollStatus.RevisionRequired
+                    : PayrollStatus.Rejected;
+
+            foreach (var payroll in payrolls)
+            {
+                payroll.Status = nextStatus;
+                payroll.ApprovedByAccountId = review.IsApproved ? actorAccountId : null;
+                payroll.ApprovedAt = review.IsApproved ? now : null;
+                payroll.ReviewNote = note;
+            }
+
+            var auditAction = review.IsApproved
+                ? "PAYROLL_RUN_APPROVED"
+                : review.RequestRevision
+                    ? "PAYROLL_RUN_REVISION_REQUESTED"
+                    : "PAYROLL_RUN_REJECTED";
+
+            await _auditRepo.LogSystemEventAsync(
+                auditAction,
+                actorAccountId,
+                "payrolls",
+                $"Reviewed payroll run {dto.Month:00}/{dto.Year}. Status={nextStatus}. Count={payrolls.Count}.");
+            await _unitOfWork.CommitAsync(ct);
+
+            return MapPayrollRunSummary(payrolls, dto.Month, dto.Year, includeSlips: true);
+        }
+
+        public async Task<PayrollRunSummaryDto> LockPayrollPeriodAsync(PayrollPeriodDto dto, int actorAccountId, string actorRole, CancellationToken ct = default)
+        {
+            EnsurePayrollOperator(actorRole);
+            ValidatePeriod(dto.Month, dto.Year);
+
+            return await _lockService.GetWithLockAsync(
+                LockKeys.PayrollRun(dto.Month, dto.Year),
+                innerCt => LockPayrollPeriodCoreAsync(dto, actorAccountId, actorRole, innerCt),
+                TimeSpan.FromSeconds(20),
+                ct);
+        }
+
+        private async Task<PayrollRunSummaryDto> LockPayrollPeriodCoreAsync(PayrollPeriodDto dto, int actorAccountId, string actorRole, CancellationToken ct = default)
+        {
+            EnsurePayrollOperator(actorRole);
+            ValidatePeriod(dto.Month, dto.Year);
+
+            var payrolls = await _payrollRepo.GetTrackedByPeriodAsync(dto.Month, dto.Year, ct);
+            if (payrolls.Count == 0)
+                throw new InvalidOperationException("Chua co bang luong de chot.");
+
+            if (payrolls.All(p => p.Status == PayrollStatus.Finalized || p.Status == PayrollStatus.Paid))
+                return MapPayrollRunSummary(payrolls, dto.Month, dto.Year, includeSlips: true);
+
+            if (payrolls.Any(p => p.Status != PayrollStatus.Approved))
+                throw new InvalidOperationException("Chi co the chot bang luong da duoc giam doc duyet.");
+
+            var now = DateTime.UtcNow;
+            foreach (var payroll in payrolls)
+            {
+                payroll.Status = PayrollStatus.Finalized;
+                payroll.LockedByAccountId = actorAccountId;
+                payroll.LockedAt = now;
+            }
+
+            await _auditRepo.LogSystemEventAsync(
+                "PAYROLL_RUN_FINALIZED",
+                actorAccountId,
+                "payrolls",
+                $"Finalized payroll run {dto.Month:00}/{dto.Year}. Count={payrolls.Count}.");
+            await _unitOfWork.CommitAsync(ct);
+
+            return MapPayrollRunSummary(payrolls, dto.Month, dto.Year, includeSlips: true);
         }
 
         public async Task<PayrollAdjustmentDto> CreateAdjustmentAsync(CreatePayrollAdjustmentDto dto, int actorAccountId, string actorRole, CancellationToken ct = default)
@@ -322,6 +519,25 @@ namespace HRM.backend.src.HRM.Application.UseCases.PayrollAllowances
         {
             if (!IsAny(role, "Admin", "HR"))
                 throw new UnauthorizedAccessException("Bạn không có quyền tổng hợp bảng lương.");
+        }
+
+        private static void EnsurePayrollViewer(string role)
+        {
+            if (!IsAny(role, "Admin", "HR", "Director"))
+                throw new UnauthorizedAccessException("Bạn không có quyền xem bảng lương theo kỳ.");
+        }
+
+        private static void EnsurePayrollApprover(string role)
+        {
+            if (!IsAny(role, "Admin", "Director"))
+                throw new UnauthorizedAccessException("Bạn không có quyền phê duyệt bảng lương.");
+        }
+
+        private static bool IsLockedStatus(Core.Entities.PayrollAllowances.Payroll payroll)
+        {
+            return payroll.Status == PayrollStatus.Locked ||
+                   payroll.Status == PayrollStatus.Finalized ||
+                   payroll.Status == PayrollStatus.Paid;
         }
 
         private static void AddPolicy(
@@ -462,6 +678,78 @@ namespace HRM.backend.src.HRM.Application.UseCases.PayrollAllowances
         private static bool IsAny(string role, params string[] values)
         {
             return values.Any(v => string.Equals(role, v, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static PayrollRunSummaryDto MapPayrollRunSummary(List<Core.Entities.PayrollAllowances.Payroll> payrolls, byte month, short year, bool includeSlips)
+        {
+            if (payrolls.Count == 0)
+            {
+                return new PayrollRunSummaryDto
+                {
+                    Month = month,
+                    Year = year,
+                    Period = $"{month:00}/{year}",
+                    Status = PayrollStatus.Draft,
+                    StatusText = PayrollStatusLabel(PayrollStatus.Draft)
+                };
+            }
+
+            var status = ResolveRunStatus(payrolls);
+            return new PayrollRunSummaryDto
+            {
+                Month = month,
+                Year = year,
+                Period = $"{month:00}/{year}",
+                Status = status,
+                StatusText = PayrollStatusLabel(status),
+                SlipCount = payrolls.Count,
+                GrossIncome = payrolls.Sum(p => p.GrossIncome ?? p.GrossSalary ?? 0),
+                NetSalary = payrolls.Sum(p => p.NetSalary ?? 0),
+                TotalCompanyCost = payrolls.Sum(p => p.TotalCompanyCost ?? 0),
+                CalculatedAt = payrolls.Max(p => p.CalculatedAt),
+                SubmittedAt = payrolls.Max(p => p.SubmittedAt),
+                ApprovedAt = payrolls.Max(p => p.ApprovedAt),
+                LockedAt = payrolls.Max(p => p.LockedAt),
+                SubmittedByAccountId = payrolls.OrderByDescending(p => p.SubmittedAt).FirstOrDefault(p => p.SubmittedByAccountId.HasValue)?.SubmittedByAccountId,
+                ApprovedByAccountId = payrolls.OrderByDescending(p => p.ApprovedAt).FirstOrDefault(p => p.ApprovedByAccountId.HasValue)?.ApprovedByAccountId,
+                LockedByAccountId = payrolls.OrderByDescending(p => p.LockedAt).FirstOrDefault(p => p.LockedByAccountId.HasValue)?.LockedByAccountId,
+                ReviewNote = payrolls.OrderByDescending(p => p.ApprovedAt ?? p.SubmittedAt ?? p.CalculatedAt ?? p.CreatedAt).FirstOrDefault(p => !string.IsNullOrWhiteSpace(p.ReviewNote))?.ReviewNote,
+                Slips = includeSlips
+                    ? payrolls.OrderBy(p => p.Employee?.FullName).Select(p => PayrollSlipMapper.Map(p)).ToList()
+                    : new List<SalarySlipDto>()
+            };
+        }
+
+        private static PayrollStatus ResolveRunStatus(List<Core.Entities.PayrollAllowances.Payroll> payrolls)
+        {
+            var distinctStatuses = payrolls.Select(p => p.Status).Distinct().ToList();
+            if (distinctStatuses.Count == 1) return distinctStatuses[0];
+            if (distinctStatuses.All(status => status == PayrollStatus.Finalized || status == PayrollStatus.Paid)) return PayrollStatus.Finalized;
+            if (distinctStatuses.Contains(PayrollStatus.PendingApproval)) return PayrollStatus.PendingApproval;
+            if (distinctStatuses.Contains(PayrollStatus.RevisionRequired)) return PayrollStatus.RevisionRequired;
+            if (distinctStatuses.Contains(PayrollStatus.Rejected)) return PayrollStatus.Rejected;
+            if (distinctStatuses.Contains(PayrollStatus.Approved)) return PayrollStatus.Approved;
+            if (distinctStatuses.Contains(PayrollStatus.Calculated)) return PayrollStatus.Calculated;
+            return distinctStatuses[0];
+        }
+
+        private static string PayrollStatusLabel(PayrollStatus status)
+        {
+            return status switch
+            {
+                PayrollStatus.Draft => "Bản nháp",
+                PayrollStatus.Calculated => "Đã tổng hợp",
+                PayrollStatus.HRReviewed => "HR đã kiểm tra",
+                PayrollStatus.PendingApproval => "Chờ giám đốc duyệt",
+                PayrollStatus.Approved => "Đã duyệt",
+                PayrollStatus.Locked => "Đã khóa",
+                PayrollStatus.Finalized => "Đã chốt",
+                PayrollStatus.Paid => "Đã chi trả",
+                PayrollStatus.Cancelled => "Đã hủy",
+                PayrollStatus.RevisionRequired => "Cần bổ sung",
+                PayrollStatus.Rejected => "Từ chối",
+                _ => status.ToString()
+            };
         }
 
         private static PayrollAdjustmentDto MapAdjustment(Core.Entities.PayrollAllowances.PayrollAdjustment adjustment)

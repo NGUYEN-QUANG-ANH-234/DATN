@@ -31,11 +31,20 @@ namespace HRM.backend.src.HRM.Core.Entities.PayrollAllowances
 
         public FormulaStatus Status { get; set; } = FormulaStatus.Pending;
         public DateTime? DeadlineAt { get; set; }
+        public int? CreatedByAccountId { get; set; }
+        public int? SubmittedByAccountId { get; set; }
+        public DateTime? SubmittedAt { get; set; }
         public int? ApprovedByAccountId { get; set; }
         public DateTime? ApprovedAt { get; set; }
+        public int? ActivatedByAccountId { get; set; }
+        public DateTime? ActivatedAt { get; set; }
+        public int? ArchivedByAccountId { get; set; }
+        public DateTime? ArchivedAt { get; set; }
         [StringLength(1000)] public string? RejectReason { get; set; }
+        [StringLength(1000)] public string? ReviewNote { get; set; }
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime? UpdatedAt { get; set; }
 
         public virtual ICollection<PayrollFormulaLine> Lines { get; set; } = new List<PayrollFormulaLine>();
     }

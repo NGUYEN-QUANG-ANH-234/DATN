@@ -51,6 +51,7 @@ namespace HRM.backend.src.HRM.Application.Services.PayrollAllowances
             foreach (var line in output.Lines.Where(l => l.FormulaLine.IsSnapshotRequired || l.Amount != 0))
             {
                 var isProjectBonusLine = string.Equals(line.ComponentCode, "PROJECT_BONUS", StringComparison.OrdinalIgnoreCase);
+                var isExternalTimesheetLine = string.Equals(line.ComponentCode, "EXTERNAL_TIMESHEET_PAY", StringComparison.OrdinalIgnoreCase);
                 payroll.Details.Add(new PayrollDetail
                 {
                     ComponentCode = line.ComponentCode,
@@ -66,7 +67,9 @@ namespace HRM.backend.src.HRM.Application.Services.PayrollAllowances
                     CalculationMethod = line.CalculationMethod,
                     Note = isProjectBonusLine && source.ProjectBonusLines.Count > 0
                         ? $"Nguồn: {source.ProjectBonusLines.Count} dòng thưởng dự án đã duyệt."
-                        : line.Note,
+                        : isExternalTimesheetLine && source.ExternalTimesheetLines.Count > 0
+                            ? $"Nguồn: {source.ExternalTimesheetLines.Count} dòng giờ công cộng tác viên đã duyệt."
+                            : line.Note,
                     SnapshotJson = JsonSerializer.Serialize(new
                     {
                         formulaLineId = line.FormulaLine.Id,
@@ -93,6 +96,26 @@ namespace HRM.backend.src.HRM.Application.Services.PayrollAllowances
                                 l.Taxable,
                                 l.InsuranceContributable,
                                 l.Reason,
+                                l.Note
+                            })
+                            : null,
+                        externalTimesheetSources = isExternalTimesheetLine
+                            ? source.ExternalTimesheetLines.Select(l => new
+                            {
+                                l.Id,
+                                l.ImportId,
+                                l.Import.FileName,
+                                l.Import.PayrollPeriod,
+                                l.Import.ApprovedAt,
+                                l.CollaboratorEmployeeId,
+                                l.CollaboratorCode,
+                                l.CollaboratorNameSnapshot,
+                                l.WorkDate,
+                                l.ProjectCode,
+                                l.TaskCode,
+                                l.ApprovedHours,
+                                l.HourlyRate,
+                                l.Amount,
                                 l.Note
                             })
                             : null

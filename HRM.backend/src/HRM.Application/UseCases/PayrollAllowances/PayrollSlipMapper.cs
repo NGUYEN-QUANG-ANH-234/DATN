@@ -48,7 +48,10 @@ namespace HRM.backend.src.HRM.Application.UseCases.PayrollAllowances
                 TotalCompanyCost = payroll.TotalCompanyCost ?? 0,
                 Status = payroll.Status,
                 CalculatedAt = payroll.CalculatedAt,
+                SubmittedAt = payroll.SubmittedAt,
+                ApprovedAt = payroll.ApprovedAt,
                 LockedAt = payroll.LockedAt,
+                ReviewNote = payroll.ReviewNote,
                 Details = includeDetails
                     ? payroll.Details
                         .OrderBy(d => d.Id)
@@ -65,11 +68,55 @@ namespace HRM.backend.src.HRM.Application.UseCases.PayrollAllowances
                             IsTaxable = d.IsTaxable,
                             IsInsuranceBased = d.IsInsuranceBased,
                             Note = d.Note,
-                            ProjectBonusSources = ExtractProjectBonusSources(d.SnapshotJson)
+                            ProjectBonusSources = ExtractProjectBonusSources(d.SnapshotJson),
+                            ExternalTimesheetSources = ExtractExternalTimesheetSources(d.SnapshotJson)
                         })
                         .ToList()
                     : new List<SalarySlipDetailDto>()
             };
+        }
+
+        private static List<ExternalTimesheetPayrollSourceDto> ExtractExternalTimesheetSources(string? detailSnapshotJson)
+        {
+            if (string.IsNullOrWhiteSpace(detailSnapshotJson))
+                return new List<ExternalTimesheetPayrollSourceDto>();
+
+            try
+            {
+                using var document = JsonDocument.Parse(detailSnapshotJson);
+                if (!document.RootElement.TryGetProperty("externalTimesheetSources", out var sources) ||
+                    sources.ValueKind != JsonValueKind.Array)
+                    return new List<ExternalTimesheetPayrollSourceDto>();
+
+                var result = new List<ExternalTimesheetPayrollSourceDto>();
+                foreach (var source in sources.EnumerateArray())
+                {
+                    result.Add(new ExternalTimesheetPayrollSourceDto
+                    {
+                        Id = GetInt(source, "id"),
+                        ImportId = GetInt(source, "importId"),
+                        FileName = GetString(source, "fileName"),
+                        PayrollPeriod = GetString(source, "payrollPeriod"),
+                        ApprovedAt = GetNullableDateTime(source, "approvedAt"),
+                        CollaboratorEmployeeId = GetNullableInt(source, "collaboratorEmployeeId"),
+                        CollaboratorCode = GetString(source, "collaboratorCode") ?? string.Empty,
+                        CollaboratorName = GetString(source, "collaboratorNameSnapshot"),
+                        WorkDate = GetNullableDateTime(source, "workDate") ?? DateTime.MinValue,
+                        ProjectCode = GetString(source, "projectCode") ?? string.Empty,
+                        TaskCode = GetString(source, "taskCode") ?? string.Empty,
+                        ApprovedHours = GetDecimal(source, "approvedHours"),
+                        HourlyRate = GetDecimal(source, "hourlyRate"),
+                        Amount = GetDecimal(source, "amount"),
+                        Note = GetString(source, "note")
+                    });
+                }
+
+                return result;
+            }
+            catch (JsonException)
+            {
+                return new List<ExternalTimesheetPayrollSourceDto>();
+            }
         }
 
         private static List<ProjectBonusPayrollSourceDto> ExtractProjectBonusSources(string? detailSnapshotJson)
@@ -126,6 +173,15 @@ namespace HRM.backend.src.HRM.Application.UseCases.PayrollAllowances
             return element.TryGetProperty(propertyName, out var property) && property.TryGetInt32(out var value)
                 ? value
                 : 0;
+        }
+
+        private static int? GetNullableInt(JsonElement element, string propertyName)
+        {
+            return element.TryGetProperty(propertyName, out var property) &&
+                   property.ValueKind != JsonValueKind.Null &&
+                   property.TryGetInt32(out var value)
+                ? value
+                : null;
         }
 
         private static decimal GetDecimal(JsonElement element, string propertyName)
