@@ -8,6 +8,13 @@ namespace HRM.backend.src.HRM.Application.DTOs.TimeAttendance
         public short Year { get; set; }
     }
 
+    public class CloseAttendancePeriodDto
+    {
+        public byte Month { get; set; }
+        public short Year { get; set; }
+        public string? Note { get; set; }
+    }
+
     public class AttendanceSummaryResponseDto
     {
         public int Id { get; set; }
@@ -24,6 +31,14 @@ namespace HRM.backend.src.HRM.Application.DTOs.TimeAttendance
         public int LateMinutes { get; set; }
         public int EarlyLeaveMinutes { get; set; }
         public int ActualOtMinutes { get; set; }
+        public AttendancePayrollApprovalStatus ApprovalStatus { get; set; }
+        public int? SubmittedByAccountId { get; set; }
+        public DateTime? SubmittedAt { get; set; }
+        public int? ApprovedByAccountId { get; set; }
+        public DateTime? ApprovedAt { get; set; }
+        public int? LockedByAccountId { get; set; }
+        public DateTime? LockedAt { get; set; }
+        public string? PeriodNote { get; set; }
         public bool IsPayrollLocked { get; set; }
         public DateTime GeneratedAt { get; set; }
     }

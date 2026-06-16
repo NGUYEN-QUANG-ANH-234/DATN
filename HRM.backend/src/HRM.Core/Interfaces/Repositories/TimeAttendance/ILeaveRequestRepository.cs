@@ -12,6 +12,7 @@ namespace HRM.backend.src.HRM.Core.Interfaces.Repositories.TimeAttendance
         Task<List<LeaveRequest>> GetPendingDeptAsync(int? deptId, CancellationToken ct = default);
         Task<List<LeaveRequest>> GetByStatusAsync(LeaveRequestStatus status, CancellationToken ct = default);
         Task<List<LeaveRequest>> GetApprovedByPeriodAsync(DateTime startDate, DateTime endDate, CancellationToken ct = default);
+        Task<List<LeaveRequest>> GetApprovedForPayrollLockByPeriodAsync(DateTime startDate, DateTime endDate, CancellationToken ct = default);
         Task<IEnumerable<LeaveRequest>> FetchExpiredRequestsAsync();
     }
 }

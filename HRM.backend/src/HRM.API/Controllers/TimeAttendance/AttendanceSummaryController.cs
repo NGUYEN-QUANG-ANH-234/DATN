@@ -58,6 +58,63 @@ namespace HRM.backend.src.HRM.API.Controllers.TimeAttendance
             }
         }
 
+        [HttpPatch("submit")]
+        [RequirePermission("ATTENDANCE_SUMMARY_VIEW", GroupName = SystemModules.TimekeepingLeave, Description = "Gửi chốt bảng công tháng")]
+        public async Task<IActionResult> SubmitMonthly([FromBody] CloseAttendancePeriodDto dto, CancellationToken ct)
+        {
+            try
+            {
+                var data = await _useCase.SubmitMonthlyTimesheetAsync(dto, GetAccountId(), GetRole(), ct);
+                return Ok(new { Success = true, Data = data, Message = $"Đã gửi chốt bảng công tháng {dto.Month:D2}/{dto.Year}." });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, new { Success = false, Message = ex.Message });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { Success = false, Message = ex.Message });
+            }
+        }
+
+        [HttpPatch("approve")]
+        [RequirePermission("ATTENDANCE_SUMMARY_VIEW", GroupName = SystemModules.TimekeepingLeave, Description = "Duyệt bảng công tháng")]
+        public async Task<IActionResult> ApproveMonthly([FromBody] CloseAttendancePeriodDto dto, CancellationToken ct)
+        {
+            try
+            {
+                var data = await _useCase.ApproveMonthlyTimesheetAsync(dto, GetAccountId(), GetRole(), ct);
+                return Ok(new { Success = true, Data = data, Message = $"Đã duyệt bảng công tháng {dto.Month:D2}/{dto.Year}." });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, new { Success = false, Message = ex.Message });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { Success = false, Message = ex.Message });
+            }
+        }
+
+        [HttpPatch("lock")]
+        [RequirePermission("ATTENDANCE_SUMMARY_VIEW", GroupName = SystemModules.TimekeepingLeave, Description = "Khóa bảng công tháng")]
+        public async Task<IActionResult> LockMonthly([FromBody] CloseAttendancePeriodDto dto, CancellationToken ct)
+        {
+            try
+            {
+                var data = await _useCase.LockMonthlyTimesheetAsync(dto, GetAccountId(), GetRole(), ct);
+                return Ok(new { Success = true, Data = data, Message = $"Đã khóa bảng công tháng {dto.Month:D2}/{dto.Year}." });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, new { Success = false, Message = ex.Message });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { Success = false, Message = ex.Message });
+            }
+        }
+
         [HttpGet("daily")]
         [RequirePermission("ATTENDANCE_SUMMARY_VIEW", GroupName = SystemModules.TimekeepingLeave, Description = "Xem bảng công theo ngày")]
         public async Task<IActionResult> GetDaily([FromQuery] byte month, [FromQuery] short year, CancellationToken ct)

@@ -104,5 +104,26 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.TimeAttend
                 .AsNoTracking()
                 .ToListAsync(ct);
         }
+
+        public async Task<List<LeaveRequest>> GetApprovedForPayrollLockByPeriodAsync(DateTime startDate, DateTime endDate, CancellationToken ct = default)
+        {
+            var start = startDate.Date;
+            var end = endDate.Date;
+
+            return await _dbSet
+                .Include(r => r.Employee)
+                .ThenInclude(e => e!.Department)
+                .Include(r => r.LeaveType)
+                .Where(r => r.EmployeeId.HasValue &&
+                            r.StartDate.HasValue &&
+                            r.EndDate.HasValue &&
+                            r.StartDate.Value < end &&
+                            r.EndDate.Value >= start &&
+                            !r.IsPayrollLocked &&
+                            (r.Status == LeaveRequestStatus.Approved ||
+                             r.Status == LeaveRequestStatus.Auto_Approved ||
+                             r.Status == LeaveRequestStatus.AutoFinalApproved))
+                .ToListAsync(ct);
+        }
     }
 }

@@ -2,6 +2,7 @@ using HRM.backend.src.HRM.Application.DTOs.TimeAttendance;
 using HRM.backend.src.HRM.Application.Interfaces;
 using HRM.backend.src.HRM.Application.Interfaces.TimeAttendance.Services;
 using HRM.backend.src.HRM.Application.Interfaces.TimeAttendance.Usecases;
+using HRM.backend.src.HRM.Application.Services.System;
 using HRM.backend.src.HRM.Core.Entities.EmployeeProfile;
 using HRM.backend.src.HRM.Core.Entities.TimeAttendance;
 using HRM.backend.src.HRM.Core.Enums;
@@ -62,8 +63,166 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
             ValidatePeriod(dto.Month, dto.Year);
 
             return await _lockService.GetWithLockAsync(
-                $"timesheet_{dto.Year}_{dto.Month:D2}",
+                LockKeys.AttendancePeriod(dto.Month, dto.Year),
                 async (innerCt) => await GenerateMonthlyCoreAsync(dto, actorAccountId, actorRoleName, innerCt),
+                cancellationToken: ct);
+        }
+
+        public async Task<IEnumerable<AttendanceSummaryResponseDto>> SubmitMonthlyTimesheetAsync(CloseAttendancePeriodDto dto, int actorAccountId, string actorRoleName, CancellationToken ct = default)
+        {
+            EnsureHrOrAdmin(actorRoleName);
+            ValidatePeriod(dto.Month, dto.Year);
+
+            return await _lockService.GetWithLockAsync(
+                LockKeys.AttendancePeriod(dto.Month, dto.Year),
+                async (innerCt) =>
+                {
+                    var summaries = await LoadMonthlySummariesOrThrowAsync(dto.Month, dto.Year, innerCt);
+                    if (summaries.Any(s => s.IsPayrollLocked || s.ApprovalStatus == AttendancePayrollApprovalStatus.Locked))
+                        throw new ArgumentException("Kỳ công đã khóa, không thể gửi chốt lại.");
+                    if (summaries.Any(s => s.ApprovalStatus != AttendancePayrollApprovalStatus.Draft))
+                        throw new ArgumentException("Chỉ kỳ công ở trạng thái bản nháp mới được gửi chốt.");
+
+                    var now = DateTime.UtcNow;
+                    var note = NormalizeNote(dto.Note);
+                    foreach (var summary in summaries)
+                    {
+                        summary.ApprovalStatus = AttendancePayrollApprovalStatus.PendingHRReview;
+                        summary.SubmittedByAccountId = actorAccountId;
+                        summary.SubmittedAt = now;
+                        summary.PeriodNote = note;
+                    }
+
+                    var dailySummaries = await _summaryRepo.GetDailyByPeriodAsync(dto.Month, dto.Year, innerCt);
+                    foreach (var daily in dailySummaries.Where(d =>
+                                 !d.IsPayrollLocked &&
+                                 d.ApprovalStatus != AttendancePayrollApprovalStatus.Locked &&
+                                 d.ApprovalStatus != AttendancePayrollApprovalStatus.Approved))
+                    {
+                        daily.ApprovalStatus = AttendancePayrollApprovalStatus.PendingHRReview;
+                        daily.PayrollPeriod = BuildPayrollPeriod(dto.Month, dto.Year);
+                    }
+
+                    await _auditLogRepo.LogSystemEventAsync(
+                        "SUBMIT_MONTHLY_TIMESHEET",
+                        actorAccountId,
+                        "attendance_summaries",
+                        $"Gửi chốt kỳ công {dto.Month:D2}/{dto.Year}");
+                    await _unitOfWork.CommitAsync(innerCt);
+
+                    return await GetMonthlyAsync(dto.Month, dto.Year, actorRoleName, innerCt);
+                },
+                cancellationToken: ct);
+        }
+
+        public async Task<IEnumerable<AttendanceSummaryResponseDto>> ApproveMonthlyTimesheetAsync(CloseAttendancePeriodDto dto, int actorAccountId, string actorRoleName, CancellationToken ct = default)
+        {
+            EnsureDirectorOrAdmin(actorRoleName);
+            ValidatePeriod(dto.Month, dto.Year);
+
+            return await _lockService.GetWithLockAsync(
+                LockKeys.AttendancePeriod(dto.Month, dto.Year),
+                async (innerCt) =>
+                {
+                    var summaries = await LoadMonthlySummariesOrThrowAsync(dto.Month, dto.Year, innerCt);
+                    if (summaries.Any(s => s.IsPayrollLocked || s.ApprovalStatus == AttendancePayrollApprovalStatus.Locked))
+                        throw new ArgumentException("Kỳ công đã khóa, không thể duyệt lại.");
+                    if (summaries.Any(s => s.ApprovalStatus != AttendancePayrollApprovalStatus.PendingHRReview))
+                        throw new ArgumentException("Chỉ kỳ công đã gửi chốt mới được duyệt.");
+
+                    var now = DateTime.UtcNow;
+                    var note = NormalizeNote(dto.Note);
+                    foreach (var summary in summaries)
+                    {
+                        summary.ApprovalStatus = AttendancePayrollApprovalStatus.Approved;
+                        summary.ApprovedByAccountId = actorAccountId;
+                        summary.ApprovedAt = now;
+                        summary.PeriodNote = note ?? summary.PeriodNote;
+                    }
+
+                    var dailySummaries = await _summaryRepo.GetDailyByPeriodAsync(dto.Month, dto.Year, innerCt);
+                    foreach (var daily in dailySummaries.Where(d => !d.IsPayrollLocked && d.ApprovalStatus != AttendancePayrollApprovalStatus.Locked))
+                    {
+                        daily.ApprovalStatus = AttendancePayrollApprovalStatus.Approved;
+                        daily.PayrollPeriod = BuildPayrollPeriod(dto.Month, dto.Year);
+                    }
+
+                    await _auditLogRepo.LogSystemEventAsync(
+                        "APPROVE_MONTHLY_TIMESHEET",
+                        actorAccountId,
+                        "attendance_summaries",
+                        $"Duyệt kỳ công {dto.Month:D2}/{dto.Year}");
+                    await _unitOfWork.CommitAsync(innerCt);
+
+                    return await GetMonthlyAsync(dto.Month, dto.Year, actorRoleName, innerCt);
+                },
+                cancellationToken: ct);
+        }
+
+        public async Task<IEnumerable<AttendanceSummaryResponseDto>> LockMonthlyTimesheetAsync(CloseAttendancePeriodDto dto, int actorAccountId, string actorRoleName, CancellationToken ct = default)
+        {
+            EnsureHrOrAdmin(actorRoleName);
+            ValidatePeriod(dto.Month, dto.Year);
+
+            return await _lockService.GetWithLockAsync(
+                LockKeys.AttendancePeriod(dto.Month, dto.Year),
+                async (innerCt) =>
+                {
+                    var summaries = await LoadMonthlySummariesOrThrowAsync(dto.Month, dto.Year, innerCt);
+                    if (summaries.Any(s => s.IsPayrollLocked || s.ApprovalStatus == AttendancePayrollApprovalStatus.Locked))
+                        throw new ArgumentException("Kỳ công đã được khóa trước đó.");
+                    if (summaries.Any(s => s.ApprovalStatus != AttendancePayrollApprovalStatus.Approved))
+                        throw new ArgumentException("Chỉ kỳ công đã được duyệt mới được khóa.");
+
+                    var periodStart = new DateTime(dto.Year, dto.Month, 1);
+                    var periodEnd = periodStart.AddMonths(1);
+                    var payrollPeriod = BuildPayrollPeriod(dto.Month, dto.Year);
+                    var now = DateTime.UtcNow;
+                    var note = NormalizeNote(dto.Note);
+
+                    foreach (var summary in summaries)
+                    {
+                        summary.ApprovalStatus = AttendancePayrollApprovalStatus.Locked;
+                        summary.IsPayrollLocked = true;
+                        summary.LockedByAccountId = actorAccountId;
+                        summary.LockedAt = now;
+                        summary.PeriodNote = note ?? summary.PeriodNote;
+                    }
+
+                    var dailySummaries = await _summaryRepo.GetDailyByPeriodAsync(dto.Month, dto.Year, innerCt);
+                    foreach (var daily in dailySummaries)
+                    {
+                        daily.ApprovalStatus = AttendancePayrollApprovalStatus.Locked;
+                        daily.IsPayrollLocked = true;
+                        daily.PayrollPeriod = payrollPeriod;
+                    }
+
+                    var overtimeRequests = await _overtimeRepo.GetApprovedByPeriodAsync(periodStart, periodEnd, innerCt);
+                    foreach (var overtime in overtimeRequests.Where(o => !o.IsPayrollLocked))
+                    {
+                        overtime.IsPayrollLocked = true;
+                        overtime.PayrollPeriod = payrollPeriod;
+                        overtime.PayrollLockedAt = now;
+                        overtime.Status = OvertimeRequestStatus.PayrollLocked;
+                    }
+
+                    var leaveRequests = await _leaveReqRepo.GetApprovedForPayrollLockByPeriodAsync(periodStart, periodEnd, innerCt);
+                    foreach (var leave in leaveRequests)
+                    {
+                        leave.IsPayrollLocked = true;
+                        leave.PayrollPeriod = payrollPeriod;
+                        leave.PayrollLockedAt = now;
+                    }
+
+                    await _auditLogRepo.LogSystemEventAsync(
+                        "LOCK_MONTHLY_TIMESHEET",
+                        actorAccountId,
+                        "attendance_summaries",
+                        $"Khóa kỳ công {dto.Month:D2}/{dto.Year}. Daily={dailySummaries.Count}, OT={overtimeRequests.Count}, Leave={leaveRequests.Count}");
+                    await _unitOfWork.CommitAsync(innerCt);
+
+                    return await GetMonthlyAsync(dto.Month, dto.Year, actorRoleName, innerCt);
+                },
                 cancellationToken: ct);
         }
 
@@ -71,6 +230,9 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
         {
             var periodStart = new DateTime(dto.Year, dto.Month, 1);
             var periodEnd = periodStart.AddMonths(1);
+            var existingSummaries = await _summaryRepo.GetByPeriodAsync(dto.Month, dto.Year, ct);
+            if (existingSummaries.Any(IsClosedForRegeneration))
+                throw new ArgumentException("Kỳ công đã được gửi chốt, duyệt hoặc khóa nên không thể tổng hợp lại.");
 
             var logs = await _attendanceRepo.FetchLogsByPeriodAsync(periodStart, periodEnd, ct);
             var approvedOt = await _overtimeRepo.GetApprovedByPeriodAsync(periodStart, periodEnd, ct);
@@ -186,7 +348,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
 
         public async Task<IEnumerable<AttendanceDailySummaryResponseDto>> GetDailyAsync(byte month, short year, string actorRoleName, CancellationToken ct = default)
         {
-            EnsureHrOrAdmin(actorRoleName);
+            EnsureHrDirectorOrAdmin(actorRoleName);
             ValidatePeriod(month, year);
 
             var daily = await _summaryRepo.GetDailyByPeriodAsync(month, year, ct);
@@ -251,11 +413,39 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
 
         public async Task<IEnumerable<AttendanceSummaryResponseDto>> GetMonthlyAsync(byte month, short year, string actorRoleName, CancellationToken ct = default)
         {
-            EnsureHrOrAdmin(actorRoleName);
+            EnsureHrDirectorOrAdmin(actorRoleName);
             ValidatePeriod(month, year);
 
             var summaries = await _summaryRepo.GetByPeriodAsync(month, year, ct);
             return summaries.Select(MapToResponse);
+        }
+
+        private async Task<List<AttendanceSummary>> LoadMonthlySummariesOrThrowAsync(byte month, short year, CancellationToken ct)
+        {
+            var summaries = await _summaryRepo.GetByPeriodAsync(month, year, ct);
+            if (summaries.Count == 0)
+                throw new ArgumentException("Chưa có bảng công cho kỳ này. Vui lòng tổng hợp bảng công trước.");
+
+            return summaries;
+        }
+
+        private static bool IsClosedForRegeneration(AttendanceSummary summary)
+        {
+            return summary.IsPayrollLocked ||
+                   summary.ApprovalStatus is AttendancePayrollApprovalStatus.PendingHRReview
+                       or AttendancePayrollApprovalStatus.Approved
+                       or AttendancePayrollApprovalStatus.Locked;
+        }
+
+        private static string BuildPayrollPeriod(byte month, short year)
+        {
+            return $"{month:00}/{year}";
+        }
+
+        private static string? NormalizeNote(string? note)
+        {
+            var normalized = note?.Trim();
+            return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
         }
 
         private static void ValidatePeriod(byte month, short year)
@@ -271,6 +461,21 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
             if (!string.Equals(actorRoleName, "HR", StringComparison.OrdinalIgnoreCase) &&
                 !string.Equals(actorRoleName, "Admin", StringComparison.OrdinalIgnoreCase))
                 throw new UnauthorizedAccessException("Chỉ HR hoặc Admin được tổng hợp bảng công.");
+        }
+
+        private static void EnsureHrDirectorOrAdmin(string actorRoleName)
+        {
+            if (!string.Equals(actorRoleName, "HR", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(actorRoleName, "Director", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(actorRoleName, "Admin", StringComparison.OrdinalIgnoreCase))
+                throw new UnauthorizedAccessException("Chỉ HR, Giám đốc hoặc Admin được xem kỳ công.");
+        }
+
+        private static void EnsureDirectorOrAdmin(string actorRoleName)
+        {
+            if (!string.Equals(actorRoleName, "Director", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(actorRoleName, "Admin", StringComparison.OrdinalIgnoreCase))
+                throw new UnauthorizedAccessException("Chỉ Giám đốc hoặc Admin được duyệt kỳ công.");
         }
 
         private static WorkdayPolicy ResolveWorkdayPolicy(
@@ -645,6 +850,14 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
                 LateMinutes = summary.LateMinutes,
                 EarlyLeaveMinutes = summary.EarlyLeaveMinutes,
                 ActualOtMinutes = summary.ActualOtMinutes,
+                ApprovalStatus = summary.ApprovalStatus,
+                SubmittedByAccountId = summary.SubmittedByAccountId,
+                SubmittedAt = summary.SubmittedAt,
+                ApprovedByAccountId = summary.ApprovedByAccountId,
+                ApprovedAt = summary.ApprovedAt,
+                LockedByAccountId = summary.LockedByAccountId,
+                LockedAt = summary.LockedAt,
+                PeriodNote = summary.PeriodNote,
                 IsPayrollLocked = summary.IsPayrollLocked,
                 GeneratedAt = summary.GeneratedAt
             };

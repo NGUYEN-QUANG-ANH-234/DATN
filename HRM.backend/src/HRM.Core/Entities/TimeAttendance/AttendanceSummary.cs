@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using HRM.backend.src.HRM.Core.Entities.EmployeeProfile;
+using HRM.backend.src.HRM.Core.Enums;
 
 namespace HRM.backend.src.HRM.Core.Entities.TimeAttendance
 {
@@ -26,6 +27,18 @@ namespace HRM.backend.src.HRM.Core.Entities.TimeAttendance
         public int LateMinutes { get; set; }
         public int EarlyLeaveMinutes { get; set; }
         public int ActualOtMinutes { get; set; }
+
+        public AttendancePayrollApprovalStatus ApprovalStatus { get; set; } = AttendancePayrollApprovalStatus.Draft;
+
+        public int? SubmittedByAccountId { get; set; }
+        public DateTime? SubmittedAt { get; set; }
+        public int? ApprovedByAccountId { get; set; }
+        public DateTime? ApprovedAt { get; set; }
+        public int? LockedByAccountId { get; set; }
+        public DateTime? LockedAt { get; set; }
+
+        [StringLength(500)]
+        public string? PeriodNote { get; set; }
 
         public bool IsPayrollLocked { get; set; }
         public DateTime GeneratedAt { get; set; } = DateTime.UtcNow;

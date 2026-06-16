@@ -24,5 +24,12 @@ namespace HRM.backend.src.HRM.Core.Entities.TimeAttendance
         public LeaveRequestStatus Status { get; set; } = LeaveRequestStatus.Pending;
 
         public DateTime? DeadlineAt { get; set; } // Phục vụ SLA duyệt tự động
+
+        public bool IsPayrollLocked { get; set; }
+
+        [StringLength(7)]
+        public string? PayrollPeriod { get; set; }
+
+        public DateTime? PayrollLockedAt { get; set; }
     }
 }
