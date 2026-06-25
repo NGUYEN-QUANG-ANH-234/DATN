@@ -193,6 +193,7 @@ namespace HRM.backend.src.HRM.Application.Services.PayrollAllowances
                 "LEGACY_INSURANCE_ALLOWANCE" => "Phu cap cu tinh BH",
                 "LEGACY_TAXABLE_ALLOWANCE" => "Phu cap cu chiu thue",
                 "LEGACY_NONTAXABLE_ALLOWANCE" => "Phụ cấp cũ không chịu thuế",
+                "INTERN_ALLOWANCE" => "Trợ cấp thực tập",
                 "KPI_BONUS" => "Thưởng KPI thực nhận",
                 "PROJECT_BONUS" => "Thưởng dự án",
                 "OT_BASE" => "OT phan 100% chiu thue",

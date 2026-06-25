@@ -19,6 +19,8 @@ import {
   secondaryButtonClass,
   textareaClass,
 } from "../../../core/components/FeatureShell";
+import { useCurrentUser } from "../../../core/auth/hooks/useCurrentUser";
+import { normalizeRole } from "../../../core/auth/roleAccess";
 
 type DepartmentOption = { id: number; deptName: string };
 
@@ -128,6 +130,11 @@ export const ContractAddendumManagement = () => {
   const [documentPreview, setDocumentPreview] = useState<ContractDocumentPreviewDto | null>(null);
   const [documentTarget, setDocumentTarget] = useState<ContractAddendumDto | null>(null);
   const [documentLoading, setDocumentLoading] = useState(false);
+
+  const { user } = useCurrentUser();
+  const currentRole = normalizeRole(user?.role);
+  const canEditAddendum = currentRole === "Admin" || currentRole === "HR";
+  const canDirectorApprove = currentRole === "Admin" || currentRole === "Director";
 
   const { triggerAlert } = useNotification();
   const alertRef = useRef(triggerAlert);
@@ -295,10 +302,10 @@ export const ContractAddendumManagement = () => {
   };
 
   const handleSubmit = (id: number) => {
-    alertRef.current("confirm", "Gửi duyệt phụ lục", "Bạn muốn gửi phụ lục này cho Giám đốc phê duyệt?", async () => {
+    alertRef.current("confirm", "Gửi duyệt phụ lục", "Bạn muốn gửi phụ lục này cho Trưởng phòng xác nhận?", async () => {
       try {
         await contractAddendumApi.submit(id);
-        alertRef.current("success", "Đã gửi duyệt", "Phụ lục đã chuyển sang trạng thái chờ Giám đốc.");
+        alertRef.current("success", "Đã gửi duyệt", "Phụ lục đã chuyển sang trạng thái chờ Trưởng phòng xác nhận.");
         fetchData();
       } catch (err: unknown) {
         const e = err as { message?: string };
@@ -420,10 +427,10 @@ export const ContractAddendumManagement = () => {
             <RefreshCw size={16} />
             Làm mới
           </button>
-          <button className={primaryButtonClass} onClick={openCreate}>
+          {canEditAddendum && <button className={primaryButtonClass} onClick={openCreate}>
             <FilePlus2 size={16} />
             Tạo phụ lục
-          </button>
+          </button>}
         </div>
       }
     >
@@ -458,7 +465,7 @@ export const ContractAddendumManagement = () => {
                   </div>
 
                   <div className="flex flex-wrap gap-2">
-                    {(addendum.status === "Draft" || addendum.status === "PendingHRRevision") && (
+                    {canEditAddendum && (addendum.status === "Draft" || addendum.status === "PendingHRRevision") && (
                       <>
                         <button className={secondaryButtonClass} onClick={() => openEdit(addendum)}>
                           <FilePenLine size={16} />
@@ -470,7 +477,7 @@ export const ContractAddendumManagement = () => {
                         </button>
                       </>
                     )}
-                    {addendum.status === "PendingDirector" && (
+                    {canDirectorApprove && addendum.status === "PendingDirector" && (
                       <>
                         <button className={dangerButtonClass} onClick={() => { setRejectTarget(addendum); setRejectReason(""); }}>
                           <X size={16} />

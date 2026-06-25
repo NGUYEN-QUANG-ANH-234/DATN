@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 using HRM.backend.src.HRM.Core.Enums;
  using HRM.backend.src.HRM.Core.Entities.EmployeeProfile;
 
-namespace HRM.backend.src.HRM.Core.Entities.RequestHandover
+namespace HRM.backend.src.HRM.Core.Entities.WorkflowRequests
 {
     [Table("employment_history")]
     public class EmploymentHistory

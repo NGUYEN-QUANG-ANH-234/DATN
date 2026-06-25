@@ -61,11 +61,19 @@ export const leaveRequestApi = {
     return await axiosClient.get(`${ENDPOINT}/pending-director`);
   },
 
+  getPendingHR: async (): Promise<{ success: boolean; data: LeaveRequest[] }> => {
+    return await axiosClient.get(`${ENDPOINT}/pending-hr`);
+  },
+
   reviewByDept: async (id: number, isApproved: boolean) => {
     return await axiosClient.patch(`${ENDPOINT}/${id}/dept-approve`, { isApproved });
   },
 
   finalApprove: async (id: number, isApproved: boolean) => {
     return await axiosClient.patch(`${ENDPOINT}/${id}/final-approve`, { isApproved });
+  },
+
+  hrConfirm: async (id: number, isApproved: boolean) => {
+    return await axiosClient.patch(`${ENDPOINT}/${id}/hr-confirm`, { isApproved });
   },
 };

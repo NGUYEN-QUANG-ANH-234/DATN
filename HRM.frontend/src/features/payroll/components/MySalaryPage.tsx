@@ -14,11 +14,13 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { Button, Card, StatusBadge } from "../../../components/ui";
+import { useCurrentUser } from "../../../core/auth/hooks/useCurrentUser";
+import { normalizeRole } from "../../../core/auth/roleAccess";
 import { FeaturePage } from "../../../core/components/FeatureShell";
 import { usePayrollPeriod } from "../hooks/usePayrollPeriod";
 import { useMySalarySlips } from "../hooks/useMySalarySlips";
 import type { ExternalTimesheetSource, ProjectBonusSource, SalarySlip, SalarySlipDetail } from "../types/payroll";
-import { formatMoney, formatNumber } from "../utils";
+import { formatMoney, formatNumber, getPayrollStatusLabel, normalizePayrollStatus } from "../utils";
 
 const statusLabel: Record<string, string> = {
   Draft: "Bản nháp",
@@ -39,14 +41,18 @@ const importantIncomeCodes = new Set([
   "BASE_SALARY",
   "KPI_BONUS",
   "PROJECT_BONUS",
+  "INTERN_ALLOWANCE",
   "EXTERNAL_TIMESHEET_PAY",
   "OVERTIME_PAY",
   "SENIORITY_ALLOWANCE",
 ]);
 
 export const MySalaryPage = () => {
+  const { user } = useCurrentUser();
+  const role = normalizeRole(user?.role);
+  const accessMode = role === "Admin" ? "scope" : "self";
   const { month, year, period, setMonth, setYear } = usePayrollPeriod();
-  const payroll = useMySalarySlips(period);
+  const payroll = useMySalarySlips(period, accessMode);
   const slip = payroll.activeSlip;
 
   const incomeDetails = getIncomeDetails(slip);
@@ -54,6 +60,7 @@ export const MySalaryPage = () => {
   const projectBonusSources = getProjectBonusSources(slip);
   const externalTimesheetSources = getExternalTimesheetSources(slip);
   const kpiBonus = sumByCodes(slip, ["KPI_BONUS"]);
+  const internAllowance = sumByCodes(slip, ["INTERN_ALLOWANCE"]);
   const projectBonus = sumByCodes(slip, ["PROJECT_BONUS"]);
   const externalTimesheet = sumByCodes(slip, ["EXTERNAL_TIMESHEET_PAY"]);
   const overtimePay = sumByCodes(slip, ["OVERTIME_PAY", "OVERTIME_HOURS"]);
@@ -160,8 +167,9 @@ export const MySalaryPage = () => {
 
       {slip ? (
         <>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
             <MetricTile icon={<Banknote size={20} />} label="Lương hợp đồng" value={formatMoney(slip.baseSalary)} />
+            <MetricTile icon={<WalletCards size={20} />} label="Trợ cấp thực tập" value={formatMoney(internAllowance)} />
             <MetricTile icon={<TrendingUp size={20} />} label="Thưởng KPI" value={formatMoney(kpiBonus)} />
             <MetricTile icon={<BriefcaseBusiness size={20} />} label="Thưởng dự án" value={formatMoney(projectBonus)} />
             <MetricTile icon={<Clock3 size={20} />} label="Làm thêm giờ" value={formatMoney(overtimePay)} />
@@ -270,7 +278,10 @@ export const MySalaryPage = () => {
                       </span>
                     </span>
                     <span className="flex items-center gap-3">
-                      <StatusBadge status={item.status} label={getStatusLabel(item.status)} />
+                      <StatusBadge
+                        status={normalizePayrollStatus(item.status)}
+                        label={getStatusLabel(item.status, item.statusText)}
+                      />
                       <span className="font-bold text-[var(--hicas-text-main)]">{formatMoney(item.netSalary)}</span>
                     </span>
                   </button>
@@ -510,7 +521,10 @@ const sumByCodes = (slip: SalarySlip | null | undefined, codes: string[]) => {
     .reduce((sum, detail) => sum + Number(detail.amount || 0), 0);
 };
 
-const getStatusLabel = (status: string) => statusLabel[status] ?? status;
+const getStatusLabel = (status: SalarySlip["status"], fallbackLabel?: string | null) => {
+  const normalized = normalizePayrollStatus(status);
+  return fallbackLabel || statusLabel[normalized] || getPayrollStatusLabel(status);
+};
 
 const formatDate = (value?: string | null) => {
   if (!value) return "-";

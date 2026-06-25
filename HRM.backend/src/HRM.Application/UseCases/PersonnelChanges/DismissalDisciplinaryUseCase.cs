@@ -3,12 +3,14 @@ using HRM.backend.src.HRM.Application.Interfaces;
 using HRM.backend.src.HRM.Application.Interfaces.PersonnelChanges.Services;
 using HRM.backend.src.HRM.Application.Interfaces.PersonnelChanges.UseCases;
 using HRM.backend.src.HRM.Core.Entities.EmployeeProfile;
+using HRM.backend.src.HRM.Core.Entities.System;
 using HRM.backend.src.HRM.Core.Entities.PersonnelChanges;
-using HRM.backend.src.HRM.Core.Entities.RequestHandover;
+using HRM.backend.src.HRM.Core.Entities.WorkflowRequests;
 using HRM.backend.src.HRM.Core.Entities.TasksTraining;
 using HRM.backend.src.HRM.Core.Enums;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.EmployeeProfile;
+using HRM.backend.src.HRM.Core.Interfaces.Repositories.Organization;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.PersonnelChanges;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.System;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.TasksTraining;
@@ -19,6 +21,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
     {
         private readonly IPersonnelChangeRepository _personnelChangeRepo;
         private readonly IEmployeeRepository _employeeRepo;
+        private readonly IDepartmentRepository _departmentRepo;
         private readonly IPenaltyRecordRepository _penaltyRecordRepo;
         private readonly IAccountRepository _accountRepo;
         private readonly IBaseRepository<EmploymentHistory> _historyRepo;
@@ -33,6 +36,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
         public DismissalDisciplinaryUseCase(
             IPersonnelChangeRepository personnelChangeRepo,
             IEmployeeRepository employeeRepo,
+            IDepartmentRepository departmentRepo,
             IPenaltyRecordRepository penaltyRecordRepo,
             IAccountRepository accountRepo,
             IBaseRepository<EmploymentHistory> historyRepo,
@@ -46,6 +50,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
         {
             _personnelChangeRepo = personnelChangeRepo;
             _employeeRepo = employeeRepo;
+            _departmentRepo = departmentRepo;
             _penaltyRecordRepo = penaltyRecordRepo;
             _accountRepo = accountRepo;
             _historyRepo = historyRepo;
@@ -63,6 +68,8 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
             int actorAccountId,
             CancellationToken ct)
         {
+            await _accessGuard.EnsureActorHasRoleAsync(actorAccountId, ct, "HR", "Admin");
+
             if (dto.EmployeeId <= 0)
                 throw new ArgumentException("Employee is required.");
             if (dto.SourcePenaltyRecordId <= 0)
@@ -73,9 +80,13 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
             var employee = await _accessGuard.EnsureCanAccessEmployeeAsync(dto.EmployeeId, actorAccountId, ct);
             var penalty = await _penaltyRecordRepo.GetByIdAsync(dto.SourcePenaltyRecordId, ct)
                 ?? throw new KeyNotFoundException("Penalty record was not found.");
+            var actor = await GetActorAccountAsync(actorAccountId, ct);
+            var targetRole = await GetEmployeeRoleNameAsync(employee, ct);
 
             if (penalty.EmployeeId != employee.Id)
                 throw new InvalidOperationException("Penalty record does not belong to the selected employee.");
+            EnsureCanCreateDismissalForTarget(actor, employee, targetRole);
+            EnsurePenaltyRecordCanStartDismissal(penalty);
             await _accessGuard.EnsureContractBelongsToEmployeeAsync(dto.RelatedContractId, employee.Id, ct);
 
             var reason = FirstNonEmpty(dto.Reason, penalty.Reason);
@@ -148,6 +159,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
             return MutateDismissalAsync(id, actorAccountId, async (request, innerCt) =>
             {
                 EnsureStatus(request, PersonnelChangeStatus.PendingHRReview, PersonnelChangeStatus.PendingEmployeeNotification);
+                await EnsureActorIsNotTargetEmployeeAsync(request, actorAccountId, "The target employee cannot notify their own dismissal case.", innerCt);
 
                 _accessGuard.EnsurePersonnelChangeEvidencePath(dto.EvidenceFilePath);
                 request.HRNote = FirstNonEmpty(dto.HRNote, request.HRNote);
@@ -218,6 +230,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
             {
                 EnsureStatus(request, PersonnelChangeStatus.PendingEmployeeExplanation, PersonnelChangeStatus.PendingDirectorApproval);
                 EnsureDirectorCanReview(request);
+                await EnsureCanApproveDismissalAsync(request, actorAccountId, dto, innerCt);
 
                 var oldStatus = request.Status;
                 request.DirectorApprovedByAccountId = dto.IsApproved ? actorAccountId : null;
@@ -262,6 +275,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
 
                 var employee = await _employeeRepo.GetByIdAsync(request.EmployeeId.Value, innerCt)
                     ?? throw new KeyNotFoundException("Employee was not found.");
+                await EnsureCanExecuteDismissalAsync(request, employee, actorAccountId, innerCt);
 
                 if (request.Status == PersonnelChangeStatus.ContractAccepted)
                 {
@@ -343,6 +357,8 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
                 }
             }
 
+            await ClearManagerAssignmentsAsync(employee, effectiveDate, ct);
+
             if (request.RequiresFinalSettlement && !request.RelatedFinalSettlementId.HasValue)
             {
                 var settlement = new FinalSettlement
@@ -360,6 +376,53 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
                 await _finalSettlementRepo.AddAsync(settlement, ct);
                 request.RelatedFinalSettlement = settlement;
             }
+        }
+
+        private async Task ClearManagerAssignmentsAsync(Employee employee, DateTime effectiveDate, CancellationToken ct)
+        {
+            var managedDepartments = (await _departmentRepo.FindAsync(d => d.ManagerId == employee.Id, ct)).ToList();
+            if (managedDepartments.Count > 0)
+            {
+                foreach (var department in managedDepartments)
+                {
+                    department.ManagerId = null;
+                }
+
+                _departmentRepo.UpdateRange(managedDepartments);
+                await AddEmploymentHistoryAsync(
+                    employee.Id,
+                    HistoryType.Termination,
+                    $"DepartmentManagerOf: {string.Join(", ", managedDepartments.Select(d => d.Id))}",
+                    "DepartmentManagerOf: cleared",
+                    effectiveDate,
+                    ct);
+            }
+
+            var directReports = (await _employeeRepo.FindAsync(e =>
+                    e.ManagerId == employee.Id &&
+                    e.Id != employee.Id &&
+                    e.Status != EmployeeStatus.Resigned &&
+                    e.Status != EmployeeStatus.Terminated &&
+                    e.Status != EmployeeStatus.Dismissed,
+                    ct))
+                .ToList();
+
+            if (directReports.Count == 0)
+                return;
+
+            foreach (var directReport in directReports)
+            {
+                directReport.ManagerId = null;
+                await AddEmploymentHistoryAsync(
+                    directReport.Id,
+                    HistoryType.Transfer,
+                    $"ManagerId: {employee.Id}",
+                    "ManagerId: cleared",
+                    effectiveDate,
+                    ct);
+            }
+
+            _employeeRepo.UpdateRange(directReports);
         }
 
         private Task AddEmploymentHistoryAsync(
@@ -391,6 +454,124 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
 
             if (employee.AccountId.HasValue && employee.AccountId.Value != actorAccountId)
                 throw new UnauthorizedAccessException("Only the employee can submit dismissal explanation.");
+        }
+
+        private async Task<Account> GetActorAccountAsync(int actorAccountId, CancellationToken ct)
+        {
+            return await _accountRepo.GetByIdWithRoleAsync(actorAccountId, ct)
+                ?? throw new UnauthorizedAccessException("Actor account was not found.");
+        }
+
+        private async Task<string?> GetEmployeeRoleNameAsync(Employee employee, CancellationToken ct)
+        {
+            if (!employee.AccountId.HasValue)
+                return null;
+
+            var account = await _accountRepo.GetByIdWithRoleAsync(employee.AccountId.Value, ct);
+            return account?.Role.RoleName;
+        }
+
+        private async Task<Employee> GetRequestEmployeeAsync(PersonnelChangeRequest request, CancellationToken ct)
+        {
+            if (!request.EmployeeId.HasValue)
+                throw new InvalidOperationException("Dismissal has no selected employee.");
+
+            return await _employeeRepo.GetByIdAsync(request.EmployeeId.Value, ct)
+                ?? throw new KeyNotFoundException("Employee was not found.");
+        }
+
+        private static void EnsureCanCreateDismissalForTarget(Account actor, Employee target, string? targetRole)
+        {
+            EnsureActorIsNotTargetAccount(actor.Id, target, "You cannot create a dismissal case for yourself.");
+
+            var actorRole = actor.Role.RoleName;
+            if (IsDirectorRole(targetRole))
+            {
+                if (!IsHrRole(actorRole) && !IsAdminRole(actorRole))
+                    throw new UnauthorizedAccessException("Director dismissal records must be created by HR or Admin and attached to external council evidence.");
+                return;
+            }
+
+            if (IsHrRole(targetRole))
+            {
+                if (!IsHrRole(actorRole) && !IsAdminRole(actorRole) && !IsDirectorRole(actorRole))
+                    throw new UnauthorizedAccessException("HR dismissal records must be handled by another HR, Admin, or Director.");
+                return;
+            }
+
+            if (IsManagerRole(targetRole))
+            {
+                if (!IsHrRole(actorRole) && !IsAdminRole(actorRole) && !IsDirectorRole(actorRole))
+                    throw new UnauthorizedAccessException("Manager dismissal records must be created by HR/Admin and then reviewed by Director.");
+            }
+        }
+
+        private static void EnsurePenaltyRecordCanStartDismissal(PenaltyRecord penalty)
+        {
+            if (!penalty.AffectsPersonnelDecision)
+                throw new InvalidOperationException("Penalty record is not marked for personnel decision.");
+
+            if (penalty.Status is not (PenaltyRecordStatus.Approved or PenaltyRecordStatus.Applied))
+                throw new InvalidOperationException("Penalty record must be approved before creating a dismissal case.");
+        }
+
+        private async Task EnsureActorIsNotTargetEmployeeAsync(
+            PersonnelChangeRequest request,
+            int actorAccountId,
+            string message,
+            CancellationToken ct)
+        {
+            var employee = await GetRequestEmployeeAsync(request, ct);
+            EnsureActorIsNotTargetAccount(actorAccountId, employee, message);
+        }
+
+        private async Task EnsureCanApproveDismissalAsync(
+            PersonnelChangeRequest request,
+            int actorAccountId,
+            DirectorApproveDismissalDto dto,
+            CancellationToken ct)
+        {
+            var actor = await GetActorAccountAsync(actorAccountId, ct);
+            var employee = await GetRequestEmployeeAsync(request, ct);
+            var targetRole = await GetEmployeeRoleNameAsync(employee, ct);
+
+            EnsureActorIsNotTargetAccount(actorAccountId, employee, "The target employee cannot approve their own dismissal case.");
+
+            var actorRole = actor.Role.RoleName;
+            if (IsDirectorRole(targetRole))
+            {
+                if (!IsHrRole(actorRole) && !IsAdminRole(actorRole))
+                    throw new UnauthorizedAccessException("Director dismissal approval must be recorded by HR/Admin after external council confirmation.");
+
+                if (dto.IsApproved && string.IsNullOrWhiteSpace(dto.Note))
+                    throw new ArgumentException("External council confirmation note is required for Director dismissal.");
+                return;
+            }
+
+            if (!IsDirectorRole(actorRole) && !IsAdminRole(actorRole))
+                throw new UnauthorizedAccessException("Only Director or Admin can make the final dismissal decision.");
+        }
+
+        private async Task EnsureCanExecuteDismissalAsync(
+            PersonnelChangeRequest request,
+            Employee employee,
+            int actorAccountId,
+            CancellationToken ct)
+        {
+            EnsureActorIsNotTargetAccount(actorAccountId, employee, "The target employee cannot execute their own dismissal case.");
+
+            var actor = await GetActorAccountAsync(actorAccountId, ct);
+            var targetRole = await GetEmployeeRoleNameAsync(employee, ct);
+            var actorRole = actor.Role.RoleName;
+
+            if (IsDirectorRole(targetRole) && !IsHrRole(actorRole) && !IsAdminRole(actorRole))
+                throw new UnauthorizedAccessException("Director dismissal execution must be recorded by HR/Admin after external council confirmation.");
+        }
+
+        private static void EnsureActorIsNotTargetAccount(int actorAccountId, Employee target, string message)
+        {
+            if (target.AccountId.HasValue && target.AccountId.Value == actorAccountId)
+                throw new UnauthorizedAccessException(message);
         }
 
         private async Task AddHistoryAndSnapshotAsync(
@@ -510,5 +691,14 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
         {
             return values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))?.Trim();
         }
+
+        private static bool IsAdminRole(string? role) => IsAnyRole(role, "Admin");
+        private static bool IsHrRole(string? role) => IsAnyRole(role, "HR");
+        private static bool IsDirectorRole(string? role) => IsAnyRole(role, "Director");
+        private static bool IsManagerRole(string? role) => IsAnyRole(role, "Manager", "Truong phong", "Trưởng phòng");
+
+        private static bool IsAnyRole(string? role, params string[] values) =>
+            !string.IsNullOrWhiteSpace(role) &&
+            values.Any(value => string.Equals(role, value, StringComparison.OrdinalIgnoreCase));
     }
 }

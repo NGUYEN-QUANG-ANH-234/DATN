@@ -289,13 +289,25 @@ namespace HRM.backend.src.HRM.Application.UseCases.PayrollAllowances
             EnsurePayrollApprover(actorRole);
 
             var pending = await _payrollRepo.GetByStatusAsync(PayrollStatus.PendingApproval, ct);
-            return pending
+            var pendingPeriods = pending
                 .Where(p => p.Month.HasValue && p.Year.HasValue)
                 .GroupBy(p => new { Month = p.Month!.Value, Year = p.Year!.Value })
                 .OrderByDescending(g => g.Key.Year)
                 .ThenByDescending(g => g.Key.Month)
-                .Select(g => MapPayrollRunSummary(g.ToList(), g.Key.Month, g.Key.Year, includeSlips: false))
+                .Select(g => g.Key)
                 .ToList();
+
+            var result = new List<PayrollRunSummaryDto>();
+            foreach (var period in pendingPeriods)
+            {
+                var payrolls = await _payrollRepo.GetByPeriodAsync(period.Month, period.Year, ct);
+                if (IsRunReadyForDirectorReview(payrolls))
+                {
+                    result.Add(MapPayrollRunSummary(payrolls, period.Month, period.Year, includeSlips: false));
+                }
+            }
+
+            return result;
         }
 
         public async Task<PayrollRunSummaryDto> SubmitPayrollRunAsync(PayrollPeriodDto dto, int actorAccountId, string actorRole, CancellationToken ct = default)
@@ -372,8 +384,8 @@ namespace HRM.backend.src.HRM.Application.UseCases.PayrollAllowances
             if (payrolls.Count == 0)
                 throw new InvalidOperationException("Khong tim thay bang luong can duyet.");
 
-            if (payrolls.Any(p => p.Status != PayrollStatus.PendingApproval))
-                throw new InvalidOperationException("Chi co the xu ly bang luong dang cho phe duyet.");
+            if (!IsRunReadyForDirectorReview(payrolls))
+                throw new InvalidOperationException("Chi co the xu ly khi tat ca phieu luong trong ky dang cho phe duyet.");
 
             var note = review.Note?.Trim();
             if (!review.IsApproved && string.IsNullOrWhiteSpace(note))
@@ -725,13 +737,16 @@ namespace HRM.backend.src.HRM.Application.UseCases.PayrollAllowances
             var distinctStatuses = payrolls.Select(p => p.Status).Distinct().ToList();
             if (distinctStatuses.Count == 1) return distinctStatuses[0];
             if (distinctStatuses.All(status => status == PayrollStatus.Finalized || status == PayrollStatus.Paid)) return PayrollStatus.Finalized;
-            if (distinctStatuses.Contains(PayrollStatus.PendingApproval)) return PayrollStatus.PendingApproval;
+            if (distinctStatuses.Contains(PayrollStatus.PendingApproval)) return PayrollStatus.RevisionRequired;
             if (distinctStatuses.Contains(PayrollStatus.RevisionRequired)) return PayrollStatus.RevisionRequired;
             if (distinctStatuses.Contains(PayrollStatus.Rejected)) return PayrollStatus.Rejected;
             if (distinctStatuses.Contains(PayrollStatus.Approved)) return PayrollStatus.Approved;
             if (distinctStatuses.Contains(PayrollStatus.Calculated)) return PayrollStatus.Calculated;
             return distinctStatuses[0];
         }
+
+        private static bool IsRunReadyForDirectorReview(List<Core.Entities.PayrollAllowances.Payroll> payrolls) =>
+            payrolls.Count > 0 && payrolls.All(p => p.Status == PayrollStatus.PendingApproval);
 
         private static string PayrollStatusLabel(PayrollStatus status)
         {

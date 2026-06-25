@@ -1,7 +1,7 @@
 using HRM.backend.src.HRM.Application.DTOs.TasksTraining;
 using HRM.backend.src.HRM.Application.Interfaces;
 using HRM.backend.src.HRM.Application.Interfaces.TasksTraining.Usecases;
-using HRM.backend.src.HRM.Core.Entities.RequestHandover;
+using HRM.backend.src.HRM.Core.Entities.WorkflowRequests;
 using HRM.backend.src.HRM.Core.Entities.TasksTraining;
 using HRM.backend.src.HRM.Core.Enums;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories;
@@ -36,6 +36,18 @@ namespace HRM.backend.src.HRM.Application.UseCases.TasksTraining
             _lockService = lockService;
         }
 
+        public async Task<List<TrainingSummaryDto>> GetMyLearningAsync(int actorAccountId, CancellationToken ct = default)
+        {
+            var employee = await _employeeRepo.GetByAccountIdAsync(actorAccountId, ct)
+                ?? throw new UnauthorizedAccessException("Account is not linked to an employee profile.");
+
+            var trainings = await _trainingRepo.GetByEmployeeAsync(employee.Id, ct);
+            return trainings
+                .Where(t => t.Status != TrainingStatus.Cancelled)
+                .Select(t => MapTraining(t, t.Tasks.OrderBy(task => task.Deadline).ToList()))
+                .ToList();
+        }
+
         public async Task<TrainingSummaryDto> GetTrainingReportAsync(int trainingId, int actorAccountId, string role, CancellationToken ct = default)
         {
             var training = await _trainingRepo.GetByIdAsync(trainingId, ct)
@@ -53,7 +65,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.TasksTraining
                 throw new UnauthorizedAccessException("Only Manager, HR or Admin can evaluate training.");
 
             var trainings = IsManager(role)
-                ? await _trainingRepo.GetPendingEvaluationByManagerAsync(manager.Id, ct)
+                ? await GetPendingEvaluationsForManagerAsync(manager.Id, actorAccountId, ct)
                 : await _trainingRepo.GetByStatusAsync(TrainingStatus.PendingEvaluation, ct);
             return trainings.Select(t => MapTraining(t, t.Tasks.ToList())).ToList();
         }
@@ -129,9 +141,34 @@ namespace HRM.backend.src.HRM.Application.UseCases.TasksTraining
                 ?? throw new UnauthorizedAccessException("Account is not linked to an employee profile.");
             if (training.ManagerId.HasValue && training.ManagerId == manager.Id)
                 return;
-            if (training.DeptId.HasValue && training.DeptId == manager.DeptId)
+            var managedDeptIds = await GetManagedDepartmentIdsAsync(actorAccountId, ct);
+            if (training.DeptId.HasValue && managedDeptIds.Contains(training.DeptId.Value))
                 return;
             throw new UnauthorizedAccessException("Manager can only evaluate training in their department.");
+        }
+
+        private async Task<List<Training>> GetPendingEvaluationsForManagerAsync(int managerEmployeeId, int actorAccountId, CancellationToken ct)
+        {
+            var managedDeptIds = await GetManagedDepartmentIdsAsync(actorAccountId, ct);
+            var pending = await _trainingRepo.GetByStatusAsync(TrainingStatus.PendingEvaluation, ct);
+            var inProgress = await _trainingRepo.GetByStatusAsync(TrainingStatus.InProgress, ct);
+
+            return pending
+                .Concat(inProgress)
+                .Where(t => t.ManagerId == managerEmployeeId ||
+                            (t.DeptId.HasValue && managedDeptIds.Contains(t.DeptId.Value)))
+                .GroupBy(t => t.Id)
+                .Select(g => g.First())
+                .OrderBy(t => t.EvaluationDeadline)
+                .ToList();
+        }
+
+        private async Task<HashSet<int>> GetManagedDepartmentIdsAsync(int actorAccountId, CancellationToken ct)
+        {
+            var deptIds = await _employeeRepo.GetManagedDepartmentIdsByAccountIdAsync(actorAccountId, ct);
+            if (deptIds.Count == 0)
+                throw new UnauthorizedAccessException("Manager account has no managed department.");
+            return deptIds.ToHashSet();
         }
 
         private static TrainingSummaryDto MapTraining(Training training, List<WorkTask> tasks)

@@ -10,11 +10,11 @@ import type { CreateManualPenaltyRecordRequest, PenaltyRecord, PenaltyTab } from
 const statusOptions = [
   { value: "", label: "Tất cả trạng thái" },
   { value: "PendingEmployeeExplanation", label: "Chờ nhân viên giải trình" },
-  { value: "PendingHRReview", label: "Chờ HR kiểm tra" },
-  { value: "PendingDirectorApproval", label: "Chờ Director duyệt" },
-  { value: "Approved", label: "Đã duyệt" },
-  { value: "Applied", label: "Đã áp dụng" },
-  { value: "Rejected", label: "Từ chối" },
+  { value: "PendingHRReview", label: "Chờ HR xem xét biên bản" },
+  { value: "PendingDirectorApproval", label: "Chờ Giám đốc phê duyệt xử lý" },
+  { value: "Approved", label: "Biên bản có hiệu lực" },
+  { value: "Applied", label: "Đã áp dụng xử lý công" },
+  { value: "Rejected", label: "Biên bản không hiệu lực" },
 ];
 
 const violationTypeOptions = [

@@ -1,4 +1,5 @@
 using HRM.backend.src.HRM.Core.Enums;
+using Microsoft.AspNetCore.Http;
 
 namespace HRM.backend.src.HRM.Application.DTOs.TimeAttendance
 {
@@ -43,6 +44,14 @@ namespace HRM.backend.src.HRM.Application.DTOs.TimeAttendance
         public DateTime GeneratedAt { get; set; }
     }
 
+    public class AttendancePeriodApprovalDto
+    {
+        public byte Month { get; set; }
+        public short Year { get; set; }
+        public string Period { get; set; } = string.Empty;
+        public List<AttendanceSummaryResponseDto> Summaries { get; set; } = new();
+    }
+
     public class AttendanceDailySummaryResponseDto
     {
         public int Id { get; set; }
@@ -66,6 +75,23 @@ namespace HRM.backend.src.HRM.Application.DTOs.TimeAttendance
         public DateTime GeneratedAt { get; set; }
     }
 
+    public class AttendanceAdjustmentLogResponseDto
+    {
+        public int Id { get; set; }
+        public int AttendanceDailySummaryId { get; set; }
+        public int EmployeeId { get; set; }
+        public string EmployeeCode { get; set; } = string.Empty;
+        public string EmployeeName { get; set; } = string.Empty;
+        public string? DepartmentName { get; set; }
+        public DateTime WorkDate { get; set; }
+        public int AdjustedByAccountId { get; set; }
+        public string AdjustedByName { get; set; } = string.Empty;
+        public DateTime AdjustedAt { get; set; }
+        public string Reason { get; set; } = string.Empty;
+        public string? OldValueJson { get; set; }
+        public string? NewValueJson { get; set; }
+    }
+
     public class AdjustAttendanceDailySummaryDto
     {
         public int? WorkingMinutes { get; set; }
@@ -75,5 +101,30 @@ namespace HRM.backend.src.HRM.Application.DTOs.TimeAttendance
         public decimal? WorkdayValue { get; set; }
         public AttendanceDailyStatus? AttendanceStatus { get; set; }
         public required string Reason { get; set; }
+    }
+
+    public class ImportAttendanceDailySummaryDto
+    {
+        public byte Month { get; set; }
+        public short Year { get; set; }
+        public required IFormFile File { get; set; }
+        public string? Reason { get; set; }
+    }
+
+    public class AttendanceDailyImportResultDto
+    {
+        public int TotalRows { get; set; }
+        public int UpdatedRows { get; set; }
+        public int CreatedRows { get; set; }
+        public int ErrorRows { get; set; }
+        public List<AttendanceDailyImportErrorDto> Errors { get; set; } = new();
+    }
+
+    public class AttendanceDailyImportErrorDto
+    {
+        public int RowNumber { get; set; }
+        public string EmployeeCode { get; set; } = string.Empty;
+        public string WorkDate { get; set; } = string.Empty;
+        public string Message { get; set; } = string.Empty;
     }
 }

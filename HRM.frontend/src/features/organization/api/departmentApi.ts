@@ -4,8 +4,10 @@ import type { DepartmentTree, UpdateDepartmentPayload } from "../types/departmen
 const ENDPOINT = "/departments";
 
 export const departmentApi = {
-  getTree: async (): Promise<{ success: boolean; data: DepartmentTree[] }> => {
-    return await axiosClient.get(`${ENDPOINT}/tree`);
+  getTree: async (includeInactive = false): Promise<{ success: boolean; data: DepartmentTree[] }> => {
+    return await axiosClient.get(`${ENDPOINT}/tree`, {
+      params: { includeInactive },
+    });
   },
 
   updateStructure: async (id: number, newParentId: number | null) => {
@@ -20,6 +22,14 @@ export const departmentApi = {
 
   deactivate: async (id: number) => {
     return await axiosClient.patch(`${ENDPOINT}/${id}/deactivate`);
+  },
+
+  activate: async (id: number) => {
+    return await axiosClient.patch(`${ENDPOINT}/${id}/activate`);
+  },
+
+  delete: async (id: number) => {
+    return await axiosClient.delete(`${ENDPOINT}/${id}`);
   },
 
   create: async (data: {

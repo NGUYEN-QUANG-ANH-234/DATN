@@ -17,6 +17,9 @@ export interface TrainingSummary {
 }
 
 export const trainingApi = {
+  getMyLearning: async (): Promise<{ success: boolean; data: TrainingSummary[] }> =>
+    await axiosClient.get("/training/my-learning"),
+
   getPending: async (): Promise<{ success: boolean; data: TrainingSummary[] }> =>
     await axiosClient.get("/training/pending-evaluation"),
 

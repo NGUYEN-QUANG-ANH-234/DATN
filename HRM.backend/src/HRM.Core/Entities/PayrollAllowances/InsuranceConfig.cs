@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using HRM.backend.src.HRM.Core.Entities.System;
 using HRM.backend.src.HRM.Core.Enums;
 
 namespace HRM.backend.src.HRM.Core.Entities.PayrollAllowances
@@ -33,6 +34,7 @@ namespace HRM.backend.src.HRM.Core.Entities.PayrollAllowances
         [StringLength(200)] public string? SourceRef { get; set; }
         public int? SupersedesVersionId { get; set; }
         public int? CreatedByAccountId { get; set; }
+        [ForeignKey(nameof(CreatedByAccountId))] public virtual Account? CreatedByAccount { get; set; }
         public DateTime? ActivatedAt { get; set; }
         public bool LockedAfterUsed { get; set; }
         public bool IsActive { get; set; } = true;

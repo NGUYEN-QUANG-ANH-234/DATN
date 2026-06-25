@@ -21,7 +21,7 @@ namespace HRM.backend.src.HRM.Application.Interfaces.EmployeeProfile.Usecases
         Task<ContractDocumentDownloadDto> DownloadDocumentDocAsync(int contractId, CancellationToken ct);
         Task<ContractDocumentDownloadDto> DownloadDocumentPdfAsync(int contractId, CancellationToken ct);
         Task<ContractDocumentPreviewDto> IssueDocumentAsync(int contractId, IssueContractDocumentDto dto, int actorAccountId, string actorRoleName, CancellationToken ct);
-        Task<IEnumerable<ContractResponseDto>> GetPendingDeptAsync(CancellationToken ct);
+        Task<IEnumerable<ContractResponseDto>> GetPendingDeptAsync(int actorAccountId, string actorRoleName, CancellationToken ct);
         Task<IEnumerable<ContractResponseDto>> GetPendingHRAsync(CancellationToken ct);
         Task<IEnumerable<ContractResponseDto>> GetPendingDirectorAsync(int actorAccountId, string actorRoleName, CancellationToken ct);
     }

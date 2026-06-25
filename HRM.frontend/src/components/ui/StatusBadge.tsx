@@ -1,8 +1,8 @@
-import { getStatusConfig, normalizeStatusKey, statusMap } from "../../data/statusMap";
+import { getStatusConfig, normalizeStatusKey, statusMap, type StatusValue } from "../../data/statusMap";
 import { Badge } from "./Badge";
 
 export type StatusBadgeProps = {
-  status?: string | null;
+  status?: StatusValue;
   label?: string;
 };
 

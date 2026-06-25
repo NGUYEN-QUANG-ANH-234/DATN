@@ -230,12 +230,14 @@ namespace HRM.backend.src.HRM.Application.UseCases.Recruitment
             if (candidate == null) throw new InvalidOperationException("Không tìm thấy ứng viên.");
             if (candidate.Status != CandidateStatus.New) throw new InvalidOperationException("Hồ sơ đã được xử lý trước đó.");
 
-            var request = await _reqRepo.GetByIdAsync(candidate.RecruitmentRequestId ?? 0, ct);
+            var request = await _reqRepo.GetByIdWithCandidatesAsync(candidate.RecruitmentRequestId ?? 0, ct);
             if (request == null || !request.DeptId.HasValue) throw new InvalidOperationException("Yêu cầu tuyển dụng không xác định được phòng ban.");
             await EnsureManagerCanAccessRequestAsync(request, actorId, actorRoleName, ct);
 
+            var configuredManagerEmployee = request.Department?.Manager;
             var managerAccountIds = await _accountRepo.GetAccountIdsByRoleAsync("Manager", ct);
             var managerEmployee = (await _employeeRepo.FindAsync(e => e.DeptId == request.DeptId && e.AccountId.HasValue && managerAccountIds.Contains(e.AccountId.Value), ct)).FirstOrDefault();
+            managerEmployee = configuredManagerEmployee?.AccountId.HasValue == true ? configuredManagerEmployee : managerEmployee;
             if (managerEmployee == null) throw new InvalidOperationException("Không tìm thấy Trưởng phòng của phòng ban này.");
 
             var directorAccountIds = await _accountRepo.GetAccountIdsByRoleAsync("Director", ct);
@@ -281,9 +283,12 @@ namespace HRM.backend.src.HRM.Application.UseCases.Recruitment
             {
             var candidate = await _candidateRepo.GetByIdAsync(candidateId, ct);
             if (candidate == null) throw new InvalidOperationException("Không tìm thấy ứng viên.");
-            await EnsureManagerCanAccessCandidateAsync(candidate, approverId, actorRoleName, ct);
+            if (candidate.Status != CandidateStatus.Interview_Pending)
+                throw new InvalidOperationException("Ho so ung vien khong o trang thai cho Truong phong duyet.");
+            await EnsureManagerCanAccessCandidateAsync(candidate, approverId, actorRoleName, innerCt);
             
-            await _approvalService.ProcessStepAsync("CANDIDATE", candidateId, approverId, actorRoleName, true, "Department Approved", ct);
+            await EnsureCandidateDepartmentApprovalWorkflowAsync(candidate, innerCt);
+            await _approvalService.ProcessStepAsync("CANDIDATE", candidateId, approverId, actorRoleName, true, "Department Approved", innerCt);
             return true;
             }, cancellationToken: ct);
         }
@@ -294,7 +299,9 @@ namespace HRM.backend.src.HRM.Application.UseCases.Recruitment
             {
             var candidate = await _candidateRepo.GetByIdAsync(candidateId, ct);
             if (candidate == null) throw new InvalidOperationException("Không tìm thấy ứng viên.");
-            await EnsureManagerCanAccessCandidateAsync(candidate, approverId, actorRoleName, ct);
+            if (candidate.Status != CandidateStatus.Interview_Passed)
+                throw new InvalidOperationException("Ho so ung vien chua qua buoc Truong phong duyet.");
+            await EnsureManagerCanAccessCandidateAsync(candidate, approverId, actorRoleName, innerCt);
 
             // TRỌNG TÂM: Check SLA chặn trước theo đúng sơ đồ
             var slaTask = await _slaTrackingRepo.GetPendingTaskAsync(SlaModuleType.CandidateApproval, candidateId, ct);
@@ -311,7 +318,8 @@ namespace HRM.backend.src.HRM.Application.UseCases.Recruitment
             }
 
             // Đẩy luồng duyệt đi tiếp (Sẽ kích hoạt CandidateApprovalCompletedHandler)
-            await _approvalService.ProcessStepAsync("CANDIDATE", candidateId, approverId, actorRoleName, true, "Director Final Approved", ct);
+            await EnsureCandidateDirectorApprovalWorkflowAsync(candidate, innerCt);
+            await _approvalService.ProcessStepAsync("CANDIDATE", candidateId, approverId, actorRoleName, true, "Director Final Approved", innerCt);
             return true;
             }, cancellationToken: ct);
         }
@@ -358,6 +366,48 @@ namespace HRM.backend.src.HRM.Application.UseCases.Recruitment
                 throw new InvalidOperationException("Yêu cầu tuyển dụng không tồn tại.");
 
             await EnsureManagerCanAccessRequestAsync(request, actorId, actorRoleName, ct);
+        }
+
+        private async Task EnsureCandidateDepartmentApprovalWorkflowAsync(Candidate candidate, CancellationToken ct)
+        {
+            var request = await _reqRepo.GetByIdWithCandidatesAsync(candidate.RecruitmentRequestId ?? 0, ct);
+            if (request == null || !request.DeptId.HasValue)
+                throw new InvalidOperationException("Khong xac dinh duoc phong ban tuyen dung cua ung vien.");
+
+            var configuredManager = request.Department?.Manager;
+            var managerAccountId = configuredManager?.AccountId;
+            if (!managerAccountId.HasValue)
+            {
+                var managerAccountIds = await _accountRepo.GetAccountIdsByRoleAsync("Manager", ct);
+                var managerEmployee = (await _employeeRepo.FindAsync(
+                    e => e.DeptId == request.DeptId.Value &&
+                         e.AccountId.HasValue &&
+                         managerAccountIds.Contains(e.AccountId.Value),
+                    ct)).FirstOrDefault();
+                managerAccountId = managerEmployee?.AccountId;
+            }
+
+            if (!managerAccountId.HasValue)
+                throw new InvalidOperationException("Khong tim thay Truong phong de duyet ho so ung vien.");
+
+            var directorId = await GetDirectorApproverIdAsync(ct);
+            await _approvalService.CreateWorkflowAsync("CANDIDATE", candidate.Id, new List<int> { managerAccountId.Value, directorId }, ct);
+        }
+
+        private async Task EnsureCandidateDirectorApprovalWorkflowAsync(Candidate candidate, CancellationToken ct)
+        {
+            var directorId = await GetDirectorApproverIdAsync(ct);
+            await _approvalService.CreateWorkflowAsync("CANDIDATE", candidate.Id, new List<int> { directorId }, ct);
+        }
+
+        private async Task<int> GetDirectorApproverIdAsync(CancellationToken ct)
+        {
+            var directorAccountIds = await _accountRepo.GetAccountIdsByRoleAsync("Director", ct);
+            var directorId = directorAccountIds.FirstOrDefault();
+            if (directorId == 0)
+                throw new InvalidOperationException("Khong tim thay Giam doc trong he thong.");
+
+            return directorId;
         }
 
         private async Task EnsureManagerCanAccessRequestAsync(RecruitmentRequest request, int actorId, string actorRoleName, CancellationToken ct)

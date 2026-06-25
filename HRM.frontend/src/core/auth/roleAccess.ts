@@ -25,30 +25,98 @@ export const ROLE_LABELS: Record<AppRole, string> = {
 
 export const ROLE_GROUPS = {
   all: APP_ROLES,
-  systemConfig: ["Admin", "HR", "Director"],
+  systemConfig: ["Admin"],
   systemAdmin: ["Admin"],
   hrAdmin: ["Admin", "HR"],
-  organization: ["Admin", "HR", "Director"],
-  recruitmentPublic: ["Admin", "HR", "Manager", "Director", "Employee", "Intern", "Candidate"],
+  organization: ["Admin"],
+  recruitmentPublic: [
+    "Admin",
+    "HR",
+    "Manager",
+    "Director",
+    "Employee",
+    "Intern",
+    "Candidate",
+  ],
   recruitmentOps: ["Admin", "HR", "Manager", "Director"],
   recruitmentDemandCreators: ["Admin", "HR", "Manager"],
-  employeeSelf: ["HR", "Manager", "Director", "Employee", "Intern"],
+  employeeSelf: [
+    "HR",
+    "Manager",
+    "Director",
+    "Employee",
+    "Intern",
+    "Collaborator",
+  ],
+  employeeProfileUpdate: ["HR", "Manager", "Director", "Employee", "Intern"],
+  employeeContractRequest: ["Employee", "Manager", "Intern"],
   employeeAdmin: ["Admin", "HR"],
+  employeeContractWorkflow: ["Admin", "HR", "Manager"],
   employeeAdminDirector: ["Admin", "HR", "Director"],
-  attendanceSelf: ["Admin", "HR", "Manager", "Employee", "Intern"],
+  attendanceSelf: ["Admin", "HR", "Manager", "Employee"],
+  overtimeSelf: ["Admin", "HR", "Manager", "Employee"],
   attendanceSummary: ["Admin", "HR"],
   leave: ["Admin", "HR", "Manager", "Director", "Employee", "Intern"],
-  performanceContributors: ["Admin", "HR", "Manager", "Employee", "Intern"],
+  performanceContributors: [
+    "Admin",
+    "HR",
+    "Manager",
+    "Employee",
+    "Intern",
+    "Collaborator",
+  ],
   performanceManagers: ["Admin", "HR", "Manager"],
+  performanceReviewers: ["Admin", "Manager"],
   performanceDiscipline: ["Admin", "HR", "Manager", "Director"],
   payrollSensitive: ["Admin", "HR", "Director"],
   payrollAdjustments: ["Admin", "HR"],
-  payrollSlips: ["Admin", "HR", "Manager", "Director", "Employee", "Intern", "Collaborator"],
+  payrollSlips: [
+    "Admin",
+    "HR",
+    "Manager",
+    "Director",
+    "Employee",
+    "Intern",
+    "Collaborator",
+  ],
+  personnelChangeTracking: [
+    "Admin",
+    "HR",
+    "Manager",
+    "Director",
+    "Employee",
+    "Intern",
+    "Collaborator",
+  ],
   personnelChange: ["Admin", "HR", "Manager", "Director"],
   personnelChangeExecutive: ["Admin", "HR", "Director"],
-  documentForms: ["Admin", "HR", "Manager", "Director", "Employee", "Intern", "Collaborator"],
-  approvalInbox: ["Admin", "HR", "Manager", "Director"],
-  approvalTracking: ["Admin", "HR", "Manager", "Director", "Employee", "Intern", "Candidate"],
+  documentForms: [
+    "Admin",
+    "HR",
+    "Manager",
+    "Director",
+    "Employee",
+    "Intern",
+    "Collaborator",
+  ],
+  approvalInbox: [
+    "Admin",
+    "HR",
+    "Manager",
+    "Director",
+    "Employee",
+    "Intern",
+    "Collaborator",
+  ],
+  approvalTracking: [
+    "Admin",
+    "HR",
+    "Manager",
+    "Director",
+    "Employee",
+    "Intern",
+    "Collaborator",
+  ],
 } as const satisfies Record<string, RoleList>;
 
 const ROLE_ALIASES: Record<string, AppRole> = {
@@ -84,19 +152,27 @@ export const normalizeRole = (role?: string | null): AppRole | undefined => {
   const raw = String(role || "").trim();
   if (!raw) return undefined;
 
-  const exact = APP_ROLES.find((item) => item.toLowerCase() === raw.toLowerCase());
+  const exact = APP_ROLES.find(
+    (item) => item.toLowerCase() === raw.toLowerCase(),
+  );
   if (exact) return exact;
 
   return ROLE_ALIASES[raw.toLowerCase()];
 };
 
-export const hasAnyRole = (allowedRoles: readonly string[], role?: string | null) => {
+export const hasAnyRole = (
+  allowedRoles: readonly string[],
+  role?: string | null,
+) => {
   if (allowedRoles.length === 0) return true;
 
   const normalized = normalizeRole(role);
   if (!normalized) return false;
+  if (normalized === "Admin") return true;
 
-  return allowedRoles.some((item) => item.toLowerCase() === normalized.toLowerCase());
+  return allowedRoles.some(
+    (item) => item.toLowerCase() === normalized.toLowerCase(),
+  );
 };
 
 export const getRoleLabel = (role?: string | null) => {

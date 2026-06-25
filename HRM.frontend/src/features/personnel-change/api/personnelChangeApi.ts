@@ -59,6 +59,11 @@ export const personnelChangeApi = {
       { params },
     ),
 
+  getMyActionItems: async () =>
+    axiosClient.get<ApiResponse<PersonnelChangeListItem[]>, ApiResponse<PersonnelChangeListItem[]>>(
+      `${ENDPOINT}/my-actions`,
+    ),
+
   getDetail: async (id: number) =>
     axiosClient.get<ApiResponse<PersonnelChangeDetail>, ApiResponse<PersonnelChangeDetail>>(
       `${ENDPOINT}/${id}`,

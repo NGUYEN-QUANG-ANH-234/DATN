@@ -134,6 +134,7 @@ namespace HRM.backend.src.HRM.Application.Services.System.PayrollSources
     {
         public IReadOnlyCollection<PayrollSourceDefinition> GetSources() => new List<PayrollSourceDefinition>
         {
+            Source("intern_allowance_amount", "Trợ cấp thực tập", "Lương", SalaryVariableDataType.Money, SalaryAggregationType.Latest, true),
             Source("project_bonus_amount", "Thưởng dự án", "Lương", SalaryVariableDataType.Money, SalaryAggregationType.MonthlyTotal, true)
         };
     }

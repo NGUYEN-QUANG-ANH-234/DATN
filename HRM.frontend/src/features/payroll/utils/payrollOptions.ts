@@ -2,7 +2,58 @@ import type {
   CreatePayrollAdjustmentRequest,
   PayrollAdjustmentType,
   PayrollFormulaPreviewLine,
+  PayrollStatus,
 } from "../types/payroll";
+
+const payrollStatusKeys = [
+  "Draft",
+  "Calculated",
+  "HRReviewed",
+  "PendingApproval",
+  "Approved",
+  "Locked",
+  "Finalized",
+  "Paid",
+  "Cancelled",
+  "RevisionRequired",
+  "Rejected",
+] as const;
+
+export const payrollStatusLabels: Record<string, string> = {
+  Draft: "Bản nháp",
+  Calculated: "Đã tổng hợp",
+  HRReviewed: "HR đã kiểm tra",
+  PendingApproval: "Chờ duyệt",
+  Approved: "Đã duyệt",
+  Locked: "Đã khóa",
+  Finalized: "Đã chốt",
+  Paid: "Đã chi trả",
+  Cancelled: "Đã hủy",
+  RevisionRequired: "Cần bổ sung",
+  Rejected: "Từ chối",
+};
+
+export const normalizePayrollStatus = (status?: PayrollStatus | string | number | null) => {
+  if (typeof status === "number") {
+    return payrollStatusKeys[status] ?? String(status);
+  }
+
+  const value = String(status ?? "");
+  if (/^\d+$/.test(value)) {
+    const numericStatus = Number(value);
+    return payrollStatusKeys[numericStatus] ?? value;
+  }
+
+  return value;
+};
+
+export const getPayrollStatusLabel = (
+  status?: PayrollStatus | string | number | null,
+  fallbackLabel?: string | null,
+) => {
+  const normalized = normalizePayrollStatus(status);
+  return fallbackLabel || payrollStatusLabels[normalized] || normalized || "Không xác định";
+};
 
 export const adjustmentTypes: Array<{ value: PayrollAdjustmentType; label: string }> = [
   { value: "RetroactiveSalaryIncrease", label: "Truy lĩnh tăng lương" },
@@ -48,6 +99,16 @@ export const formulaPreviewLines: PayrollFormulaPreviewLine[] = [
     componentName: "Thưởng KPI thực nhận",
     expression: "kpi_bonus_amount * kpi_score / 100",
     calculationOrder: 80,
+    isGrossComponent: true,
+    isTaxable: true,
+    isInsuranceBased: false,
+    isDeduction: false,
+  },
+  {
+    componentCode: "INTERN_ALLOWANCE",
+    componentName: "Trợ cấp thực tập",
+    expression: "intern_allowance_amount",
+    calculationOrder: 75,
     isGrossComponent: true,
     isTaxable: true,
     isInsuranceBased: false,

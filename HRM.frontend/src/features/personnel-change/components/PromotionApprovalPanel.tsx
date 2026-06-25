@@ -18,6 +18,9 @@ import { ContractPicker } from "./PersonnelChangePickers";
 type Props = {
   request?: PersonnelChangeDetail | null;
   saving?: boolean;
+  canHrReview?: boolean;
+  canDirectorApprove?: boolean;
+  canExecute?: boolean;
   onHrReview: (id: number, payload: ApprovePromotionRequest) => Promise<boolean>;
   onDirectorApprove: (id: number, payload: ApprovePromotionRequest) => Promise<boolean>;
   onExecute: (id: number, payload: ExecutePersonnelChangeRequest) => Promise<boolean>;
@@ -26,6 +29,9 @@ type Props = {
 export const PromotionApprovalPanel = ({
   request,
   saving,
+  canHrReview = true,
+  canDirectorApprove = true,
+  canExecute = true,
   onHrReview,
   onDirectorApprove,
   onExecute,
@@ -52,7 +58,7 @@ export const PromotionApprovalPanel = ({
 
   const disabled = !request || saving;
   const executeBlockedReason = getContractFlowExecutionBlockReason(request);
-  const executeDisabled = disabled || !canExecutePersonnelChange(request);
+  const executeDisabled = disabled || !canExecute || !canExecutePersonnelChange(request);
 
   const submitHrReview = async (event: FormEvent) => {
     event.preventDefault();
@@ -90,6 +96,7 @@ export const PromotionApprovalPanel = ({
           </div>
         </div>
 
+        {canHrReview ? (
         <form className="grid gap-3 md:grid-cols-2" onSubmit={submitHrReview}>
           <Select
             label="Quyết định HR"
@@ -130,7 +137,9 @@ export const PromotionApprovalPanel = ({
             </Button>
           </div>
         </form>
+        ) : null}
 
+        {canDirectorApprove ? (
         <form className="grid gap-3 md:grid-cols-2" onSubmit={submitDirectorReview}>
           <Select
             label="Quyết định phê duyệt"
@@ -177,7 +186,9 @@ export const PromotionApprovalPanel = ({
             </Button>
           </div>
         </form>
+        ) : null}
 
+        {canExecute ? (
         <form className="grid gap-3 md:grid-cols-2" onSubmit={submitExecute}>
           <Input
             label="Thời điểm hoàn tất"
@@ -203,6 +214,7 @@ export const PromotionApprovalPanel = ({
             </Button>
           </div>
         </form>
+        ) : null}
       </div>
     </Card>
   );

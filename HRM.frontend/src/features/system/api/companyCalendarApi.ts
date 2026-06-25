@@ -8,6 +8,10 @@ import type {
 const ENDPOINT = "/system/company-calendar";
 
 export const companyCalendarApi = {
+  getActiveByYear: async (year: number): Promise<CompanyCalendarResponse<CompanyCalendar | null>> => {
+    return await axiosClient.get(`${ENDPOINT}/active/${year}`);
+  },
+
   getByYear: async (year: number): Promise<CompanyCalendarResponse<CompanyCalendar[]>> => {
     return await axiosClient.get(`${ENDPOINT}/${year}`);
   },

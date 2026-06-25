@@ -7,6 +7,21 @@
     <UserSecretsId>214d5a82-dad8-4ecd-9d7c-1e3aee6a94a7</UserSecretsId>
   </PropertyGroup>
 
+  <ItemGroup>
+    <Compile Remove="src\HRM.Application\Mappings\**" />
+    <Compile Remove="src\HRM.Application\Validators\**" />
+    <Compile Remove="src\HRM.Core\DomainServices\**" />
+    <Content Remove="src\HRM.Application\Mappings\**" />
+    <Content Remove="src\HRM.Application\Validators\**" />
+    <Content Remove="src\HRM.Core\DomainServices\**" />
+    <EmbeddedResource Remove="src\HRM.Application\Mappings\**" />
+    <EmbeddedResource Remove="src\HRM.Application\Validators\**" />
+    <EmbeddedResource Remove="src\HRM.Core\DomainServices\**" />
+    <None Remove="src\HRM.Application\Mappings\**" />
+    <None Remove="src\HRM.Application\Validators\**" />
+    <None Remove="src\HRM.Core\DomainServices\**" />
+  </ItemGroup>
+
 	<ItemGroup>
 		<PackageReference Include="AutoMapper.Extensions.Microsoft.DependencyInjection" Version="12.0.1" />
 		<PackageReference Include="BCrypt.Net-Next" Version="4.1.0" />
@@ -71,7 +86,6 @@
     <Folder Include="src\HRM.Application\Interfaces\TasksTraining\Usecases\" />
     <Folder Include="src\HRM.Application\Interfaces\TimeAttendance\Services\" />
     <Folder Include="src\HRM.Application\Interfaces\TimeAttendance\Usecases\" />
-    <Folder Include="src\HRM.Application\Mappings\" />
     <Folder Include="src\HRM.Application\Services\EmployeeProfile\" />
     <Folder Include="src\HRM.Application\Services\Organization\" />
     <Folder Include="src\HRM.Application\Services\PayrollAllowances\" />
@@ -84,8 +98,6 @@
     <Folder Include="src\HRM.Application\UseCases\RequestHandover\" />
     <Folder Include="src\HRM.Application\UseCases\TasksTraining\" />
     <Folder Include="src\HRM.Application\UseCases\TimeAttendance\" />
-    <Folder Include="src\HRM.Application\Validators\" />
-    <Folder Include="src\HRM.Core\DomainServices\" />
     <Folder Include="src\HRM.Infrastructure\Persistence\Repositories\PayrollAllowances\" />
     <Folder Include="src\HRM.Infrastructure\Persistence\Repositories\TasksTraining\" />
     <Folder Include="tests\" />

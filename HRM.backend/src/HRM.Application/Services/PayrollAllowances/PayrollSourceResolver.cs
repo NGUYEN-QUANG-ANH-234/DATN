@@ -367,6 +367,8 @@ namespace HRM.backend.src.HRM.Application.Services.PayrollAllowances
                                (toggles.EnableOvertime || !line.ComponentCode.StartsWith("OT_", StringComparison.OrdinalIgnoreCase)))
                 .Select(line => CloneFormulaLine(line, toggles))
                 .ToList();
+            if (!lines.Any(line => string.Equals(line.ComponentCode, "INTERN_ALLOWANCE", StringComparison.OrdinalIgnoreCase)))
+                lines.Add(Line("INTERN_ALLOWANCE", "intern_allowance_amount", 75, true, true, false, false));
             if (!lines.Any(line => string.Equals(line.ComponentCode, "PROJECT_BONUS", StringComparison.OrdinalIgnoreCase)))
                 lines.Add(Line("PROJECT_BONUS", "project_bonus_amount", 87, true, true, false, false));
 
@@ -460,6 +462,7 @@ namespace HRM.backend.src.HRM.Application.Services.PayrollAllowances
             var employeeComponentAmounts = source.SalaryComponents
                 .GroupBy(c => c.SalaryComponentType.Code, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(g => g.Key, g => g.Sum(c => c.Amount), StringComparer.OrdinalIgnoreCase);
+            var internAllowanceAmount = ResolveInternAllowance(source, employeeComponentAmounts);
 
             var legacyInsuranceTaxableAllowance = source.LegacyAllowances
                 .Where(a => a.AllowanceType?.IsInsuranceBase == true)
@@ -583,6 +586,7 @@ namespace HRM.backend.src.HRM.Application.Services.PayrollAllowances
                 ["meal_allowance_per_day"] = featureToggles.EnableMealAllowance
                     ? employeeComponentAmounts.GetValueOrDefault("MEAL_ALLOWANCE")
                     : 0m,
+                ["intern_allowance_amount"] = internAllowanceAmount,
                 ["kpi_bonus_amount"] = employeeComponentAmounts.GetValueOrDefault("KPI_BONUS"),
                 ["kpi_score"] = source.PerformanceReview?.TotalScore ?? 0,
                 ["dependent_count"] = source.DependentCount,
@@ -696,6 +700,7 @@ namespace HRM.backend.src.HRM.Application.Services.PayrollAllowances
                     Line("LEGACY_INSURANCE_ALLOWANCE", "legacy_insurance_allowance", 50, true, true, true, false),
                     Line("LEGACY_TAXABLE_ALLOWANCE", "legacy_taxable_allowance", 60, true, true, false, false),
                     Line("LEGACY_NONTAXABLE_ALLOWANCE", "legacy_nontaxable_allowance", 70, true, false, false, false),
+                    Line("INTERN_ALLOWANCE", "intern_allowance_amount", 75, true, true, false, false),
                     Line("KPI_BONUS", useKpiScorePayout ? KpiBonusPayoutExpression : "kpi_bonus_amount", 80, true, true, false, false),
                     Line("EXTERNAL_TIMESHEET_PAY", "external_timesheet_amount", 85, true, true, false, false),
                     Line("PROJECT_BONUS", "project_bonus_amount", 87, true, true, false, false),
@@ -741,6 +746,22 @@ namespace HRM.backend.src.HRM.Application.Services.PayrollAllowances
         private static decimal ResolveComponentOrPolicy(Dictionary<string, decimal> components, string code, decimal policyAmount)
         {
             return components.TryGetValue(code, out var componentAmount) && componentAmount > 0 ? componentAmount : policyAmount;
+        }
+
+        private static decimal ResolveInternAllowance(PayrollCalculationSource source, Dictionary<string, decimal> components)
+        {
+            if (source.Employee.Type != EmployeeType.Intern)
+                return 0m;
+
+            if (components.TryGetValue("INTERN_ALLOWANCE", out var configuredAmount) && configuredAmount > 0)
+                return configuredAmount;
+
+            return source.AllowanceTaxPolicies
+                .Where(policy => string.Equals(policy.Code, "HICAS_INTERN_ALLOWANCE_2026", StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(policy => policy.EffectiveFrom)
+                .ThenByDescending(policy => policy.Version)
+                .Select(policy => policy.Amount ?? 0m)
+                .FirstOrDefault();
         }
 
         private static bool IsInsuranceContributionEnabled(PayrollCalculationSource source, decimal unpaidLeaveWorkdays)

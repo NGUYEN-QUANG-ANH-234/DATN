@@ -4,7 +4,7 @@ using HRM.backend.src.HRM.Application.Interfaces.PersonnelChanges.Services;
 using HRM.backend.src.HRM.Application.Interfaces.PersonnelChanges.UseCases;
 using HRM.backend.src.HRM.Core.Entities.EmployeeProfile;
 using HRM.backend.src.HRM.Core.Entities.PersonnelChanges;
-using HRM.backend.src.HRM.Core.Entities.RequestHandover;
+using HRM.backend.src.HRM.Core.Entities.WorkflowRequests;
 using HRM.backend.src.HRM.Core.Enums;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.EmployeeProfile;
@@ -128,7 +128,11 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
                 EnsureStatus(request, PersonnelChangeStatus.PendingManagerReview);
                 if (!request.EmployeeId.HasValue)
                     throw new InvalidOperationException("Resignation requires an employee before manager review.");
-                await _accessGuard.EnsureCanAccessEmployeeAsync(request.EmployeeId.Value, actorAccountId, innerCt);
+                await _accessGuard.EnsureCurrentManagerCanActAsync(
+                    request.CurrentManagerId,
+                    actorAccountId,
+                    "review this resignation",
+                    innerCt);
 
                 var oldStatus = request.Status;
                 request.ManagerNote = TrimOrNull(dto.Note);
@@ -151,6 +155,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
         {
             return MutateResignationAsync(id, actorAccountId, async (request, innerCt) =>
             {
+                await _accessGuard.EnsureActorHasRoleAsync(actorAccountId, innerCt, "HR", "Admin");
                 EnsureStatus(request, PersonnelChangeStatus.PendingHRReview);
 
                 var oldStatus = request.Status;
@@ -185,6 +190,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
         {
             return MutateResignationAsync(id, actorAccountId, async (request, innerCt) =>
             {
+                await _accessGuard.EnsureActorHasRoleAsync(actorAccountId, innerCt, "Director", "Admin");
                 EnsureStatus(request, PersonnelChangeStatus.PendingDirectorApproval);
 
                 var oldStatus = request.Status;
@@ -221,6 +227,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
         {
             return MutateResignationAsync(id, actorAccountId, async (request, innerCt) =>
             {
+                await _accessGuard.EnsureActorHasRoleAsync(actorAccountId, innerCt, "HR", "Admin");
                 EnsureStatus(request, PersonnelChangeStatus.ContractAccepted, PersonnelChangeStatus.ReadyToExecute);
                 _contractFlowService.EnsureCanExecute(request);
 

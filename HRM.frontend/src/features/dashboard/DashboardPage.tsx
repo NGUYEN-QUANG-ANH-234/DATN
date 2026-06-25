@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Activity,
@@ -7,6 +13,7 @@ import {
   ArrowRight,
   BriefcaseBusiness,
   CalendarCheck,
+  CalendarDays,
   CheckCircle2,
   ChevronRight,
   ClipboardCheck,
@@ -30,6 +37,8 @@ import {
   secondaryButtonClass,
 } from "../../core/components/FeatureShell";
 import { DrawerForm } from "../../components/ui";
+import { companyCalendarApi } from "../system/api/companyCalendarApi";
+import type { CompanyCalendarDay } from "../system/types/companyCalendar";
 import { dashboardApi } from "./api/dashboardApi";
 import type {
   ApiResponse,
@@ -76,10 +85,34 @@ const SEVERITY_COLORS: Record<DashboardSeverity, string> = {
   danger: HICAS_CHART.red,
 };
 
+type DashboardPeriod = {
+  month: number;
+  year: number;
+};
+
+type CalendarMarker = "workday" | "holiday" | null;
+
+const DASHBOARD_WEEKDAYS = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
+const HOLIDAY_DAY_TYPES = new Set([
+  "0",
+  "1",
+  "3",
+  "4",
+  "5",
+  "PublicHoliday",
+  "CompanyHoliday",
+  "CompensatoryDayOff",
+  "SpecialPaidLeave",
+  "UnpaidCompanyClosure",
+]);
+const WORKING_DAY_OVERRIDE_TYPES = new Set(["2", "CompensatoryWorkingDay"]);
+
 const unwrap = <T,>(response: ApiResponse<T>): T => {
   const data = response.data ?? response.Data;
   if (!data) {
-    throw new Error(response.message || response.Message || "Chưa có dữ liệu tổng quan.");
+    throw new Error(
+      response.message || response.Message || "Chưa có dữ liệu tổng quan.",
+    );
   }
   return data;
 };
@@ -92,13 +125,32 @@ const currentPeriod = () => {
   };
 };
 
+const shiftPeriod = (
+  period: DashboardPeriod,
+  step: number,
+): DashboardPeriod => {
+  const date = new Date(period.year, period.month - 1 + step, 1);
+  return { month: date.getMonth() + 1, year: date.getFullYear() };
+};
+
+const isSamePeriod = (left: DashboardPeriod, right: DashboardPeriod) =>
+  left.month === right.month && left.year === right.year;
+
 const DashboardPage = () => {
   const navigate = useNavigate();
   const [period, setPeriod] = useState(currentPeriod);
+  const [calendarPeriod, setCalendarPeriod] = useState(currentPeriod);
   const [dashboard, setDashboard] = useState<DashboardResponse | null>(null);
+  const [companyCalendarDays, setCompanyCalendarDays] = useState<
+    CompanyCalendarDay[]
+  >([]);
+  const [calendarLoading, setCalendarLoading] = useState(false);
+  const [calendarError, setCalendarError] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [selectedWidget, setSelectedWidget] = useState<DashboardWidget | null>(null);
+  const [selectedWidget, setSelectedWidget] = useState<DashboardWidget | null>(
+    null,
+  );
   const [drilldown, setDrilldown] = useState<DashboardDrilldown | null>(null);
   const [drilldownLoading, setDrilldownLoading] = useState(false);
 
@@ -111,24 +163,54 @@ const DashboardPage = () => {
     setLoading(true);
     setError("");
     try {
-      const response = await dashboardApi.getDashboard(period.month, period.year);
+      const response = await dashboardApi.getDashboard(
+        period.month,
+        period.year,
+      );
       setDashboard(unwrap(response));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Không thể tải dữ liệu tổng quan.");
+      setError(
+        err instanceof Error ? err.message : "Không thể tải dữ liệu tổng quan.",
+      );
     } finally {
       setLoading(false);
     }
   }, [period.month, period.year]);
 
+  const fetchCompanyCalendar = useCallback(async () => {
+    setCalendarLoading(true);
+    setCalendarError("");
+    try {
+      const response = await companyCalendarApi.getActiveByYear(
+        calendarPeriod.year,
+      );
+      setCompanyCalendarDays(response.data?.days ?? []);
+    } catch (err) {
+      setCompanyCalendarDays([]);
+      setCalendarError(
+        err instanceof Error ? err.message : "Không thể tải lịch làm việc.",
+      );
+    } finally {
+      setCalendarLoading(false);
+    }
+  }, [calendarPeriod.year]);
+
   useEffect(() => {
     void fetchDashboard();
   }, [fetchDashboard]);
 
+  useEffect(() => {
+    void fetchCompanyCalendar();
+  }, [fetchCompanyCalendar]);
+
   const changeMonth = (step: number) => {
-    setPeriod((current) => {
-      const date = new Date(current.year, current.month - 1 + step, 1);
-      return { month: date.getMonth() + 1, year: date.getFullYear() };
-    });
+    const nextPeriod = shiftPeriod(period, step);
+    setPeriod(nextPeriod);
+    setCalendarPeriod(nextPeriod);
+  };
+
+  const changeCalendarMonth = (step: number) => {
+    setCalendarPeriod((current) => shiftPeriod(current, step));
   };
 
   const openDrilldown = async (widget: DashboardWidget) => {
@@ -204,19 +286,39 @@ const DashboardPage = () => {
       description="Theo dõi nhanh các chỉ số cần chú ý trong kỳ."
       actions={
         <div className="flex flex-wrap items-center gap-2">
-          <button type="button" className={secondaryButtonClass} onClick={() => changeMonth(-1)}>
+          <button
+            type="button"
+            className={secondaryButtonClass}
+            onClick={() => changeMonth(-1)}
+          >
             <ArrowLeft size={16} />
             Tháng trước
           </button>
           <div className="inline-flex min-h-[42px] items-center rounded-[var(--radius-md)] border border-[var(--hicas-border)] bg-white px-4 text-sm font-semibold text-[var(--hicas-text-main)]">
             {periodLabel}
           </div>
-          <button type="button" className={secondaryButtonClass} onClick={() => changeMonth(1)}>
+          <button
+            type="button"
+            className={secondaryButtonClass}
+            onClick={() => changeMonth(1)}
+          >
             Tháng sau
             <ArrowRight size={16} />
           </button>
-          <button type="button" className={primaryButtonClass} onClick={fetchDashboard} disabled={loading}>
-            {loading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+          <button
+            type="button"
+            className={primaryButtonClass}
+            onClick={() => {
+              void fetchDashboard();
+              void fetchCompanyCalendar();
+            }}
+            disabled={loading}
+          >
+            {loading ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <RefreshCw size={16} />
+            )}
             Làm mới
           </button>
         </div>
@@ -225,7 +327,10 @@ const DashboardPage = () => {
       {loading && (
         <div className="flex min-h-64 items-center justify-center rounded-[var(--radius-md)] border border-dashed border-[var(--hicas-border)] bg-white">
           <div className="flex items-center gap-2 text-sm font-semibold text-[var(--hicas-text-secondary)]">
-            <Loader2 size={18} className="animate-spin text-[var(--hicas-orange)]" />
+            <Loader2
+              size={18}
+              className="animate-spin text-[var(--hicas-orange)]"
+            />
             Đang tải dữ liệu...
           </div>
         </div>
@@ -243,6 +348,16 @@ const DashboardPage = () => {
             dashboard={dashboard}
             onOpenWidget={openDrilldown}
             onOpenSection={openSectionDrilldown}
+          />
+
+          <DashboardWorkCalendar
+            period={calendarPeriod}
+            dashboardPeriod={period}
+            days={companyCalendarDays}
+            loading={calendarLoading}
+            error={calendarError}
+            onChangeMonth={changeCalendarMonth}
+            onResetPeriod={() => setCalendarPeriod(period)}
           />
 
           {dashboard.quickActions.length > 0 && (
@@ -356,7 +471,13 @@ const DashboardChartBoard = ({
             <div className="h-40 min-w-0">
               <DonutChartSvg data={severityData} />
             </div>
-            <ChartLegend data={severityData.map((item) => ({ label: item.name, color: item.fill, value: `${item.value}` }))} />
+            <ChartLegend
+              data={severityData.map((item) => ({
+                label: item.name,
+                color: item.fill,
+                value: `${item.value}`,
+              }))}
+            />
           </div>
         </FeatureCard>
 
@@ -377,6 +498,219 @@ const DashboardChartBoard = ({
   );
 };
 
+const DashboardWorkCalendar = ({
+  period,
+  dashboardPeriod,
+  days,
+  loading,
+  error,
+  onChangeMonth,
+  onResetPeriod,
+}: {
+  period: DashboardPeriod;
+  dashboardPeriod: DashboardPeriod;
+  days: CompanyCalendarDay[];
+  loading: boolean;
+  error: string;
+  onChangeMonth: (step: number) => void;
+  onResetPeriod: () => void;
+}) => {
+  const daysByDate = useMemo(() => {
+    const map = new Map<string, CompanyCalendarDay>();
+    days.forEach((day) => {
+      const key = toCalendarDateKey(day.date);
+      if (key) map.set(key, day);
+    });
+    return map;
+  }, [days]);
+
+  const visibleDays = useMemo(
+    // eslint-disable-next-line react-hooks/preserve-manual-memoization
+    () => buildCalendarGrid(period),
+    [period.month, period.year],
+  );
+  const monthPrefix = `${period.year}-${padDatePart(period.month)}-`;
+  const todayKey = toDateKey(new Date());
+  const holidaysInMonth = useMemo(
+    () =>
+      days
+        .filter((day) => {
+          const key = toCalendarDateKey(day.date);
+          return key.startsWith(monthPrefix) && isCalendarHoliday(day);
+        })
+        .sort((left, right) =>
+          toCalendarDateKey(left.date).localeCompare(
+            toCalendarDateKey(right.date),
+          ),
+        ),
+    [days, monthPrefix],
+  );
+
+  return (
+    <FeatureCard
+      title="Lịch làm việc"
+      description={`Tháng ${String(period.month).padStart(2, "0")}/${period.year}`}
+      actions={
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            className={secondaryButtonClass}
+            onClick={() => onChangeMonth(-1)}
+          >
+            <ArrowLeft size={16} />
+            Tháng trước
+          </button>
+          {!isSamePeriod(period, dashboardPeriod) && (
+            <button
+              type="button"
+              className={secondaryButtonClass}
+              onClick={onResetPeriod}
+            >
+              Kỳ hiện tại
+            </button>
+          )}
+          <button
+            type="button"
+            className={secondaryButtonClass}
+            onClick={() => onChangeMonth(1)}
+          >
+            Tháng sau
+            <ArrowRight size={16} />
+          </button>
+        </div>
+      }
+      className="overflow-hidden"
+    >
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_280px]">
+        <div className="min-w-0 rounded-[var(--radius-md)] border border-[var(--hicas-border)] bg-slate-50/70 p-3">
+          <div className="grid grid-cols-7 gap-2 pb-2">
+            {DASHBOARD_WEEKDAYS.map((day) => (
+              <div
+                key={day}
+                className="flex h-8 items-center justify-center text-xs font-semibold text-[var(--hicas-text-muted)]"
+              >
+                {day}
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-7 gap-2">
+            {visibleDays.map((date) => {
+              const key = toDateKey(date);
+              const inMonth = date.getMonth() + 1 === period.month;
+              const calendarDay = daysByDate.get(key);
+              const marker = inMonth
+                ? resolveCalendarMarker(date, calendarDay)
+                : null;
+              const markerClass =
+                marker === "holiday"
+                  ? "bg-red-500"
+                  : marker === "workday"
+                    ? "bg-sky-500"
+                    : "";
+              const isToday = key === todayKey;
+
+              return (
+                <div
+                  key={key}
+                  title={calendarDay?.name || undefined}
+                  className={[
+                    "flex min-h-[76px] flex-col rounded-[var(--radius-md)] border p-2 text-sm transition sm:min-h-[86px]",
+                    inMonth
+                      ? "border-slate-100 bg-white text-[var(--hicas-text-main)]"
+                      : "border-transparent bg-slate-100/70 text-slate-300",
+                    calendarDay && isCalendarHoliday(calendarDay)
+                      ? "border-red-100 bg-red-50/70"
+                      : "",
+                    isToday ? "ring-2 ring-[var(--hicas-orange-soft)]" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                >
+                  <span
+                    className={[
+                      "inline-flex h-7 w-7 items-center justify-center rounded-full font-semibold",
+                      isToday ? "bg-[var(--hicas-orange)] text-white" : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                  >
+                    {date.getDate()}
+                  </span>
+                  <span className="mt-auto flex min-h-4 items-center justify-center pt-2">
+                    {marker && (
+                      <span className={`h-2 w-2 rounded-full ${markerClass}`} />
+                    )}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="rounded-[var(--radius-md)] border border-[var(--hicas-border)] bg-white p-4">
+          <div className="flex items-center gap-2 text-sm font-semibold text-[var(--hicas-text-main)]">
+            <CalendarDays size={18} className="text-[var(--hicas-orange)]" />
+            Ngày lễ trong tháng
+          </div>
+
+          <div className="mt-4 space-y-3">
+            {loading ? (
+              <div className="flex items-center gap-2 text-sm font-semibold text-[var(--hicas-text-secondary)]">
+                <Loader2
+                  size={16}
+                  className="animate-spin text-[var(--hicas-orange)]"
+                />
+                Đang tải lịch...
+              </div>
+            ) : holidaysInMonth.length > 0 ? (
+              <ul className="space-y-2">
+                {holidaysInMonth.map((day) => (
+                  <li
+                    key={`${day.id}-${day.date}`}
+                    className="rounded-[var(--radius-md)] border border-red-100 bg-red-50 px-3 py-2"
+                  >
+                    <div className="text-sm font-semibold text-red-700">
+                      {formatCalendarDate(day.date)}
+                    </div>
+                    <div className="mt-1 text-sm text-[var(--hicas-text-main)]">
+                      {day.name}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-[var(--hicas-text-secondary)]">
+                Không có ngày lễ trong tháng này.
+              </p>
+            )}
+          </div>
+
+          <div className="mt-5 flex flex-wrap gap-3 border-t border-[var(--hicas-border)] pt-4 text-xs font-semibold text-[var(--hicas-text-secondary)]">
+            <span className="inline-flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-sky-500" />
+              Ngày làm việc
+            </span>
+            <span className="inline-flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-red-500" />
+              Ngày lễ
+            </span>
+            <span className="inline-flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full border border-slate-300 bg-white" />
+              Ngày nghỉ thường
+            </span>
+          </div>
+
+          {error && (
+            <p className="mt-3 rounded-[var(--radius-md)] border border-amber-100 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
+              Đang hiển thị lịch làm việc mặc định.
+            </p>
+          )}
+        </div>
+      </div>
+    </FeatureCard>
+  );
+};
+
 const SectionChartCard = ({
   section,
   onOpen,
@@ -393,7 +727,11 @@ const SectionChartCard = ({
       className="overflow-hidden"
       actions={
         section.table ? (
-          <button type="button" className={secondaryButtonClass} onClick={onOpen}>
+          <button
+            type="button"
+            className={secondaryButtonClass}
+            onClick={onOpen}
+          >
             Mở chi tiết
             <ChevronRight size={16} />
           </button>
@@ -461,24 +799,37 @@ const DashboardDrilldownDrawer = ({
   open: boolean;
   onClose: () => void;
 }) => {
-  const context = getDrilldownContext(drilldown?.type || widget?.drilldown?.type || widget?.id);
+  const context = getDrilldownContext(
+    drilldown?.type || widget?.drilldown?.type || widget?.id,
+  );
 
   return (
     <DrawerForm
       open={open}
       title={drilldown?.title || widget?.title || "Chi tiết"}
-      description={drilldown?.scope || widget?.scope || "Dữ liệu theo phạm vi bạn được xem."}
+      description={
+        drilldown?.scope ||
+        widget?.scope ||
+        "Dữ liệu theo phạm vi bạn được xem."
+      }
       width="xl"
       onClose={onClose}
       footer={
-        <button type="button" className={secondaryButtonClass} onClick={onClose}>
+        <button
+          type="button"
+          className={secondaryButtonClass}
+          onClick={onClose}
+        >
           Đóng
         </button>
       }
     >
       {loading && (
         <div className="flex min-h-60 items-center justify-center text-sm font-semibold text-[var(--hicas-text-secondary)]">
-          <Loader2 size={18} className="mr-2 animate-spin text-[var(--hicas-orange)]" />
+          <Loader2
+            size={18}
+            className="mr-2 animate-spin text-[var(--hicas-orange)]"
+          />
           Đang tải chi tiết...
         </div>
       )}
@@ -511,23 +862,31 @@ const DashboardDrilldownDrawer = ({
   );
 };
 
-const DrilldownContextPanel = ({
-  context,
-}: {
-  context: DrilldownContext;
-}) => (
+const DrilldownContextPanel = ({ context }: { context: DrilldownContext }) => (
   <div className="grid gap-3 lg:grid-cols-3">
     <div className="rounded-[var(--radius-md)] border border-[var(--hicas-orange-soft)] bg-[var(--hicas-orange-lighter)] p-4">
-      <p className="text-xs font-semibold uppercase text-[var(--hicas-orange-dark)]">Cần xem</p>
-      <p className="mt-2 text-sm leading-6 text-[var(--hicas-text-main)]">{context.summary}</p>
+      <p className="text-xs font-semibold uppercase text-[var(--hicas-orange-dark)]">
+        Cần xem
+      </p>
+      <p className="mt-2 text-sm leading-6 text-[var(--hicas-text-main)]">
+        {context.summary}
+      </p>
     </div>
     <div className="rounded-[var(--radius-md)] border border-[var(--hicas-border)] bg-white p-4">
-      <p className="text-xs font-semibold uppercase text-[var(--hicas-text-secondary)]">Nguồn dữ liệu</p>
-      <p className="mt-2 text-sm leading-6 text-[var(--hicas-text-main)]">{context.source}</p>
+      <p className="text-xs font-semibold uppercase text-[var(--hicas-text-secondary)]">
+        Nguồn dữ liệu
+      </p>
+      <p className="mt-2 text-sm leading-6 text-[var(--hicas-text-main)]">
+        {context.source}
+      </p>
     </div>
     <div className="rounded-[var(--radius-md)] border border-[var(--hicas-border)] bg-white p-4">
-      <p className="text-xs font-semibold uppercase text-[var(--hicas-text-secondary)]">Việc tiếp theo</p>
-      <p className="mt-2 text-sm leading-6 text-[var(--hicas-text-main)]">{context.action}</p>
+      <p className="text-xs font-semibold uppercase text-[var(--hicas-text-secondary)]">
+        Việc tiếp theo
+      </p>
+      <p className="mt-2 text-sm leading-6 text-[var(--hicas-text-main)]">
+        {context.action}
+      </p>
     </div>
   </div>
 );
@@ -546,7 +905,9 @@ const DashboardTableView = ({ table }: { table: DashboardTable }) => {
               <th
                 key={column}
                 className={`border-b border-[var(--hicas-border-soft)] px-4 py-3 text-left text-xs font-semibold text-[var(--hicas-text-secondary)] ${
-                  index === 0 ? "sticky left-0 z-10 min-w-[190px] bg-[var(--hicas-bg-soft)]" : "min-w-[160px]"
+                  index === 0
+                    ? "sticky left-0 z-10 min-w-[190px] bg-[var(--hicas-bg-soft)]"
+                    : "min-w-[160px]"
                 }`}
               >
                 {column}
@@ -556,7 +917,10 @@ const DashboardTableView = ({ table }: { table: DashboardTable }) => {
         </thead>
         <tbody className="divide-y divide-[var(--hicas-border-soft)] bg-white">
           {table.rows.map((row, index) => (
-            <tr key={`${index}-${table.columns[0]}`} className="align-top transition hover:bg-[var(--hicas-orange-lighter)]/60">
+            <tr
+              key={`${index}-${table.columns[0]}`}
+              className="align-top transition hover:bg-[var(--hicas-orange-lighter)]/60"
+            >
               {table.columns.map((column, columnIndex) => (
                 <td
                   key={column}
@@ -566,7 +930,9 @@ const DashboardTableView = ({ table }: { table: DashboardTable }) => {
                       : "min-w-[160px] max-w-[360px]"
                   }`}
                 >
-                  <span className="block whitespace-normal break-words">{row[column] || "-"}</span>
+                  <span className="block whitespace-normal break-words">
+                    {row[column] || "-"}
+                  </span>
                 </td>
               ))}
             </tr>
@@ -586,10 +952,17 @@ const ChartLegend = ({
     {data.map((item) => (
       <div key={item.label} className="flex items-start justify-between gap-3">
         <span className="inline-flex min-w-0 items-start gap-2 text-[var(--hicas-text-secondary)]">
-          <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: item.color }} />
+          <span
+            className="h-2.5 w-2.5 shrink-0 rounded-full"
+            style={{ backgroundColor: item.color }}
+          />
           <span className="break-words leading-5">{item.label}</span>
         </span>
-        {item.value && <span className="shrink-0 font-semibold text-[var(--hicas-text-main)]">{item.value}</span>}
+        {item.value && (
+          <span className="shrink-0 font-semibold text-[var(--hicas-text-main)]">
+            {item.value}
+          </span>
+        )}
       </div>
     ))}
   </div>
@@ -632,11 +1005,18 @@ const MetricSignalGrid = ({
                   {item.fullName || item.name}
                 </p>
                 <p className="mt-2 break-words text-3xl font-extrabold tracking-tight text-[var(--hicas-text-main)]">
-                  {item.widget?.value || chartTooltipValue(item.value, item.unit)}
+                  {item.widget?.value ||
+                    chartTooltipValue(item.value, item.unit)}
                 </p>
               </div>
-              <span className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${severityIconClass(severity)}`}>
-                {item.widget ? widgetIcon(item.widget.id, item.widget.drilldown?.type) : <LineChartIcon size={22} />}
+              <span
+                className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${severityIconClass(severity)}`}
+              >
+                {item.widget ? (
+                  widgetIcon(item.widget.id, item.widget.drilldown?.type)
+                ) : (
+                  <LineChartIcon size={22} />
+                )}
               </span>
             </div>
 
@@ -657,7 +1037,9 @@ const MetricSignalGrid = ({
             </div>
 
             <div className="mt-3 flex items-center justify-between gap-3 text-xs font-bold">
-              <span className={`rounded-md px-2 py-1 ${severityBadgeClass(severity)}`}>
+              <span
+                className={`rounded-md px-2 py-1 ${severityBadgeClass(severity)}`}
+              >
                 {severityLabel(severity)}
               </span>
               {clickable && (
@@ -719,7 +1101,12 @@ const TileMapChart = ({
                 {item.value.toLocaleString("vi-VN")} dòng dữ liệu
               </span>
             </span>
-            {clickable && <ChevronRight size={16} className="text-[var(--hicas-orange-dark)]" />}
+            {clickable && (
+              <ChevronRight
+                size={16}
+                className="text-[var(--hicas-orange-dark)]"
+              />
+            )}
           </button>
         );
       })}
@@ -822,8 +1209,18 @@ const HorizontalBarChartSvg = ({
   const max = Math.max(...data.map((item) => item.value), 1);
 
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="h-full w-full" role="img">
-      <text x={margin.left} y={14} fontSize="12" fontWeight="700" fill={HICAS_CHART.slate}>
+    <svg
+      viewBox={`0 0 ${width} ${height}`}
+      className="h-full w-full"
+      role="img"
+    >
+      <text
+        x={margin.left}
+        y={14}
+        fontSize="12"
+        fontWeight="700"
+        fill={HICAS_CHART.slate}
+      >
         {metricLabel}
       </text>
       {data.map((item, index) => {
@@ -831,14 +1228,44 @@ const HorizontalBarChartSvg = ({
         const barWidth = Math.max(3, (item.value / max) * chartWidth);
 
         return (
-          <g key={`${item.name}-${index}`} onClick={onSelect} className={onSelect ? "cursor-pointer" : undefined}>
+          <g
+            key={`${item.name}-${index}`}
+            onClick={onSelect}
+            className={onSelect ? "cursor-pointer" : undefined}
+          >
             <title>{`${item.name}: ${valueFormatter(item)}`}</title>
-            <text x={margin.left - 12} y={y + 20} textAnchor="end" fontSize="12" fill={HICAS_CHART.slate}>
+            <text
+              x={margin.left - 12}
+              y={y + 20}
+              textAnchor="end"
+              fontSize="12"
+              fill={HICAS_CHART.slate}
+            >
               {item.name}
             </text>
-            <rect x={margin.left} y={y + 6} width={chartWidth} height="18" rx="9" fill="#fff7ed" />
-            <rect x={margin.left} y={y + 6} width={barWidth} height="18" rx="9" fill={item.fill} />
-            <text x={margin.left + chartWidth + 12} y={y + 20} fontSize="12" fontWeight="700" fill={HICAS_CHART.charcoal}>
+            <rect
+              x={margin.left}
+              y={y + 6}
+              width={chartWidth}
+              height="18"
+              rx="9"
+              fill="#fff7ed"
+            />
+            <rect
+              x={margin.left}
+              y={y + 6}
+              width={barWidth}
+              height="18"
+              rx="9"
+              fill={item.fill}
+            />
+            <text
+              x={margin.left + chartWidth + 12}
+              y={y + 20}
+              fontSize="12"
+              fontWeight="700"
+              fill={HICAS_CHART.charcoal}
+            >
               {valueFormatter(item)}
             </text>
           </g>
@@ -866,11 +1293,19 @@ const DonutChartSvg = ({
 
   return (
     <svg viewBox="0 0 220 180" className="h-full w-full" role="img">
-      <circle cx="110" cy="88" r={radius} fill="none" stroke="#fff7ed" strokeWidth="28" />
+      <circle
+        cx="110"
+        cy="88"
+        r={radius}
+        fill="none"
+        stroke="#fff7ed"
+        strokeWidth="28"
+      />
       {data.map((item, index) => {
         const value = (item.value / total) * circumference;
         const strokeDasharray = `${value} ${circumference - value}`;
         const strokeDashoffset = -offset;
+        // eslint-disable-next-line react-hooks/immutability
         offset += value;
 
         return (
@@ -893,17 +1328,32 @@ const DonutChartSvg = ({
           </circle>
         );
       })}
-      <text x="110" y="82" textAnchor="middle" fontSize="24" fontWeight="800" fill={HICAS_CHART.charcoal}>
+      <text
+        x="110"
+        y="82"
+        textAnchor="middle"
+        fontSize="24"
+        fontWeight="800"
+        fill={HICAS_CHART.charcoal}
+      >
         {total}
       </text>
-      <text x="110" y="104" textAnchor="middle" fontSize="12" fill={HICAS_CHART.slate}>
+      <text
+        x="110"
+        y="104"
+        textAnchor="middle"
+        fontSize="12"
+        fill={HICAS_CHART.slate}
+      >
         tổng mục
       </text>
     </svg>
   );
 };
 
-const buildSectionChart = (section: DashboardSection):
+const buildSectionChart = (
+  section: DashboardSection,
+):
   | {
       kind: "bar";
       data: Array<{ name: string; value: number }>;
@@ -963,7 +1413,10 @@ const buildSectionChart = (section: DashboardSection):
     return acc;
   }, {});
 
-  const groupedData = Object.entries(grouped).map(([name, value]) => ({ name, value }));
+  const groupedData = Object.entries(grouped).map(([name, value]) => ({
+    name,
+    value,
+  }));
 
   return sectionChartKind === "funnel"
     ? {
@@ -979,7 +1432,8 @@ const buildSectionChart = (section: DashboardSection):
 };
 
 const inferSectionChartKind = (section: DashboardSection) => {
-  const key = `${section.id} ${section.title} ${section.subtitle || ""}`.toLowerCase();
+  const key =
+    `${section.id} ${section.title} ${section.subtitle || ""}`.toLowerCase();
   if (
     key.includes("recruitment") ||
     key.includes("candidate") ||
@@ -1010,12 +1464,18 @@ const findBestMetricColumn = (table: DashboardTable) => {
   ];
 
   const candidates = table.columns.filter((column) =>
-    table.rows.some((row) => parseDisplayValue(String(row[column] || "")).chartValue > 0),
+    table.rows.some(
+      (row) => parseDisplayValue(String(row[column] || "")).chartValue > 0,
+    ),
   );
 
   return (
     preferred.find((column) => candidates.includes(column)) ||
-    candidates.find((column) => !column.toLowerCase().includes("mã") && !column.toLowerCase().includes("ngày"))
+    candidates.find(
+      (column) =>
+        !column.toLowerCase().includes("mã") &&
+        !column.toLowerCase().includes("ngày"),
+    )
   );
 };
 
@@ -1025,13 +1485,24 @@ const findStatusColumn = (table: DashboardTable) =>
   table.columns[0];
 
 const inferColumnUnit = (column: string, sample?: string | null) => {
-  if (column.toLowerCase().includes("chi phí") || column.toLowerCase().includes("gross") || column.toLowerCase().includes("thành tiền")) {
+  if (
+    column.toLowerCase().includes("chi phí") ||
+    column.toLowerCase().includes("gross") ||
+    column.toLowerCase().includes("thành tiền")
+  ) {
     return "triệu đ";
   }
-  if (String(sample || "").includes("%") || column.toLowerCase().includes("tiến độ") || column.toLowerCase().includes("đầy đủ")) {
+  if (
+    String(sample || "").includes("%") ||
+    column.toLowerCase().includes("tiến độ") ||
+    column.toLowerCase().includes("đầy đủ")
+  ) {
     return "%";
   }
-  if (column.toLowerCase().includes("ot") || column.toLowerCase().includes("giờ")) {
+  if (
+    column.toLowerCase().includes("ot") ||
+    column.toLowerCase().includes("giờ")
+  ) {
     return "giờ";
   }
   return "";
@@ -1063,9 +1534,12 @@ const parseDisplayValue = (value?: string | number | null) => {
 };
 
 const chartTooltipValue = (value: number, unit?: string) => {
-  if (unit === "triệu đ") return `${value.toLocaleString("vi-VN", { maximumFractionDigits: 1 })} triệu đ`;
-  if (unit === "%") return `${value.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}%`;
-  if (unit === "giờ") return `${value.toLocaleString("vi-VN", { maximumFractionDigits: 1 })} giờ`;
+  if (unit === "triệu đ")
+    return `${value.toLocaleString("vi-VN", { maximumFractionDigits: 1 })} triệu đ`;
+  if (unit === "%")
+    return `${value.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}%`;
+  if (unit === "giờ")
+    return `${value.toLocaleString("vi-VN", { maximumFractionDigits: 1 })} giờ`;
   return value.toLocaleString("vi-VN", { maximumFractionDigits: 1 });
 };
 
@@ -1088,7 +1562,8 @@ const getDrilldownContext = (type?: string | null): DrilldownContext => {
   if (key.includes("payroll-slip") || key.includes("payroll-summary")) {
     return {
       summary: "Xem cấu phần lương và các khoản cộng trừ trong kỳ.",
-      source: "Phiếu lương, hợp đồng, bảng công, OT, phụ cấp, thuế và bảo hiểm.",
+      source:
+        "Phiếu lương, hợp đồng, bảng công, OT, phụ cấp, thuế và bảo hiểm.",
       action: "Đối chiếu dòng lương bất thường hoặc tải phiếu khi cần.",
     };
   }
@@ -1097,7 +1572,8 @@ const getDrilldownContext = (type?: string | null): DrilldownContext => {
     return {
       summary: "Xem việc đang chờ quyết định và mức độ ưu tiên.",
       source: "Yêu cầu nghiệp vụ, người gửi, phòng ban, SLA và lịch sử xử lý.",
-      action: "Mở hồ sơ liên quan trước khi duyệt, từ chối hoặc yêu cầu bổ sung.",
+      action:
+        "Mở hồ sơ liên quan trước khi duyệt, từ chối hoặc yêu cầu bổ sung.",
     };
   }
 
@@ -1112,15 +1588,18 @@ const getDrilldownContext = (type?: string | null): DrilldownContext => {
   if (key.includes("recruitment") || key.includes("candidate")) {
     return {
       summary: "Theo dõi tiến độ tuyển dụng và ứng viên đang chờ xử lý.",
-      source: "Nhu cầu tuyển dụng, vị trí, pipeline ứng viên và lịch phỏng vấn.",
-      action: "Mở ứng viên hoặc vị trí để gửi phản hồi, cập nhật bước tiếp theo.",
+      source:
+        "Nhu cầu tuyển dụng, vị trí, pipeline ứng viên và lịch phỏng vấn.",
+      action:
+        "Mở ứng viên hoặc vị trí để gửi phản hồi, cập nhật bước tiếp theo.",
     };
   }
 
   if (key.includes("personnel")) {
     return {
       summary: "Xem tác động của thay đổi nhân sự trước khi thực thi.",
-      source: "Hồ sơ nhân sự, phòng ban, chức danh, hợp đồng, lương và timeline.",
+      source:
+        "Hồ sơ nhân sự, phòng ban, chức danh, hợp đồng, lương và timeline.",
       action: "Kiểm tra rủi ro, phát hành quyết định hoặc tiếp tục bước xử lý.",
     };
   }
@@ -1128,7 +1607,8 @@ const getDrilldownContext = (type?: string | null): DrilldownContext => {
   if (key.includes("contract")) {
     return {
       summary: "Theo dõi vòng đời hợp đồng và phụ lục cần xử lý.",
-      source: "Hồ sơ nhân sự, hợp đồng, phụ lục, phiên bản soạn thảo và phê duyệt.",
+      source:
+        "Hồ sơ nhân sự, hợp đồng, phụ lục, phiên bản soạn thảo và phê duyệt.",
       action: "Mở hợp đồng để soạn, chỉnh sửa, duyệt hoặc phát hành.",
     };
   }
@@ -1136,7 +1616,8 @@ const getDrilldownContext = (type?: string | null): DrilldownContext => {
   if (key.includes("profile")) {
     return {
       summary: "Kiểm tra hồ sơ còn thiếu hoặc đang chờ xác nhận.",
-      source: "Thông tin cá nhân, định danh, thuế, ngân hàng, bảo hiểm và tài liệu.",
+      source:
+        "Thông tin cá nhân, định danh, thuế, ngân hàng, bảo hiểm và tài liệu.",
       action: "Yêu cầu bổ sung hoặc mở hồ sơ để cập nhật dữ liệu.",
     };
   }
@@ -1144,7 +1625,8 @@ const getDrilldownContext = (type?: string | null): DrilldownContext => {
   if (key.includes("system") || key.includes("audit")) {
     return {
       summary: "Theo dõi cấu hình, quyền truy cập và thay đổi nhạy cảm.",
-      source: "Cấu hình hệ thống, tài khoản, phân quyền, MFA và nhật ký thao tác.",
+      source:
+        "Cấu hình hệ thống, tài khoản, phân quyền, MFA và nhật ký thao tác.",
       action: "Mở cấu hình hoặc nhật ký để xử lý cảnh báo.",
     };
   }
@@ -1171,7 +1653,8 @@ const normalizeSeverity = (severity?: string): DashboardSeverity =>
     : "neutral";
 
 const severityColor = (severity?: string, fallbackIndex = 0) =>
-  SEVERITY_COLORS[normalizeSeverity(severity)] || CHART_COLORS[fallbackIndex % CHART_COLORS.length];
+  SEVERITY_COLORS[normalizeSeverity(severity)] ||
+  CHART_COLORS[fallbackIndex % CHART_COLORS.length];
 
 const severityIconClass = (severity?: string) => {
   const map: Record<DashboardSeverity, string> = {
@@ -1203,7 +1686,8 @@ const widgetIcon = (id: string, type?: string | null): ReactNode => {
   if (key.includes("approval")) return <ClipboardCheck size={22} />;
   if (key.includes("contract")) return <FileText size={22} />;
   if (key.includes("profile")) return <UserRoundCheck size={22} />;
-  if (key.includes("system") || key.includes("audit")) return <ShieldCheck size={22} />;
+  if (key.includes("system") || key.includes("audit"))
+    return <ShieldCheck size={22} />;
   if (key.includes("kpi")) return <Target size={22} />;
   if (key.includes("training")) return <GraduationCap size={22} />;
   if (key.includes("risk")) return <AlertTriangle size={22} />;
@@ -1223,6 +1707,57 @@ const actionIcon = (icon?: string | null): ReactNode => {
   if (key.includes("file")) return <FileText size={16} />;
   if (key.includes("user")) return <UserRoundCheck size={16} />;
   return <ChevronRight size={16} />;
+};
+
+const padDatePart = (value: number) => String(value).padStart(2, "0");
+
+const toDateKey = (date: Date) =>
+  `${date.getFullYear()}-${padDatePart(date.getMonth() + 1)}-${padDatePart(date.getDate())}`;
+
+const toCalendarDateKey = (value?: string | null) =>
+  value ? value.slice(0, 10) : "";
+
+const buildCalendarGrid = (period: DashboardPeriod) => {
+  const firstDay = new Date(period.year, period.month - 1, 1);
+  const mondayOffset = (firstDay.getDay() + 6) % 7;
+  const start = new Date(period.year, period.month - 1, 1 - mondayOffset);
+
+  return Array.from({ length: 42 }, (_, index) => {
+    const date = new Date(start);
+    date.setDate(start.getDate() + index);
+    return date;
+  });
+};
+
+const isWeekend = (date: Date) => date.getDay() === 0 || date.getDay() === 6;
+
+const dayTypeKey = (day: CompanyCalendarDay) => String(day.dayType);
+
+const isWorkingDayOverride = (day?: CompanyCalendarDay) =>
+  Boolean(
+    day?.isWorkingDayOverride ||
+    (day && WORKING_DAY_OVERRIDE_TYPES.has(dayTypeKey(day))),
+  );
+
+const isCalendarHoliday = (day?: CompanyCalendarDay) =>
+  Boolean(
+    day && HOLIDAY_DAY_TYPES.has(dayTypeKey(day)) && !isWorkingDayOverride(day),
+  );
+
+const resolveCalendarMarker = (
+  date: Date,
+  day?: CompanyCalendarDay,
+): CalendarMarker => {
+  if (isWorkingDayOverride(day)) return "workday";
+  if (isCalendarHoliday(day)) return "holiday";
+  if (isWeekend(date)) return null;
+  return "workday";
+};
+
+const formatCalendarDate = (value: string) => {
+  const key = toCalendarDateKey(value);
+  const [, month, day] = key.split("-");
+  return day && month ? `${day}/${month}` : value;
 };
 
 export default DashboardPage;

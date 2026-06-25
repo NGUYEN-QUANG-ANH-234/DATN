@@ -181,6 +181,8 @@ export const MyProfile: React.FC = () => {
         <InfoSection title="Cá nhân & liên hệ" icon={<UserRound size={18} />}>
           <InfoItem label="Giới tính" value={getGenderText(profile.gender)} />
           <InfoItem label="Ngày sinh" value={formatDate(profile.birthDate)} />
+          <InfoItem label="Quốc tịch" value={fallback(profile.nationality)} />
+          <InfoItem label="Dân tộc" value={fallback(profile.ethnicity)} />
           <InfoItem label="Số điện thoại" value={fallback(profile.phoneNumber)} />
           <InfoItem label="Email cá nhân" value={fallback(profile.personalEmail)} />
           <InfoItem label="Chỗ ở hiện tại" value={fallback(profile.currentAddress)} />

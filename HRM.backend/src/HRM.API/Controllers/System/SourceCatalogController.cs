@@ -48,5 +48,30 @@ namespace HRM.backend.src.HRM.API.Controllers.System
                 return BadRequest(new { success = false, message = ex.Message });
             }
         }
+
+        [HttpDelete("source-catalogs/{id}")]
+        [RequirePermission("SOURCE_CATALOG_UPDATE", GroupName = SystemModules.Config, Description = "Xóa hẳn nguồn dữ liệu hệ thống")]
+        public async Task<IActionResult> DeleteSourceCatalog(int id, CancellationToken ct)
+        {
+            try
+            {
+                var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (!int.TryParse(userIdClaim, out var actorId))
+                {
+                    return Unauthorized(new { success = false, message = "Không xác định được danh tính người dùng." });
+                }
+
+                await _useCase.DeleteSourceCatalogAsync(id, actorId, ct);
+                return Ok(new { success = true, message = "Đã xóa nguồn dữ liệu lương." });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Conflict(new { success = false, message = ex.Message });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+        }
     }
 }

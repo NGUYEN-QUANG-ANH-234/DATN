@@ -7,5 +7,6 @@ namespace HRM.backend.src.HRM.Application.Interfaces.System.UseCases
         Task<IEnumerable<VariableDto>> GetAllVariablesAsync(CancellationToken ct = default);
         Task<bool> DefineVariableAsync(VariableDto dto, int adminId, CancellationToken ct = default);
         Task<bool> SetVariableActiveAsync(string code, bool isActive, int adminId, CancellationToken ct = default);
+        Task<bool> DeleteVariableAsync(string code, int adminId, CancellationToken ct = default);
     }
 }

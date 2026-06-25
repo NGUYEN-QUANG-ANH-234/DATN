@@ -5,8 +5,10 @@ export type StatusConfig = {
   variant: BadgeVariant;
 };
 
-export const normalizeStatusKey = (status?: string | null) =>
-  (status || "").replace(/[_\s-]/g, "").toLowerCase();
+export type StatusValue = string | number | null | undefined;
+
+export const normalizeStatusKey = (status?: StatusValue) =>
+  String(status ?? "").replace(/[_\s-]/g, "").toLowerCase();
 
 export const statusMap: Record<string, StatusConfig> = {
   active: { label: "Đang áp dụng", variant: "success" },
@@ -25,6 +27,8 @@ export const statusMap: Record<string, StatusConfig> = {
   pendingdirector: { label: "Chờ giám đốc duyệt", variant: "warning" },
   pendingemployeeupdate: { label: "Chờ nhân viên cập nhật", variant: "warning" },
   pendingevaluation: { label: "Chờ đánh giá", variant: "warning" },
+  pendingdirectorapproval: { label: "Chờ giám đốc duyệt", variant: "warning" },
+  pendingreviewapproval: { label: "Chờ duyệt", variant: "warning" },
 
   approved: { label: "Đã duyệt", variant: "success" },
   approvedbydirector: { label: "Đã duyệt", variant: "success" },
@@ -41,10 +45,11 @@ export const statusMap: Record<string, StatusConfig> = {
   open: { label: "Đang mở", variant: "success" },
   closed: { label: "Đã đóng", variant: "neutral" },
 
-  calculated: { label: "Đã tính", variant: "info" },
+  calculated: { label: "Đã tổng hợp", variant: "info" },
   hrreviewed: { label: "HR đã kiểm tra", variant: "info" },
   payrolllocked: { label: "Đã khóa lương", variant: "orange" },
   paid: { label: "Đã thanh toán", variant: "success" },
+  revisionrequired: { label: "Cần bổ sung", variant: "warning" },
 
   reconciled: { label: "Đã đối chiếu", variant: "info" },
   autoreconciled: { label: "Tự động đối chiếu", variant: "info" },
@@ -74,19 +79,21 @@ export const statusMap: Record<string, StatusConfig> = {
 };
 
 export const getStatusConfig = (
-  status?: string | null,
+  status?: StatusValue,
   fallbackLabel?: string,
 ): StatusConfig => {
   const key = normalizeStatusKey(status);
+  const rawStatus = String(status ?? "");
+
   return (
     statusMap[key] ?? {
-      label: fallbackLabel || status || "Không xác định",
+      label: fallbackLabel || rawStatus || "Không xác định",
       variant: "neutral",
     }
   );
 };
 
-export const getStatusLabel = (status?: string | null, fallbackLabel?: string) =>
+export const getStatusLabel = (status?: StatusValue, fallbackLabel?: string) =>
   getStatusConfig(status, fallbackLabel).label;
 
-export const getStatusVariant = (status?: string | null) => getStatusConfig(status).variant;
+export const getStatusVariant = (status?: StatusValue) => getStatusConfig(status).variant;

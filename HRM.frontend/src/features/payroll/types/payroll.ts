@@ -11,7 +11,8 @@ export type PayrollStatus =
   | "Paid"
   | "Cancelled"
   | "RevisionRequired"
-  | "Rejected";
+  | "Rejected"
+  | number;
 
 export interface SalarySlipDetail {
   id: number;
@@ -101,6 +102,7 @@ export interface SalarySlip {
   netSalary: number;
   totalCompanyCost: number;
   status: PayrollStatus;
+  statusText?: string | null;
   calculatedAt?: string | null;
   submittedAt?: string | null;
   approvedAt?: string | null;
@@ -409,9 +411,19 @@ export interface PayrollFormula {
   status: PayrollFormulaStatus | string;
   statusText: string;
   deadlineAt?: string | null;
+  createdByAccountId?: number | null;
+  createdByName?: string | null;
+  submittedByAccountId?: number | null;
+  submittedByName?: string | null;
   submittedAt?: string | null;
+  approvedByAccountId?: number | null;
+  approvedByName?: string | null;
   approvedAt?: string | null;
+  activatedByAccountId?: number | null;
+  activatedByName?: string | null;
   activatedAt?: string | null;
+  archivedByAccountId?: number | null;
+  archivedByName?: string | null;
   archivedAt?: string | null;
   rejectReason?: string | null;
   reviewNote?: string | null;
@@ -519,6 +531,9 @@ export interface SalarySlipTableProps {
   loading?: boolean;
   emptyText: string;
   onToggle: (id: number) => void;
+  onSelectMany?: (ids: number[]) => void;
+  onUnselectMany?: (ids: number[]) => void;
+  onClearSelected?: () => void;
   onOpenDetail: (id: number) => void;
 }
 

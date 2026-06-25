@@ -64,3 +64,15 @@ export interface RecruitmentRequestListItem {
 export interface CloseRecruitmentPayload {
   reason?: string;
 }
+
+export interface ReopenRecruitmentPayload {
+  reason?: string;
+  newDeadline?: string;
+}
+
+export interface CloneRecruitmentPayload {
+  quantity?: number;
+  deadline?: string;
+  description?: string;
+  reason?: string;
+}

@@ -23,6 +23,8 @@ namespace HRM.backend.src.HRM.Core.Entities.EmployeeProfile
         // --- Thông tin cá nhân & Địa chỉ ---
         public Gender? Gender { get; set; }
         public DateTime? BirthDate { get; set; }
+        [StringLength(80)] public string? Nationality { get; set; }
+        [StringLength(80)] public string? Ethnicity { get; set; }
         [StringLength(20)] public string? PhoneNumber { get; set; }
         [StringLength(100)] public string? PersonalEmail { get; set; }
         [StringLength(255)] public string? CurrentAddress { get; set; }

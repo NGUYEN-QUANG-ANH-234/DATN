@@ -101,7 +101,7 @@ export const PayrollFeatureTogglePanel = () => {
         </Button>
       }
     >
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="grid max-h-[520px] gap-3 overflow-y-auto pr-1 md:grid-cols-2">
         {toggleItems.map((item) => {
           const Icon = item.icon;
           const key = item.key;

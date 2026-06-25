@@ -123,6 +123,9 @@ export const PayrollAggregationPage = () => {
           selectedIds={payroll.selectedIds}
           loading={payroll.loading}
           onToggle={payroll.toggleSelected}
+          onSelectMany={payroll.selectSlips}
+          onUnselectMany={payroll.unselectSlips}
+          onClearSelected={payroll.clearSelected}
           onOpenDetail={payroll.openDetail}
           emptyText={`Chưa có phiếu lương cho kỳ ${period}.`}
         />

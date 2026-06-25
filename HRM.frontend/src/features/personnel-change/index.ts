@@ -1,4 +1,5 @@
 export { PersonnelChangePage } from "./components/PersonnelChangePage";
+export { PersonnelChangeTrackingPage } from "./components/PersonnelChangeTrackingPage";
 export { InternalTransferDemandForm } from "./components/InternalTransferDemandForm";
 export { HrSelectEmployeePanel } from "./components/HrSelectEmployeePanel";
 export { CurrentManagerOpinionPanel } from "./components/CurrentManagerOpinionPanel";

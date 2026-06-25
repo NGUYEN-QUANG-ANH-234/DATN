@@ -180,20 +180,42 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
             if (employee == null)
                 throw new UnauthorizedAccessException("Tài khoản chưa liên kết hồ sơ nhân sự.");
 
+            if (employee.Type == EmployeeType.Intern)
+                throw new UnauthorizedAccessException("Thuc tap sinh khong can cham cong.");
+
             return employee;
         }
 
-        private async Task<WorkShift?> GetEmployeeShiftAsync(Employee employee, CancellationToken ct)
+        private async Task<AttendanceShiftSnapshotDto?> GetEmployeeShiftAsync(Employee employee, CancellationToken ct)
         {
             if (!employee.DeptId.HasValue)
                 return null;
 
             return await _cache.GetOrSetWithLockAsync(
-                $"shift_config_dept_{employee.DeptId.Value}",
-                async (innerCt) => await _workShiftRepo.GetByDeptIdAsync(employee.DeptId.Value, innerCt),
+                $"shift_config_dept_{employee.DeptId.Value}_v2",
+                async (innerCt) =>
+                {
+                    var shift = await _workShiftRepo.GetByDeptIdAsync(employee.DeptId.Value, innerCt);
+                    return shift == null ? null : MapShiftSnapshot(shift);
+                },
                 TimeSpan.FromHours(12),
                 _lockService,
                 ct: ct);
+        }
+
+        private static AttendanceShiftSnapshotDto MapShiftSnapshot(WorkShift shift)
+        {
+            return new AttendanceShiftSnapshotDto
+            {
+                Id = shift.Id,
+                ShiftName = shift.ShiftName,
+                StartTime = shift.StartTime,
+                EndTime = shift.EndTime,
+                BreakStartTime = shift.BreakStartTime,
+                BreakEndTime = shift.BreakEndTime,
+                LateThresholdMins = shift.LateThresholdMins,
+                EarlyLeaveThresholdMins = shift.EarlyLeaveThresholdMins
+            };
         }
 
         private async Task<AttendanceConfigDto> GetSecurityConfigAsync(CancellationToken ct)
@@ -341,7 +363,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
             return value?.ToString(@"hh\:mm");
         }
 
-        private static AttendanceStatus ResolveCheckInStatus(DateTime now, WorkShift? shift)
+        private static AttendanceStatus ResolveCheckInStatus(DateTime now, AttendanceShiftSnapshotDto? shift)
         {
             if (shift?.StartTime == null)
                 return AttendanceStatus.Valid;
@@ -350,7 +372,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
             return now.TimeOfDay > latestValidCheckIn ? AttendanceStatus.Late : AttendanceStatus.Valid;
         }
 
-        private static DateTime ResolveBusinessDate(DateTime now, WorkShift? shift)
+        private static DateTime ResolveBusinessDate(DateTime now, AttendanceShiftSnapshotDto? shift)
         {
             if (shift?.StartTime == null)
                 return now.Date;
@@ -379,7 +401,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
             }
         }
 
-        private static AttendanceStatus ResolveCheckOutStatus(DateTime now, WorkShift? shift, AttendanceStatus currentStatus)
+        private static AttendanceStatus ResolveCheckOutStatus(DateTime now, AttendanceShiftSnapshotDto? shift, AttendanceStatus currentStatus)
         {
             if (shift?.EndTime == null)
                 return currentStatus;
@@ -391,7 +413,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
             return currentStatus;
         }
 
-        private static int CalculateLateMinutes(DateTime? checkIn, WorkShift? shift)
+        private static int CalculateLateMinutes(DateTime? checkIn, AttendanceShiftSnapshotDto? shift)
         {
             if (!checkIn.HasValue || shift?.StartTime == null)
                 return 0;
@@ -400,7 +422,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
             return CalculateMinutesAfter(checkIn.Value.TimeOfDay, latestValidCheckIn);
         }
 
-        private static int CalculateEarlyLeaveMinutes(DateTime? checkOut, WorkShift? shift)
+        private static int CalculateEarlyLeaveMinutes(DateTime? checkOut, AttendanceShiftSnapshotDto? shift)
         {
             if (!checkOut.HasValue || shift?.EndTime == null)
                 return 0;
@@ -409,7 +431,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
             return CalculateMinutesAfter(earliestValidCheckOut, checkOut.Value.TimeOfDay);
         }
 
-        private static int CalculateOvertimeMinutes(DateTime? checkOut, WorkShift? shift)
+        private static int CalculateOvertimeMinutes(DateTime? checkOut, AttendanceShiftSnapshotDto? shift)
         {
             if (!checkOut.HasValue || shift?.EndTime == null)
                 return 0;
@@ -423,7 +445,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
             return minutes > 0 ? (int)Math.Ceiling(minutes) : 0;
         }
 
-        private static string BuildTodayMessage(string nextAction, WorkShift? shift)
+        private static string BuildTodayMessage(string nextAction, AttendanceShiftSnapshotDto? shift)
         {
             var shiftText = shift == null
                 ? "Bạn chưa được gán ca làm việc theo phòng ban."

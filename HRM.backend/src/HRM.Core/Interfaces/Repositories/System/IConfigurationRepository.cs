@@ -11,6 +11,7 @@ namespace HRM.backend.src.HRM.Core.Interfaces.Repositories.System
         Task EnsureVariableMappingsAsync(IEnumerable<(string Code, string Source, string Description)> variables, CancellationToken ct = default);
         Task SaveMappingAsync(string code, string tablePath, string? description = null, bool isActive = true, CancellationToken ct = default);
         Task SetMappingActiveAsync(string code, bool isActive, CancellationToken ct = default);
+        Task DeleteMappingAsync(string code, CancellationToken ct = default);
 
         // ==========================================
         // 2. SYSTEM CONFIG REPO (SLA & Điểm danh)

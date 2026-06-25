@@ -4,10 +4,12 @@ namespace HRM.backend.src.HRM.Application.Interfaces.System.UseCases
 {
     public interface IOrgTreeUseCase
     {
-        Task<List<DepartmentTreeDto>> GetOrganizationTreeAsync(CancellationToken ct = default);
+        Task<List<DepartmentTreeDto>> GetOrganizationTreeAsync(bool includeInactive = false, CancellationToken ct = default);
         Task<bool> UpdateDepartmentNodeAsync(int deptId, UpdateDeptStructureDto dto, int actorId, CancellationToken ct = default);
         Task<bool> UpdateDepartmentAsync(int deptId, UpdateDepartmentDto dto, int actorId, CancellationToken ct = default);
+        Task<bool> ActivateDepartmentAsync(int deptId, int actorId, CancellationToken ct = default);
         Task<bool> DeactivateDepartmentAsync(int deptId, int actorId, CancellationToken ct = default);
+        Task<bool> DeleteDepartmentAsync(int deptId, int actorId, CancellationToken ct = default);
         Task<int> CreateDepartmentAsync(CreateDepartmentDto dto, int actorId, CancellationToken ct = default);
     }
 }

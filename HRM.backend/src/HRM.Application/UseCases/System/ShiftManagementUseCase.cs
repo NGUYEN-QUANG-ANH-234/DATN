@@ -161,6 +161,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
                 await _unitOfWork.CommitAsync(innerCt);
 
                 await _appCache.RemoveAsync($"shift_config_dept_{dto.DeptId}", innerCt);
+                await _appCache.RemoveAsync($"shift_config_dept_{dto.DeptId}_v2", innerCt);
 
                 return true;
             }, TimeSpan.FromSeconds(10), ct);

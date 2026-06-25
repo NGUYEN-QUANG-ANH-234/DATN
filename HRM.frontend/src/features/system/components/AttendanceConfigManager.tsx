@@ -163,7 +163,7 @@ export const AttendanceConfigManager = () => {
         </Card>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-5">
-          <div className="grid gap-5 xl:grid-cols-2">
+          <div className="grid max-h-[680px] gap-5 overflow-y-auto pr-1 xl:grid-cols-2">
             {offices.map((office, index) => (
               <Card
                 key={index}

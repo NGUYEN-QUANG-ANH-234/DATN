@@ -69,6 +69,11 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.PayrollAll
         private IQueryable<PayrollFormula> BuildQuery()
         {
             return _dbSet
+                .Include(f => f.CreatedByAccount)
+                .Include(f => f.SubmittedByAccount)
+                .Include(f => f.ApprovedByAccount)
+                .Include(f => f.ActivatedByAccount)
+                .Include(f => f.ArchivedByAccount)
                 .Include(f => f.Lines.OrderBy(l => l.CalculationOrder).ThenBy(l => l.Id))
                     .ThenInclude(l => l.SalaryComponentType);
         }

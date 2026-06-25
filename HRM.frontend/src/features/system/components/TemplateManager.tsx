@@ -3,7 +3,9 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
   AlertTriangle,
+  Bell,
   CheckCircle2,
+  Clock3,
   ListChecks,
   MailCheck,
   Plus,
@@ -83,6 +85,7 @@ export const TemplateManager = () => {
   }, [groupedTemplates, templates]);
 
   const selectedTemplateReady = hasConfiguredContent(formData);
+  const preview = useMemo(() => buildNotificationPreview(formData), [formData]);
 
   useEffect(() => {
     if (!selectedKey && templates.length > 0) {
@@ -353,7 +356,7 @@ export const TemplateManager = () => {
                   <p className="font-semibold">Biến hợp lệ</p>
                   <Badge variant="neutral">{formData.allowedPlaceholders.length} biến</Badge>
                 </div>
-                <div className="mt-3 flex flex-wrap gap-2">
+                <div className="mt-3 flex max-h-[150px] flex-wrap gap-2 overflow-y-auto pr-1">
                   {formData.allowedPlaceholders.length > 0 ? (
                     formData.allowedPlaceholders.map((placeholder) => (
                       <span
@@ -440,7 +443,7 @@ export const TemplateManager = () => {
                 </label>
 
                 {formData.customVariables.length > 0 && (
-                  <div className="mt-4 space-y-2">
+                  <div className="mt-4 max-h-[260px] space-y-2 overflow-y-auto pr-1">
                     {formData.customVariables.map((variable) => (
                       <div
                         key={variable.code}
@@ -494,7 +497,13 @@ export const TemplateManager = () => {
                 />
               </label>
 
-              <div className="rounded-xl border border-[var(--hicas-border)] bg-[var(--hicas-bg-soft)] p-4">
+              <NotificationTemplatePreview
+                template={formData}
+                preview={preview}
+                ready={selectedTemplateReady}
+              />
+
+              <div className="hidden">
                 <div className="mb-2 flex items-center justify-between">
                   <p className="text-sm font-semibold">Bản xem trước</p>
                   <Badge variant="neutral">Trong hệ thống / Email</Badge>
@@ -523,7 +532,7 @@ export const TemplateManager = () => {
         description="Theo dõi mẫu đã sẵn sàng dùng và mẫu cần bổ sung nội dung."
         actions={<ListChecks size={20} className="text-[var(--hicas-orange)]" />}
       >
-        <div className="overflow-x-auto">
+        <div className="max-h-[520px] overflow-auto pr-1">
           <table className="w-full min-w-[760px] text-left text-sm">
             <thead>
               <tr className="border-b border-[var(--hicas-border)] text-xs uppercase text-[var(--hicas-text-muted)]">
@@ -561,3 +570,211 @@ export const TemplateManager = () => {
     </div>
   );
 };
+
+type NotificationPreviewModel = {
+  subject: string;
+  bodyHtml: string;
+  recipient: string;
+};
+
+const NotificationTemplatePreview = ({
+  template,
+  preview,
+  ready,
+}: {
+  template: NotificationTemplate;
+  preview: NotificationPreviewModel;
+  ready: boolean;
+}) => (
+  <div className="rounded-xl border border-[var(--hicas-border)] bg-[var(--hicas-bg-soft)] p-4">
+    <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <p className="text-sm font-semibold">Bản xem trước</p>
+        <p className="mt-1 text-xs font-medium text-[var(--hicas-text-secondary)]">
+          Hiển thị theo giao diện người dùng nhận được trong hệ thống và qua email.
+        </p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Badge variant="orange">Trong hệ thống</Badge>
+        <Badge variant="neutral">Email</Badge>
+      </div>
+    </div>
+
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+      <div className="overflow-hidden rounded-2xl border border-[var(--hicas-border)] bg-white shadow-sm">
+        <div className="flex items-start justify-between gap-3 border-b border-[var(--hicas-border-soft)] px-4 py-3">
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--hicas-orange-soft)] text-[var(--hicas-orange)]">
+              <Bell size={19} />
+            </span>
+            <div>
+              <p className="text-sm font-bold text-[var(--hicas-text-main)]">Trung tâm thông báo</p>
+              <p className="text-xs font-semibold text-[var(--hicas-text-muted)]">HICAS HRM</p>
+            </div>
+          </div>
+          <Badge variant="success">Mới</Badge>
+        </div>
+
+        <div className="p-4">
+          <div className="rounded-2xl border border-[var(--hicas-orange-soft)] bg-[linear-gradient(180deg,#fff7ed_0%,#ffffff_100%)] p-4">
+            <div className="flex items-start gap-3">
+              <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--hicas-orange)]" />
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant={ready ? "success" : "warning"}>
+                    {ready ? "Sẵn sàng gửi" : "Đang soạn"}
+                  </Badge>
+                  <span className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--hicas-text-muted)]">
+                    <Clock3 size={13} />
+                    Vừa xong
+                  </span>
+                </div>
+                <p className="mt-3 text-base font-bold leading-6 text-[var(--hicas-text-main)]">
+                  {preview.subject}
+                </p>
+                <div
+                  className="mt-2 text-sm font-medium leading-6 text-[var(--hicas-text-secondary)] [&_a]:font-semibold [&_a]:text-[var(--hicas-orange-dark)] [&_p]:mb-2 [&_strong]:text-[var(--hicas-text-main)] [&_ul]:ml-5 [&_ul]:list-disc"
+                  dangerouslySetInnerHTML={{ __html: preview.bodyHtml }}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold text-[var(--hicas-text-secondary)]">
+            <span className="rounded-full border border-[var(--hicas-border)] bg-white px-3 py-1">
+              {template.category || "Mẫu hệ thống"}
+            </span>
+            <span className="rounded-full border border-[var(--hicas-border)] bg-white px-3 py-1">
+              {template.templateKey || "TEMPLATE_KEY"}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="overflow-hidden rounded-2xl border border-[var(--hicas-border)] bg-white shadow-sm">
+        <div className="border-b border-[var(--hicas-border-soft)] bg-[var(--hicas-bg-soft)] px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-sm font-bold text-[var(--hicas-text-main)]">
+              <MailCheck size={18} className="text-[var(--hicas-orange)]" />
+              Email preview
+            </div>
+            <Badge variant="neutral">no-reply@hicas.vn</Badge>
+          </div>
+        </div>
+
+        <div className="space-y-3 px-4 py-4">
+          <div className="rounded-xl border border-[var(--hicas-border)] bg-white px-3 py-2">
+            <p className="text-xs font-semibold uppercase text-[var(--hicas-text-muted)]">Tiêu đề</p>
+            <p className="mt-1 text-sm font-bold text-[var(--hicas-text-main)]">{preview.subject}</p>
+          </div>
+
+          <div className="grid gap-2 sm:grid-cols-2">
+            <div className="rounded-xl border border-[var(--hicas-border)] bg-white px-3 py-2">
+              <p className="text-xs font-semibold uppercase text-[var(--hicas-text-muted)]">Người gửi</p>
+              <p className="mt-1 truncate text-sm font-semibold text-[var(--hicas-text-main)]">
+                HICAS HRM
+              </p>
+            </div>
+            <div className="rounded-xl border border-[var(--hicas-border)] bg-white px-3 py-2">
+              <p className="text-xs font-semibold uppercase text-[var(--hicas-text-muted)]">Người nhận</p>
+              <p className="mt-1 truncate text-sm font-semibold text-[var(--hicas-text-main)]">
+                {preview.recipient}
+              </p>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-[var(--hicas-border)] bg-white p-5">
+            <div className="border-b border-[var(--hicas-border-soft)] pb-4">
+              <p className="text-lg font-bold text-[var(--hicas-text-main)]">HICAS</p>
+              <p className="mt-1 text-sm font-medium text-[var(--hicas-text-secondary)]">
+                Nền tảng quản trị nhân sự
+              </p>
+            </div>
+            <div
+              className="mt-4 text-sm leading-7 text-[var(--hicas-text-secondary)] [&_a]:font-semibold [&_a]:text-[var(--hicas-orange-dark)] [&_p]:mb-3 [&_strong]:text-[var(--hicas-text-main)] [&_ul]:ml-5 [&_ul]:list-disc"
+              dangerouslySetInnerHTML={{ __html: preview.bodyHtml }}
+            />
+            <div className="mt-5 rounded-xl bg-[var(--hicas-bg-soft)] px-4 py-3 text-xs font-semibold text-[var(--hicas-text-secondary)]">
+              Đây là email tự động từ hệ thống HICAS HRM.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+const buildNotificationPreview = (template: NotificationTemplate): NotificationPreviewModel => {
+  const sampleValues = buildSampleValues(template);
+  const subject = replaceTemplatePlaceholders(
+    template.subject || "Tiêu đề thông báo",
+    sampleValues,
+  );
+  const bodySource = template.bodyHtml || "Nội dung thông báo sẽ hiển thị tại đây.";
+  const replacedBody = replaceTemplatePlaceholders(bodySource, sampleValues);
+  const bodyHtml = looksLikeHtml(replacedBody)
+    ? replacedBody
+    : escapeHtml(replacedBody).replace(/\n/g, "<br />");
+
+  return {
+    subject,
+    bodyHtml,
+    recipient:
+      sampleValues.get("email") ||
+      sampleValues.get("employee_email") ||
+      sampleValues.get("candidate_email") ||
+      "nguyenvana@hicas.vn",
+  };
+};
+
+const buildSampleValues = (template: NotificationTemplate) => {
+  const values = new Map<string, string>();
+  const placeholders = [
+    ...template.allowedPlaceholders,
+    ...template.systemPlaceholders,
+    ...template.customVariables.map((variable) => variable.placeholder || `{${variable.code}}`),
+  ];
+
+  placeholders.forEach((placeholder) => {
+    const code = placeholder.replace(/[{}]/g, "").trim();
+    if (code) values.set(code, sampleValueForCode(code));
+  });
+
+  return values;
+};
+
+const replaceTemplatePlaceholders = (value: string, samples: Map<string, string>) =>
+  value.replace(/\{([a-zA-Z0-9_]+)\}/g, (match, code: string) =>
+    samples.get(code) ?? sampleValueForCode(code) ?? match,
+  );
+
+const sampleValueForCode = (code: string) => {
+  const normalized = code.toLowerCase();
+  if (normalized.includes("email")) return "nguyenvana@hicas.vn";
+  if (normalized.includes("employee") && normalized.includes("name")) return "Nguyễn Văn A";
+  if (normalized.includes("candidate") && normalized.includes("name")) return "Trần Minh Anh";
+  if (normalized === "name" || normalized.endsWith("_name")) return "Nguyễn Văn A";
+  if (normalized.includes("manager")) return "Lê Quang Minh";
+  if (normalized.includes("department")) return "Phòng Công nghệ";
+  if (normalized.includes("position")) return "Chuyên viên Nhân sự";
+  if (normalized.includes("tracking") || normalized.includes("code")) return "HICAS-2026-001";
+  if (normalized.includes("date")) return "19/06/2026";
+  if (normalized.includes("time")) return "09:30";
+  if (normalized.includes("amount") || normalized.includes("salary") || normalized.includes("money")) {
+    return "2.000.000 VND";
+  }
+  if (normalized.includes("reason")) return "Bổ sung hồ sơ theo yêu cầu hệ thống";
+  if (normalized.includes("status")) return "Đã được phê duyệt";
+  if (normalized.includes("url") || normalized.includes("link")) return "https://hrm.hicas.vn/approvals";
+  return "Dữ liệu mẫu";
+};
+
+const looksLikeHtml = (value: string) => /<\/?[a-z][\s\S]*>/i.test(value);
+
+const escapeHtml = (value: string) =>
+  value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");

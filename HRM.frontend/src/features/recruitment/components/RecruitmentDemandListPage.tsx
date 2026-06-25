@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Lock, Plus, RefreshCw } from "lucide-react";
+import { Copy, Lock, Plus, RefreshCw, Unlock } from "lucide-react";
 import {
   EmptyState,
   FeatureCard,
@@ -38,6 +38,24 @@ const getStatusLabel = (status: string) => statusLabels[status] ?? status;
 const getStatusClass = (status: string) =>
   statusClasses[status] ?? "bg-gray-100 text-gray-700 ring-gray-200";
 
+const getErrorMessage = (error: unknown, fallback: string) => {
+  if (typeof error === "object" && error !== null && "response" in error) {
+    const response = (error as { response?: { data?: { message?: string; Message?: string } } })
+      .response;
+    return response?.data?.message || response?.data?.Message || fallback;
+  }
+
+  return fallback;
+};
+
+const getTomorrowInputValue = () => {
+  const date = new Date();
+  date.setDate(date.getDate() + 1);
+  return date.toISOString().slice(0, 10);
+};
+
+const normalizeRole = (role?: string) => (role || "").trim().toLowerCase();
+
 export const RecruitmentDemandListPage = () => {
   const { user } = useCurrentUser();
   const { triggerAlert } = useNotification();
@@ -45,7 +63,7 @@ export const RecruitmentDemandListPage = () => {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("ALL");
-  const [closingId, setClosingId] = useState<number | null>(null);
+  const [processingId, setProcessingId] = useState<number | null>(null);
 
   const loadRequests = async () => {
     setLoading(true);
@@ -95,35 +113,124 @@ export const RecruitmentDemandListPage = () => {
     }),
     [requests],
   );
+
   const canCreateDemand = canAccessPath("/recruitment/demands/create", user?.role, false);
+  const canManagePosting = ["admin", "hr"].includes(normalizeRole(user?.role));
+
+  const updateRequestInList = (updated: RecruitmentRequestListItem) => {
+    setRequests((current) =>
+      current.some((request) => request.id === updated.id)
+        ? current.map((request) => (request.id === updated.id ? updated : request))
+        : [updated, ...current],
+    );
+  };
 
   const handleClose = async (item: RecruitmentRequestListItem) => {
-    const reason = window.prompt("Lý do đóng tuyển dụng", "");
+    const reason = window.prompt("Lý do đóng tin tuyển dụng", "");
     if (reason === null) return;
 
-    setClosingId(item.id);
+    setProcessingId(item.id);
     try {
       const response = await recruitmentApi.closeRequest(item.id, { reason });
-      setRequests((current) =>
-        current.map((request) => (request.id === item.id ? response.data : request)),
-      );
+      updateRequestInList(response.data);
       triggerAlert("success", "Đã đóng tuyển dụng", "Tin tuyển không còn nhận hồ sơ mới.");
     } catch (error) {
       console.error("Không thể đóng tuyển dụng:", error);
       triggerAlert(
         "error",
         "Không thể đóng tuyển dụng",
-        "Vui lòng kiểm tra quyền hoặc trạng thái tin tuyển.",
+        getErrorMessage(error, "Vui lòng kiểm tra quyền hoặc trạng thái tin tuyển."),
       );
     } finally {
-      setClosingId(null);
+      setProcessingId(null);
+    }
+  };
+
+  const handleReopen = async (item: RecruitmentRequestListItem) => {
+    if (item.isFull) {
+      triggerAlert(
+        "warning",
+        "Tin đã đủ chỉ tiêu",
+        "Vui lòng nhân bản tin hoặc tạo nhu cầu mới cho đợt tuyển tiếp theo.",
+      );
+      return;
+    }
+
+    const reason = window.prompt("Lý do mở lại tin tuyển dụng", "");
+    if (reason === null) return;
+
+    const defaultDeadline = item.isExpired ? getTomorrowInputValue() : item.deadline?.slice(0, 10) || "";
+    const newDeadline = window.prompt(
+      "Hạn nhận hồ sơ mới (yyyy-mm-dd). Bắt buộc nếu tin đã quá hạn.",
+      defaultDeadline,
+    );
+    if (newDeadline === null) return;
+
+    setProcessingId(item.id);
+    try {
+      const response = await recruitmentApi.reopenRequest(item.id, {
+        reason,
+        newDeadline: newDeadline.trim() || undefined,
+      });
+      updateRequestInList(response.data);
+      triggerAlert("success", "Đã mở lại tin tuyển dụng", "Ứng viên có thể tiếp tục nộp hồ sơ.");
+    } catch (error) {
+      console.error("Không thể mở lại tuyển dụng:", error);
+      triggerAlert(
+        "error",
+        "Không thể mở lại tin",
+        getErrorMessage(error, "Vui lòng kiểm tra hạn nhận hồ sơ và chỉ tiêu tuyển dụng."),
+      );
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleClone = async (item: RecruitmentRequestListItem) => {
+    const reason = window.prompt("Lý do nhân bản tin tuyển dụng", "");
+    if (reason === null) return;
+
+    const quantityText = window.prompt("Số lượng tuyển cho tin mới", String(item.quantity));
+    if (quantityText === null) return;
+
+    const quantity = Number(quantityText);
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      triggerAlert("warning", "Số lượng không hợp lệ", "Vui lòng nhập số lượng tuyển lớn hơn 0.");
+      return;
+    }
+
+    const deadline = window.prompt("Hạn nhận hồ sơ cho tin mới (yyyy-mm-dd)", getTomorrowInputValue());
+    if (deadline === null) return;
+
+    setProcessingId(item.id);
+    try {
+      const response = await recruitmentApi.cloneRequest(item.id, {
+        reason,
+        quantity,
+        deadline: deadline.trim() || undefined,
+      });
+      updateRequestInList(response.data);
+      triggerAlert(
+        "success",
+        "Đã nhân bản tin tuyển dụng",
+        "Tin mới đã được tạo và đang chờ phê duyệt.",
+      );
+    } catch (error) {
+      console.error("Không thể nhân bản tuyển dụng:", error);
+      triggerAlert(
+        "error",
+        "Không thể nhân bản tin",
+        getErrorMessage(error, "Vui lòng kiểm tra phòng ban, vị trí và hạn nhận hồ sơ."),
+      );
+    } finally {
+      setProcessingId(null);
     }
   };
 
   return (
     <FeaturePage
       title="Quản lý nhu cầu tuyển dụng"
-      description="Theo dõi nhu cầu đã tạo, tin đang tuyển, chỉ tiêu và trạng thái đóng tuyển."
+      description="Theo dõi chỉ tiêu, hồ sơ đang xử lý và trạng thái nhận hồ sơ của từng tin tuyển dụng."
       actions={
         <div className="flex flex-wrap gap-2">
           <button
@@ -136,10 +243,10 @@ export const RecruitmentDemandListPage = () => {
             Làm mới
           </button>
           {canCreateDemand && (
-          <Link to="/recruitment/demands/create" className={primaryButtonClass}>
-            <Plus size={16} />
-            Tạo nhu cầu
-          </Link>
+            <Link to="/recruitment/demands/create" className={primaryButtonClass}>
+              <Plus size={16} />
+              Tạo nhu cầu
+            </Link>
           )}
         </div>
       }
@@ -193,9 +300,9 @@ export const RecruitmentDemandListPage = () => {
             description="Tạo nhu cầu mới hoặc đổi bộ lọc để xem thêm dữ liệu."
           />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-[var(--hicas-border-soft)] text-sm">
-              <thead className="bg-[var(--hicas-bg-soft)] text-left text-xs font-semibold uppercase tracking-wide text-[var(--hicas-text-secondary)]">
+          <div className="max-h-[680px] overflow-auto">
+            <table className="min-w-[1040px] divide-y divide-[var(--hicas-border-soft)] text-sm">
+              <thead className="sticky top-0 z-10 bg-[var(--hicas-bg-soft)] text-left text-xs font-semibold uppercase tracking-wide text-[var(--hicas-text-secondary)]">
                 <tr>
                   <th className="px-4 py-3">Vị trí</th>
                   <th className="px-4 py-3">Trạng thái</th>
@@ -206,7 +313,16 @@ export const RecruitmentDemandListPage = () => {
               </thead>
               <tbody className="divide-y divide-[var(--hicas-border-soft)] bg-white">
                 {filteredRequests.map((item) => {
-                  const canClose = item.status === "Approved" && !item.isClosed;
+                  const isProcessing = processingId === item.id;
+                  const canClose =
+                    canManagePosting && item.status === "Approved" && !item.isClosed && !item.isFull;
+                  const canReopen =
+                    canManagePosting &&
+                    !item.isFull &&
+                    (item.status === "Closed" || (item.status === "Approved" && item.isExpired));
+                  const canClone =
+                    canManagePosting &&
+                    (item.status === "Closed" || item.isExpired || item.isFull);
 
                   return (
                     <tr key={item.id} className="align-top">
@@ -230,9 +346,7 @@ export const RecruitmentDemandListPage = () => {
                           {getStatusLabel(item.status)}
                         </span>
                         {item.isExpired && item.status === "Approved" && (
-                          <p className="mt-2 text-xs font-medium text-amber-700">
-                            Đã quá hạn nộp
-                          </p>
+                          <p className="mt-2 text-xs font-medium text-amber-700">Đã quá hạn nộp</p>
                         )}
                         {item.isFull && (
                           <p className="mt-2 text-xs font-medium text-emerald-700">
@@ -254,17 +368,51 @@ export const RecruitmentDemandListPage = () => {
                       <td className="px-4 py-4 text-[var(--hicas-text-secondary)]">
                         {formatDate(item.deadline)}
                       </td>
-                      <td className="px-4 py-4 text-right">
-                        <button
-                          type="button"
-                          className={secondaryButtonClass}
-                          disabled={!canClose || closingId === item.id}
-                          onClick={() => void handleClose(item)}
-                          title={canClose ? "Đóng tin tuyển dụng" : "Chỉ đóng được tin đang tuyển"}
-                        >
-                          <Lock size={16} />
-                          {closingId === item.id ? "Đang đóng..." : "Đóng tuyển"}
-                        </button>
+                      <td className="px-4 py-4">
+                        <div className="flex flex-wrap justify-end gap-2">
+                          <button
+                            type="button"
+                            className={secondaryButtonClass}
+                            disabled={!canClose || isProcessing}
+                            onClick={() => void handleClose(item)}
+                            title={
+                              canClose
+                                ? "Đóng tin tuyển dụng"
+                                : "Chỉ đóng được tin đang tuyển và chưa đủ chỉ tiêu"
+                            }
+                          >
+                            <Lock size={16} />
+                            Đóng
+                          </button>
+                          <button
+                            type="button"
+                            className={secondaryButtonClass}
+                            disabled={!canReopen || isProcessing}
+                            onClick={() => void handleReopen(item)}
+                            title={
+                              canReopen
+                                ? "Mở lại tin tuyển dụng"
+                                : "Chỉ mở lại tin đã đóng/quá hạn và còn chỉ tiêu"
+                            }
+                          >
+                            <Unlock size={16} />
+                            Mở lại
+                          </button>
+                          <button
+                            type="button"
+                            className={secondaryButtonClass}
+                            disabled={!canClone || isProcessing}
+                            onClick={() => void handleClone(item)}
+                            title={
+                              canClone
+                                ? "Tạo nhu cầu mới từ tin này"
+                                : "Nhân bản dùng cho tin đã đóng, quá hạn hoặc đủ chỉ tiêu"
+                            }
+                          >
+                            <Copy size={16} />
+                            Nhân bản
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );

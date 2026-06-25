@@ -3,6 +3,8 @@ export interface MyProfileDto {
   fullName: string;
   gender: string | null;
   birthDate: string | null;
+  nationality: string | null;
+  ethnicity: string | null;
 
   // --- MỚI THÊM ---
   phoneNumber: string | null;

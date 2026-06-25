@@ -19,7 +19,7 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.System
 
             return await _dbSet
                 .AsNoTracking()
-                .Where(x => paths.Contains(x.SourcePath))
+                .Where(x => !x.IsDeleted && paths.Contains(x.SourcePath))
                 .OrderBy(x => x.Module)
                 .ThenByDescending(x => x.IsActive)
                 .ThenBy(x => x.DisplayName)
@@ -30,7 +30,7 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.System
         {
             return await _dbSet
                 .AsNoTracking()
-                .FirstOrDefaultAsync(x => x.SourcePath == sourcePath && x.IsActive, ct);
+                .FirstOrDefaultAsync(x => x.SourcePath == sourcePath && x.IsActive && !x.IsDeleted, ct);
         }
 
         public async Task SyncSystemPayrollSourcesAsync(IEnumerable<PayrollSourceDefinition> sources, CancellationToken ct = default)
@@ -55,6 +55,11 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.System
                 var sourcePath = definition.Code.Trim();
                 if (existingByCode.TryGetValue(sourcePath, out var existing))
                 {
+                    if (existing.IsDeleted)
+                    {
+                        continue;
+                    }
+
                     existing.DisplayName = definition.DisplayName.Trim();
                     existing.Module = definition.Module.Trim();
                     existing.DataType = definition.DataType;
@@ -77,6 +82,11 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.System
 
             foreach (var catalog in existingCatalogs)
             {
+                if (catalog.IsDeleted)
+                {
+                    continue;
+                }
+
                 if (!definitionCodes.Contains(catalog.SourcePath))
                 {
                     catalog.IsActive = false;

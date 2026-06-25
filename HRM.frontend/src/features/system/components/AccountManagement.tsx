@@ -86,7 +86,7 @@ export const AccountManagement: React.FC = () => {
               </option>
             ))}
           </select>
-          {account.roleId === 1 && (
+          {account.roleName?.toLowerCase() === "admin" && (
             <span className="block text-[11px] font-medium text-[var(--hicas-danger)]">
               Quản trị hệ thống
             </span>
@@ -198,6 +198,7 @@ export const AccountManagement: React.FC = () => {
         </form>
       </Card>
 
+      <div className="max-h-[620px] overflow-y-auto pr-1">
       <DataTable
         columns={columns}
         data={accounts}
@@ -206,6 +207,7 @@ export const AccountManagement: React.FC = () => {
         emptyTitle="Chưa có tài khoản"
         emptyDescription="Tài khoản mới sẽ xuất hiện tại đây sau khi được khởi tạo."
       />
+      </div>
     </div>
   );
 };

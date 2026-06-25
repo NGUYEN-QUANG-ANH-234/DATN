@@ -43,4 +43,16 @@ namespace HRM.backend.src.HRM.Application.DTOs.TimeAttendance
         public string NextAction { get; set; } = "CHECK_IN";
         public string Message { get; set; } = string.Empty;
     }
+
+    public class AttendanceShiftSnapshotDto
+    {
+        public int Id { get; set; }
+        public string ShiftName { get; set; } = string.Empty;
+        public TimeSpan? StartTime { get; set; }
+        public TimeSpan? EndTime { get; set; }
+        public TimeSpan? BreakStartTime { get; set; }
+        public TimeSpan? BreakEndTime { get; set; }
+        public int LateThresholdMins { get; set; }
+        public int EarlyLeaveThresholdMins { get; set; }
+    }
 }

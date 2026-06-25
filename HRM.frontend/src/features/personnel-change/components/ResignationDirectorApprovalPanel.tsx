@@ -14,6 +14,8 @@ import {
 type Props = {
   request?: PersonnelChangeDetail | null;
   saving?: boolean;
+  canApprove?: boolean;
+  canExecute?: boolean;
   onApprove: (id: number, payload: DirectorApproveResignationRequest) => Promise<boolean>;
   onExecute: (id: number, payload: ExecutePersonnelChangeRequest) => Promise<boolean>;
 };
@@ -21,6 +23,8 @@ type Props = {
 export const ResignationDirectorApprovalPanel = ({
   request,
   saving,
+  canApprove = true,
+  canExecute = true,
   onApprove,
   onExecute,
 }: Props) => {
@@ -29,7 +33,7 @@ export const ResignationDirectorApprovalPanel = ({
   const [completedAt, setCompletedAt] = useState("");
   const [executeNote, setExecuteNote] = useState("");
   const executeBlockedReason = getContractFlowExecutionBlockReason(request);
-  const executeDisabled = !request || saving || !canExecutePersonnelChange(request);
+  const executeDisabled = !request || saving || !canExecute || !canExecutePersonnelChange(request);
 
   const approve = async (event: FormEvent) => {
     event.preventDefault();
@@ -51,6 +55,7 @@ export const ResignationDirectorApprovalPanel = ({
 
   return (
     <Card title="Phê duyệt nghỉ việc" description="Phê duyệt hồ sơ nghỉ việc và thực hiện sau khi xử lý hợp đồng hoàn tất.">
+      {canApprove ? (
       <form className="space-y-4" onSubmit={approve}>
         <Select
           label="Quyết định"
@@ -81,7 +86,9 @@ export const ResignationDirectorApprovalPanel = ({
           Gửi phê duyệt
         </Button>
       </form>
+      ) : null}
 
+      {canExecute ? (
       <form className="mt-5 grid gap-4 border-t border-[var(--hicas-border-soft)] pt-5 md:grid-cols-2" onSubmit={execute}>
         <Input
           label="Thời điểm hoàn tất"
@@ -107,6 +114,7 @@ export const ResignationDirectorApprovalPanel = ({
           </Button>
         </div>
       </form>
+      ) : null}
     </Card>
   );
 };

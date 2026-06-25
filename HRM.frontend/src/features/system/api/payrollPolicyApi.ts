@@ -1,5 +1,7 @@
 import axiosClient from "../../../core/api/axiosClient";
 import type {
+  OvertimeRateConfig,
+  OvertimeRateConfigPayload,
   PayrollPolicy,
   PayrollPolicyPayload,
   PayrollPolicyResponse,
@@ -40,6 +42,40 @@ export const payrollPolicyApi = {
     isActive: boolean,
   ): Promise<PayrollPolicyResponse<null>> => {
     return await axiosClient.patch(`${ENDPOINT}/${id}/status`, null, {
+      params: { isActive },
+    });
+  },
+
+  delete: async (id: number): Promise<PayrollPolicyResponse<null>> => {
+    return await axiosClient.delete(`${ENDPOINT}/${id}`);
+  },
+
+  getOvertimeRates: async (
+    includeInactive = true,
+  ): Promise<PayrollPolicyResponse<OvertimeRateConfig[]>> => {
+    return await axiosClient.get(`${ENDPOINT}/overtime-rates`, {
+      params: { includeInactive },
+    });
+  },
+
+  createOvertimeRate: async (
+    payload: OvertimeRateConfigPayload,
+  ): Promise<PayrollPolicyResponse<OvertimeRateConfig>> => {
+    return await axiosClient.post(`${ENDPOINT}/overtime-rates`, payload);
+  },
+
+  createOvertimeRateVersion: async (
+    id: number,
+    payload: OvertimeRateConfigPayload,
+  ): Promise<PayrollPolicyResponse<OvertimeRateConfig>> => {
+    return await axiosClient.put(`${ENDPOINT}/overtime-rates/${id}`, payload);
+  },
+
+  setOvertimeRateStatus: async (
+    id: number,
+    isActive: boolean,
+  ): Promise<PayrollPolicyResponse<null>> => {
+    return await axiosClient.patch(`${ENDPOINT}/overtime-rates/${id}/status`, null, {
       params: { isActive },
     });
   },

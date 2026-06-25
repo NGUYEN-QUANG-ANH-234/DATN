@@ -4,7 +4,7 @@ using HRM.backend.src.HRM.Application.Interfaces.PersonnelChanges.Services;
 using HRM.backend.src.HRM.Application.Interfaces.PersonnelChanges.UseCases;
 using HRM.backend.src.HRM.Core.Entities.EmployeeProfile;
 using HRM.backend.src.HRM.Core.Entities.PersonnelChanges;
-using HRM.backend.src.HRM.Core.Entities.RequestHandover;
+using HRM.backend.src.HRM.Core.Entities.WorkflowRequests;
 using HRM.backend.src.HRM.Core.Enums;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.EmployeeProfile;
@@ -55,6 +55,8 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
             int actorAccountId,
             CancellationToken ct)
         {
+            await _accessGuard.EnsureActorHasRoleAsync(actorAccountId, ct, "HR", "Admin");
+
             if (dto.EmployeeId <= 0)
                 throw new ArgumentException("Employee is required.");
             if (dto.NewPositionId <= 0)
@@ -134,7 +136,13 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
             return MutateSeniorAppointmentAsync(id, actorAccountId, async (request, innerCt) =>
             {
                 EnsureStatus(request, PersonnelChangeStatus.PendingEmployeeConsent);
-                await EnsureSelectedEmployeeCanConsentAsync(request, actorAccountId, innerCt);
+                if (!request.EmployeeId.HasValue)
+                    throw new InvalidOperationException("Senior appointment has no selected employee.");
+                await _accessGuard.EnsureEmployeeAccountCanActAsync(
+                    request.EmployeeId.Value,
+                    actorAccountId,
+                    "submit appointment consent",
+                    innerCt);
 
                 var oldStatus = request.Status;
                 request.EmployeeConsentAt = DateTime.UtcNow;
@@ -164,6 +172,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
 
             return MutateSeniorAppointmentAsync(id, actorAccountId, async (request, innerCt) =>
             {
+                await _accessGuard.EnsureActorHasRoleAsync(actorAccountId, innerCt, "HR", "Admin");
                 EnsureStatus(request, PersonnelChangeStatus.PendingContractFlow);
 
                 if (request.EmployeeConsentStatus != PersonnelChangeConsentStatus.Accepted)
@@ -201,6 +210,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
 
             return MutateSeniorAppointmentAsync(id, actorAccountId, async (request, innerCt) =>
             {
+                await _accessGuard.EnsureActorHasRoleAsync(actorAccountId, innerCt, "HR", "Admin");
                 EnsureStatus(
                     request,
                     PersonnelChangeStatus.ContractAccepted,
@@ -238,6 +248,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
         {
             return MutateSeniorAppointmentAsync(id, actorAccountId, async (request, innerCt) =>
             {
+                await _accessGuard.EnsureActorHasRoleAsync(actorAccountId, innerCt, "HR", "Admin");
                 EnsureStatus(request, PersonnelChangeStatus.ReadyToExecute);
                 _contractFlowService.EnsureCanExecute(request);
 

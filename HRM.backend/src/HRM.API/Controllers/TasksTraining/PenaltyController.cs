@@ -80,7 +80,7 @@ namespace HRM.backend.src.HRM.API.Controllers.TasksTraining
         }
 
         [HttpPatch("{id:int}/hr-review")]
-        [RequirePermission("PENALTY_RECORD_REVIEW", GroupName = SystemModules.PerformanceTraining, Description = "HR duyệt hoặc từ chối biên bản vi phạm")]
+        [RequirePermission("PENALTY_RECORD_REVIEW", GroupName = SystemModules.PerformanceTraining, Description = "HR ghi nhận hoặc hủy hiệu lực biên bản vi phạm")]
         public async Task<IActionResult> HrReview(int id, [FromBody] ReviewPenaltyRecordDto dto, CancellationToken ct)
         {
             var data = await _useCase.ReviewByHrAsync(id, dto, GetAccountId(), GetRole(), ct);
@@ -88,8 +88,8 @@ namespace HRM.backend.src.HRM.API.Controllers.TasksTraining
             {
                 Success = true,
                 Message = dto.IsApproved
-                    ? "HR đã xác nhận biên bản vi phạm."
-                    : "HR đã từ chối biên bản vi phạm.",
+                    ? "Biên bản đã được ghi nhận có hiệu lực xử lý."
+                    : "Biên bản đã được đánh dấu không có hiệu lực xử lý.",
                 Data = data
             });
         }
@@ -103,8 +103,8 @@ namespace HRM.backend.src.HRM.API.Controllers.TasksTraining
             {
                 Success = true,
                 Message = dto.IsApproved
-                    ? "Director đã duyệt biên bản vi phạm."
-                    : "Director đã từ chối biên bản vi phạm.",
+                    ? "Giám đốc đã phê duyệt hiệu lực xử lý của biên bản."
+                    : "Giám đốc không phê duyệt hiệu lực xử lý của biên bản.",
                 Data = data
             });
         }

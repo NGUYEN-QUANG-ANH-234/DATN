@@ -125,12 +125,20 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
                 var targetAccount = await _accountRepo.GetByIdAsync(targetAccountId, innerCt);
                 if (targetAccount == null) throw new Exception("Tài khoản không tồn tại.");
 
-                if (actorId > 0 && targetAccountId == actorId && targetAccount.RoleId == 1 && newRoleId != 1)
+                var roles = (await _accountRepo.FetchRolesWithPermissionMatrixAsync(innerCt)).ToList();
+                var targetRole = roles.FirstOrDefault(r => r.Id == targetAccount.RoleId);
+                var newRole = roles.FirstOrDefault(r => r.Id == newRoleId);
+                var targetIsAdmin = string.Equals(targetRole?.RoleName, "Admin", StringComparison.OrdinalIgnoreCase);
+                var newRoleIsAdmin = string.Equals(newRole?.RoleName, "Admin", StringComparison.OrdinalIgnoreCase);
+
+                if (actorId > 0 && targetAccountId == actorId && targetIsAdmin && !newRoleIsAdmin)
                     throw new Exception("Bạn không thể tự hạ cấp quyền Admin của chính mình.");
 
-                if (targetAccount.RoleId == 1 && newRoleId != 1)
+                if (targetIsAdmin && !newRoleIsAdmin)
                 {
-                    var adminCount = (await _accountRepo.GetAllAsync(innerCt)).Count(a => a.RoleId == 1 && a.Status == AccountStatus.Active);
+                    var adminCount = (await _accountRepo.GetAllWithRoleAsync(innerCt))
+                        .Count(a => string.Equals(a.Role?.RoleName, "Admin", StringComparison.OrdinalIgnoreCase) &&
+                                    a.Status == AccountStatus.Active);
                     if (adminCount <= 1)
                         throw new Exception("Hệ thống phải có ít nhất một tài khoản Admin đang hoạt động.");
                 }

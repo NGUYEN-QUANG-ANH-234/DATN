@@ -250,6 +250,7 @@ export const AuditLogViewer: React.FC = () => {
         </form>
       </Card>
 
+      <div className="max-h-[640px] overflow-y-auto pr-1">
       <DataTable
         columns={columns}
         data={logs}
@@ -258,6 +259,7 @@ export const AuditLogViewer: React.FC = () => {
         emptyTitle="Không có nhật ký phù hợp"
         emptyDescription="Thử mở rộng bộ lọc hoặc chọn khoảng thời gian khác."
       />
+      </div>
     </div>
   );
 };

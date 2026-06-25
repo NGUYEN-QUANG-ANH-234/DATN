@@ -257,7 +257,16 @@ namespace HRM.backend.src.HRM.Application.UseCases.TasksTraining
                 return;
             }
 
-            var daily = await ResolveDailySummaryForPenaltyAsync(record, ct);
+            var daily = await TryResolveDailySummaryForPenaltyAsync(record, ct);
+            if (daily == null)
+            {
+                record.Status = PenaltyRecordStatus.Approved;
+                record.HRNote = AppendSystemNote(
+                    record.HRNote,
+                    "Bien ban da duoc ghi nhan co hieu luc, nhung chua ap dung dieu chinh cong vi chua co bang cong ngay tuong ung.");
+                return;
+            }
+
             if (daily.IsPayrollLocked || daily.ApprovalStatus == AttendancePayrollApprovalStatus.Locked)
                 throw new InvalidOperationException("Bảng công ngày đã khóa, không thể áp dụng biên bản vi phạm.");
 
@@ -294,7 +303,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.TasksTraining
             await RecalculateMonthlyAttendanceSummaryAsync(daily.EmployeeId, daily.WorkDate, ct);
         }
 
-        private async Task<AttendanceDailySummary> ResolveDailySummaryForPenaltyAsync(PenaltyRecord record, CancellationToken ct)
+        private async Task<AttendanceDailySummary?> TryResolveDailySummaryForPenaltyAsync(PenaltyRecord record, CancellationToken ct)
         {
             if (record.SourceType == PenaltySourceType.Attendance && record.ReferenceId.HasValue)
             {
@@ -304,9 +313,15 @@ namespace HRM.backend.src.HRM.Application.UseCases.TasksTraining
             }
 
             if (!record.OccurredAt.HasValue)
+                return null;
+
+            if (!record.OccurredAt.HasValue)
                 throw new InvalidOperationException("Biên bản chưa có thời điểm vi phạm để xác định bảng công ngày.");
 
             var daily = await _attendanceSummaryRepo.GetDailyByEmployeeDateAsync(record.EmployeeId, record.OccurredAt.Value.Date, ct);
+            if (daily == null)
+                return null;
+
             if (daily == null)
                 throw new InvalidOperationException("Không tìm thấy bảng công ngày tương ứng để áp dụng biên bản vi phạm.");
 
@@ -457,9 +472,10 @@ namespace HRM.backend.src.HRM.Application.UseCases.TasksTraining
             var manager = await _employeeRepo.GetByAccountIdAsync(actorAccountId, ct)
                 ?? throw new UnauthorizedAccessException("Tài khoản Manager chưa liên kết hồ sơ nhân sự.");
 
-            if (!manager.DeptId.HasValue ||
+            var managedDeptIds = await _employeeRepo.GetManagedDepartmentIdsByAccountIdAsync(actorAccountId, ct);
+            if (managedDeptIds.Count == 0 ||
                 !targetEmployee.DeptId.HasValue ||
-                manager.DeptId.Value != targetEmployee.DeptId.Value)
+                !managedDeptIds.Contains(targetEmployee.DeptId.Value))
                 throw new UnauthorizedAccessException("Manager chỉ được lập/xem biên bản nhân sự trong phòng ban của mình.");
         }
 
@@ -567,6 +583,13 @@ namespace HRM.backend.src.HRM.Application.UseCases.TasksTraining
             if (string.IsNullOrWhiteSpace(existing))
                 return next.Trim();
             return $"{existing.Trim()} | Director: {next.Trim()}";
+        }
+
+        private static string AppendSystemNote(string? existing, string note)
+        {
+            if (string.IsNullOrWhiteSpace(existing))
+                return note;
+            return $"{existing.Trim()} | {note}";
         }
 
         private static bool RequiresDirectorReview(PenaltyRecord record)

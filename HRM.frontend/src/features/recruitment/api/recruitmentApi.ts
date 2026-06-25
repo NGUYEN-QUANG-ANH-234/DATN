@@ -2,8 +2,10 @@ import axiosClient from "../../../core/api/axiosClient";
 import type {
   ActiveJob,
   CloseRecruitmentPayload,
+  CloneRecruitmentPayload,
   CreateRecruitmentPayload,
   RecruitmentRequestListItem,
+  ReopenRecruitmentPayload,
 } from "../types/recruitment";
 
 const ENDPOINT = "/recruitment";
@@ -39,6 +41,20 @@ export const recruitmentApi = {
     payload: CloseRecruitmentPayload = {},
   ): Promise<{ success: boolean; data: RecruitmentRequestListItem; message?: string }> => {
     return await axiosClient.patch(`${ENDPOINT}/requests/${id}/close`, payload);
+  },
+
+  reopenRequest: async (
+    id: number,
+    payload: ReopenRecruitmentPayload,
+  ): Promise<{ success: boolean; data: RecruitmentRequestListItem; message?: string }> => {
+    return await axiosClient.patch(`${ENDPOINT}/requests/${id}/reopen`, payload);
+  },
+
+  cloneRequest: async (
+    id: number,
+    payload: CloneRecruitmentPayload = {},
+  ): Promise<{ success: boolean; data: RecruitmentRequestListItem; message?: string }> => {
+    return await axiosClient.post(`${ENDPOINT}/requests/${id}/clone`, payload);
   },
 
   getDepartmentsTree: async () => {

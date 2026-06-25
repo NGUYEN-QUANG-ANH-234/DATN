@@ -10,7 +10,12 @@ using HRM.backend.src.HRM.Core.Interfaces.Repositories;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.EmployeeProfile;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.System;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.TimeAttendance;
+using Microsoft.AspNetCore.Http;
+using System.Globalization;
+using System.IO.Compression;
+using System.Text;
 using System.Text.Json;
+using System.Xml.Linq;
 
 namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
 {
@@ -68,6 +73,25 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
                 cancellationToken: ct);
         }
 
+        public async Task<IEnumerable<AttendancePeriodApprovalDto>> GetPendingApprovalPeriodsAsync(string actorRoleName, CancellationToken ct = default)
+        {
+            EnsureDirectorOrAdmin(actorRoleName);
+
+            var pending = await _summaryRepo.GetPendingApprovalAsync(ct);
+            return pending
+                .GroupBy(x => new { x.Month, x.Year })
+                .OrderBy(g => g.Key.Year)
+                .ThenBy(g => g.Key.Month)
+                .Select(g => new AttendancePeriodApprovalDto
+                {
+                    Month = g.Key.Month,
+                    Year = g.Key.Year,
+                    Period = BuildPayrollPeriod(g.Key.Month, g.Key.Year),
+                    Summaries = g.Select(MapToResponse).ToList()
+                })
+                .ToList();
+        }
+
         public async Task<IEnumerable<AttendanceSummaryResponseDto>> SubmitMonthlyTimesheetAsync(CloseAttendancePeriodDto dto, int actorAccountId, string actorRoleName, CancellationToken ct = default)
         {
             EnsureHrOrAdmin(actorRoleName);
@@ -78,14 +102,14 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
                 async (innerCt) =>
                 {
                     var summaries = await LoadMonthlySummariesOrThrowAsync(dto.Month, dto.Year, innerCt);
-                    if (summaries.Any(s => s.IsPayrollLocked || s.ApprovalStatus == AttendancePayrollApprovalStatus.Locked))
+                    if (summaries.All(s => s.IsPayrollLocked || s.ApprovalStatus == AttendancePayrollApprovalStatus.Locked))
                         throw new ArgumentException("Kỳ công đã khóa, không thể gửi chốt lại.");
-                    if (summaries.Any(s => s.ApprovalStatus != AttendancePayrollApprovalStatus.Draft))
+                    if (summaries.Any(s => s.ApprovalStatus is not AttendancePayrollApprovalStatus.Draft and not AttendancePayrollApprovalStatus.PendingHRReview))
                         throw new ArgumentException("Chỉ kỳ công ở trạng thái bản nháp mới được gửi chốt.");
 
                     var now = DateTime.UtcNow;
                     var note = NormalizeNote(dto.Note);
-                    foreach (var summary in summaries)
+                    foreach (var summary in summaries.Where(s => s.ApprovalStatus == AttendancePayrollApprovalStatus.Draft))
                     {
                         summary.ApprovalStatus = AttendancePayrollApprovalStatus.PendingHRReview;
                         summary.SubmittedByAccountId = actorAccountId;
@@ -96,8 +120,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
                     var dailySummaries = await _summaryRepo.GetDailyByPeriodAsync(dto.Month, dto.Year, innerCt);
                     foreach (var daily in dailySummaries.Where(d =>
                                  !d.IsPayrollLocked &&
-                                 d.ApprovalStatus != AttendancePayrollApprovalStatus.Locked &&
-                                 d.ApprovalStatus != AttendancePayrollApprovalStatus.Approved))
+                                 d.ApprovalStatus == AttendancePayrollApprovalStatus.Draft))
                     {
                         daily.ApprovalStatus = AttendancePayrollApprovalStatus.PendingHRReview;
                         daily.PayrollPeriod = BuildPayrollPeriod(dto.Month, dto.Year);
@@ -127,12 +150,12 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
                     var summaries = await LoadMonthlySummariesOrThrowAsync(dto.Month, dto.Year, innerCt);
                     if (summaries.Any(s => s.IsPayrollLocked || s.ApprovalStatus == AttendancePayrollApprovalStatus.Locked))
                         throw new ArgumentException("Kỳ công đã khóa, không thể duyệt lại.");
-                    if (summaries.Any(s => s.ApprovalStatus != AttendancePayrollApprovalStatus.PendingHRReview))
+                    if (summaries.Any(s => s.ApprovalStatus is not AttendancePayrollApprovalStatus.PendingHRReview and not AttendancePayrollApprovalStatus.Approved))
                         throw new ArgumentException("Chỉ kỳ công đã gửi chốt mới được duyệt.");
 
                     var now = DateTime.UtcNow;
                     var note = NormalizeNote(dto.Note);
-                    foreach (var summary in summaries)
+                    foreach (var summary in summaries.Where(s => s.ApprovalStatus == AttendancePayrollApprovalStatus.PendingHRReview))
                     {
                         summary.ApprovalStatus = AttendancePayrollApprovalStatus.Approved;
                         summary.ApprovedByAccountId = actorAccountId;
@@ -171,7 +194,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
                     var summaries = await LoadMonthlySummariesOrThrowAsync(dto.Month, dto.Year, innerCt);
                     if (summaries.Any(s => s.IsPayrollLocked || s.ApprovalStatus == AttendancePayrollApprovalStatus.Locked))
                         throw new ArgumentException("Kỳ công đã được khóa trước đó.");
-                    if (summaries.Any(s => s.ApprovalStatus != AttendancePayrollApprovalStatus.Approved))
+                    if (summaries.Any(s => !s.IsPayrollLocked && s.ApprovalStatus is not AttendancePayrollApprovalStatus.Approved and not AttendancePayrollApprovalStatus.Locked))
                         throw new ArgumentException("Chỉ kỳ công đã được duyệt mới được khóa.");
 
                     var periodStart = new DateTime(dto.Year, dto.Month, 1);
@@ -180,7 +203,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
                     var now = DateTime.UtcNow;
                     var note = NormalizeNote(dto.Note);
 
-                    foreach (var summary in summaries)
+                    foreach (var summary in summaries.Where(s => !s.IsPayrollLocked && s.ApprovalStatus == AttendancePayrollApprovalStatus.Approved))
                     {
                         summary.ApprovalStatus = AttendancePayrollApprovalStatus.Locked;
                         summary.IsPayrollLocked = true;
@@ -355,6 +378,15 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
             return daily.Select(MapDailyToResponse);
         }
 
+        public async Task<IEnumerable<AttendanceAdjustmentLogResponseDto>> GetAdjustmentLogsAsync(byte month, short year, string actorRoleName, CancellationToken ct = default)
+        {
+            EnsureHrDirectorOrAdmin(actorRoleName);
+            ValidatePeriod(month, year);
+
+            var logs = await _summaryRepo.GetAdjustmentLogsByPeriodAsync(month, year, ct);
+            return logs.Select(MapAdjustmentLogToResponse);
+        }
+
         public async Task<AttendanceDailySummaryResponseDto> AdjustDailyAsync(int id, AdjustAttendanceDailySummaryDto dto, int actorAccountId, string actorRoleName, CancellationToken ct = default)
         {
             EnsureHrOrAdmin(actorRoleName);
@@ -393,6 +425,161 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
             await _unitOfWork.CommitAsync(ct);
 
             return MapDailyToResponse(daily);
+        }
+
+        public async Task<AttendanceDailyImportResultDto> ImportDailyAdjustmentsAsync(ImportAttendanceDailySummaryDto dto, int actorAccountId, string actorRoleName, CancellationToken ct = default)
+        {
+            EnsureHrOrAdmin(actorRoleName);
+            ValidatePeriod(dto.Month, dto.Year);
+            ValidateImportFile(dto.File);
+
+            return await _lockService.GetWithLockAsync(
+                LockKeys.AttendancePeriod(dto.Month, dto.Year),
+                async (innerCt) =>
+                {
+                    var existingSummaries = await _summaryRepo.GetByPeriodAsync(dto.Month, dto.Year, innerCt);
+                    if (existingSummaries.Any(IsClosedForRegeneration))
+                        throw new ArgumentException("Kỳ công đã gửi chốt, duyệt hoặc khóa nên không thể import ghi đè bảng công ngày.");
+
+                    var parsedRows = await ParseAttendanceImportRowsAsync(dto.File, innerCt);
+                    var result = new AttendanceDailyImportResultDto { TotalRows = parsedRows.Count };
+                    if (parsedRows.Count == 0)
+                        throw new ArgumentException("File import không có dòng dữ liệu hợp lệ để xử lý.");
+
+                    var employees = await _employeeRepo.GetActiveWithDepartmentAsync(innerCt);
+                    var employeesByCode = employees
+                        .Where(e => !string.IsNullOrWhiteSpace(e.EmployeeCode))
+                        .GroupBy(e => e.EmployeeCode.Trim(), StringComparer.OrdinalIgnoreCase)
+                        .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+
+                    var periodStart = new DateTime(dto.Year, dto.Month, 1);
+                    var periodEnd = periodStart.AddMonths(1);
+                    var seenKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    var validRows = new List<ValidatedAttendanceImportRow>();
+
+                    foreach (var row in parsedRows)
+                    {
+                        var errors = new List<string>(row.ParseErrors);
+                        employeesByCode.TryGetValue(row.EmployeeCode.Trim(), out var employee);
+                        if (employee == null)
+                            errors.Add("Mã nhân viên không tồn tại hoặc không còn hoạt động.");
+
+                        if (!row.WorkDate.HasValue)
+                            errors.Add("Ngày công không hợp lệ.");
+                        else if (row.WorkDate.Value.Date < periodStart || row.WorkDate.Value.Date >= periodEnd)
+                            errors.Add($"Ngày công không thuộc kỳ {dto.Month:00}/{dto.Year}.");
+
+                        if (!row.WorkingMinutes.HasValue)
+                            errors.Add("Thiếu số phút/giờ làm việc.");
+                        if (!row.WorkdayValue.HasValue)
+                            errors.Add("Thiếu công quy đổi.");
+
+                        if (employee != null && row.WorkDate.HasValue)
+                        {
+                            var key = $"{employee.Id}|{row.WorkDate.Value:yyyyMMdd}";
+                            if (!seenKeys.Add(key))
+                                errors.Add("File có nhiều dòng trùng mã nhân viên và ngày công.");
+                        }
+
+                        if (errors.Count > 0)
+                        {
+                            result.Errors.Add(new AttendanceDailyImportErrorDto
+                            {
+                                RowNumber = row.RowNumber,
+                                EmployeeCode = row.EmployeeCode,
+                                WorkDate = row.WorkDateText,
+                                Message = string.Join(" ", errors)
+                            });
+                            continue;
+                        }
+
+                        validRows.Add(new ValidatedAttendanceImportRow(
+                            row.RowNumber,
+                            employee!,
+                            row.WorkDate!.Value.Date,
+                            row.WorkingMinutes!.Value,
+                            row.LateMinutes ?? 0,
+                            row.EarlyLeaveMinutes ?? 0,
+                            row.OvertimeMinutes ?? 0,
+                            row.WorkdayValue!.Value,
+                            row.AttendanceStatus ?? AttendanceDailyStatus.Present,
+                            row.Reason));
+                    }
+
+                    var affectedEmployeeIds = new HashSet<int>();
+                    var touchedDailySummaries = new List<AttendanceDailySummary>();
+                    var globalReason = NormalizeNote(dto.Reason) ?? "Import ghi đè bảng công ngày";
+                    foreach (var row in validRows)
+                    {
+                        var daily = await _summaryRepo.GetDailyByEmployeeDateAsync(row.Employee.Id, row.WorkDate, innerCt);
+                        if (daily is { IsPayrollLocked: true } || daily?.ApprovalStatus == AttendancePayrollApprovalStatus.Locked)
+                        {
+                            result.Errors.Add(new AttendanceDailyImportErrorDto
+                            {
+                                RowNumber = row.RowNumber,
+                                EmployeeCode = row.Employee.EmployeeCode,
+                                WorkDate = row.WorkDate.ToString("yyyy-MM-dd"),
+                                Message = "Dòng bảng công ngày đã khóa, không thể ghi đè."
+                            });
+                            continue;
+                        }
+
+                        var isCreated = daily == null;
+                        if (daily == null)
+                        {
+                            daily = new AttendanceDailySummary
+                            {
+                                EmployeeId = row.Employee.Id,
+                                WorkDate = row.WorkDate
+                            };
+                            await _summaryRepo.AddDailyAsync(daily, innerCt);
+                        }
+
+                        var oldValue = isCreated ? "{}" : SnapshotDaily(daily);
+                        daily.WorkingMinutes = row.WorkingMinutes;
+                        daily.LateMinutes = row.LateMinutes;
+                        daily.EarlyLeaveMinutes = row.EarlyLeaveMinutes;
+                        daily.OvertimeMinutes = row.OvertimeMinutes;
+                        daily.WorkdayValue = row.WorkdayValue;
+                        daily.AttendanceStatus = row.AttendanceStatus;
+                        daily.IsManualAdjusted = true;
+                        daily.AdjustedByAccountId = actorAccountId;
+                        daily.AdjustedAt = DateTime.UtcNow;
+                        daily.AdjustmentReason = NormalizeNote(row.Reason) ?? globalReason;
+                        daily.ApprovalStatus = AttendancePayrollApprovalStatus.Approved;
+                        daily.PayrollPeriod = BuildPayrollPeriod(dto.Month, dto.Year);
+                        daily.GeneratedAt = DateTime.UtcNow;
+
+                        await _summaryRepo.AddAdjustmentLogAsync(new AttendanceAdjustmentLog
+                        {
+                            AttendanceDailySummaryId = daily.Id,
+                            AttendanceDailySummary = daily,
+                            OldValueJson = oldValue,
+                            NewValueJson = SnapshotDaily(daily),
+                            AdjustedByAccountId = actorAccountId,
+                            Reason = daily.AdjustmentReason,
+                            AdjustedAt = DateTime.UtcNow
+                        }, innerCt);
+
+                        affectedEmployeeIds.Add(row.Employee.Id);
+                        touchedDailySummaries.Add(daily);
+                        if (isCreated) result.CreatedRows++;
+                        else result.UpdatedRows++;
+                    }
+
+                    await RecalculateMonthlySummariesFromDailyAsync(affectedEmployeeIds, dto.Month, dto.Year, touchedDailySummaries, innerCt);
+                    result.ErrorRows = result.Errors.Count;
+
+                    await _auditLogRepo.LogSystemEventAsync(
+                        "IMPORT_ATTENDANCE_DAILY_SUMMARY",
+                        actorAccountId,
+                        "attendance_daily_summaries",
+                        $"Import ghi đè bảng công ngày kỳ {dto.Month:00}/{dto.Year}. Updated={result.UpdatedRows}, Created={result.CreatedRows}, Errors={result.ErrorRows}.");
+                    await _unitOfWork.CommitAsync(innerCt);
+
+                    return result;
+                },
+                cancellationToken: ct);
         }
 
         public async Task<AttendanceDailySummaryResponseDto> ApproveDailyAsync(int id, int actorAccountId, string actorRoleName, CancellationToken ct = default)
@@ -446,6 +633,438 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
         {
             var normalized = note?.Trim();
             return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
+        }
+
+        private async Task RecalculateMonthlySummariesFromDailyAsync(
+            HashSet<int> employeeIds,
+            byte month,
+            short year,
+            IReadOnlyCollection<AttendanceDailySummary> touchedDailySummaries,
+            CancellationToken ct)
+        {
+            if (employeeIds.Count == 0)
+                return;
+
+            var dailyByPeriod = await _summaryRepo.GetDailyByPeriodAsync(month, year, ct);
+            if (touchedDailySummaries.Count > 0)
+            {
+                var touchedByKey = touchedDailySummaries
+                    .GroupBy(d => $"{d.EmployeeId}|{d.WorkDate:yyyyMMdd}", StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(g => g.Key, g => g.Last(), StringComparer.OrdinalIgnoreCase);
+
+                dailyByPeriod = dailyByPeriod
+                    .Where(d => !touchedByKey.ContainsKey($"{d.EmployeeId}|{d.WorkDate:yyyyMMdd}"))
+                    .Concat(touchedByKey.Values)
+                    .ToList();
+            }
+
+            foreach (var employeeId in employeeIds)
+            {
+                var rows = dailyByPeriod.Where(d => d.EmployeeId == employeeId).ToList();
+                if (rows.Count == 0)
+                    continue;
+
+                var summary = await _summaryRepo.GetByEmployeePeriodAsync(employeeId, month, year, ct);
+                if (summary?.IsPayrollLocked == true || summary?.ApprovalStatus == AttendancePayrollApprovalStatus.Locked)
+                    continue;
+
+                if (summary == null)
+                {
+                    summary = new AttendanceSummary
+                    {
+                        EmployeeId = employeeId,
+                        Month = month,
+                        Year = year
+                    };
+                    await _summaryRepo.AddAsync(summary, ct);
+                }
+
+                summary.WorkedMinutes = rows.Sum(r => r.WorkingMinutes);
+                summary.WorkDays = Math.Round(rows.Sum(r => r.WorkdayValue), 2, MidpointRounding.AwayFromZero);
+                summary.PayableWorkHours = Math.Round(summary.WorkDays * 8m, 2, MidpointRounding.AwayFromZero);
+                summary.LateMinutes = rows.Sum(r => r.LateMinutes);
+                summary.EarlyLeaveMinutes = rows.Sum(r => r.EarlyLeaveMinutes);
+                summary.ActualOtMinutes = rows.Sum(r => r.OvertimeMinutes);
+                summary.ApprovalStatus = AttendancePayrollApprovalStatus.Draft;
+                summary.GeneratedAt = DateTime.UtcNow;
+            }
+        }
+
+        private static async Task<List<ParsedAttendanceImportRow>> ParseAttendanceImportRowsAsync(IFormFile file, CancellationToken ct)
+        {
+            var extension = Path.GetExtension(file.FileName);
+            var rows = string.Equals(extension, ".xlsx", StringComparison.OrdinalIgnoreCase)
+                ? await ReadXlsxRowsAsync(file, ct)
+                : await ReadDelimitedRowsAsync(file, ct);
+
+            if (rows.Count <= 1)
+                return new List<ParsedAttendanceImportRow>();
+
+            var headers = rows[0];
+            var headerIndex = headers
+                .Select((header, index) => new { Key = NormalizeHeader(header), Index = index })
+                .Where(x => !string.IsNullOrWhiteSpace(x.Key))
+                .GroupBy(x => x.Key, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.First().Index, StringComparer.OrdinalIgnoreCase);
+
+            var parsedRows = new List<ParsedAttendanceImportRow>();
+            for (var i = 1; i < rows.Count; i++)
+            {
+                ct.ThrowIfCancellationRequested();
+                var cells = rows[i];
+                if (cells.All(string.IsNullOrWhiteSpace))
+                    continue;
+
+                var errors = new List<string>();
+                var workDateText = GetCell(cells, headerIndex, 1, "NgayCong", "Ngày công", "WorkDate", "Date");
+                if (!TryParseDate(workDateText, out var workDate))
+                    errors.Add("Ngày công không hợp lệ.");
+
+                var workingMinutes = ParseWorkingMinutes(cells, headerIndex, errors);
+                var lateMinutes = ParseOptionalInteger(cells, headerIndex, 3, errors, "Đi muộn", "DiMuon", "Đi muộn", "LateMinutes");
+                var earlyLeaveMinutes = ParseOptionalInteger(cells, headerIndex, 4, errors, "Về sớm", "VeSom", "Về sớm", "EarlyLeaveMinutes");
+                var overtimeMinutes = ParseOptionalInteger(cells, headerIndex, 5, errors, "OT", "OT", "LamThem", "Làm thêm", "OvertimeMinutes");
+                var workdayValue = ParseWorkdayValue(cells, headerIndex, errors);
+                var statusText = GetCell(cells, headerIndex, 7, "TrangThai", "Trạng thái", "AttendanceStatus", "Status");
+                var status = string.IsNullOrWhiteSpace(statusText)
+                    ? AttendanceDailyStatus.Present
+                    : TryParseAttendanceStatus(statusText, out var parsedStatus)
+                        ? parsedStatus
+                        : (AttendanceDailyStatus?)null;
+                if (!string.IsNullOrWhiteSpace(statusText) && status == null)
+                    errors.Add("Trạng thái ngày công không hợp lệ.");
+
+                parsedRows.Add(new ParsedAttendanceImportRow(
+                    i + 1,
+                    GetCell(cells, headerIndex, 0, "MaNhanVien", "Mã nhân viên", "EmployeeCode"),
+                    workDateText,
+                    workDate,
+                    workingMinutes,
+                    lateMinutes,
+                    earlyLeaveMinutes,
+                    overtimeMinutes,
+                    workdayValue,
+                    status,
+                    NormalizeNote(GetCell(cells, headerIndex, 8, "LyDo", "Lý do", "GhiChu", "Ghi chú", "Reason", "Note")),
+                    errors));
+            }
+
+            return parsedRows;
+        }
+
+        private static async Task<List<List<string>>> ReadDelimitedRowsAsync(IFormFile file, CancellationToken ct)
+        {
+            await using var stream = file.OpenReadStream();
+            using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+            var content = await reader.ReadToEndAsync(ct);
+            var rawRows = content
+                .Split(new[] { "\r\n", "\n" }, StringSplitOptions.None)
+                .Where(line => !string.IsNullOrWhiteSpace(line))
+                .ToList();
+            if (rawRows.Count == 0)
+                return new List<List<string>>();
+
+            var delimiter = ResolveDelimiter(rawRows[0]);
+            return rawRows.Select(row => SplitDelimitedLine(row, delimiter)).ToList();
+        }
+
+        private static async Task<List<List<string>>> ReadXlsxRowsAsync(IFormFile file, CancellationToken ct)
+        {
+            await using var stream = file.OpenReadStream();
+            using var archive = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen: false);
+            var sharedStrings = LoadSharedStrings(archive);
+            var sheetEntry = archive.Entries
+                .Where(e => e.FullName.StartsWith("xl/worksheets/sheet", StringComparison.OrdinalIgnoreCase) &&
+                            e.FullName.EndsWith(".xml", StringComparison.OrdinalIgnoreCase))
+                .OrderBy(e => e.FullName, StringComparer.OrdinalIgnoreCase)
+                .FirstOrDefault()
+                ?? throw new ArgumentException("Không tìm thấy sheet dữ liệu trong file Excel.");
+
+            await using var sheetStream = sheetEntry.Open();
+            var doc = await XDocument.LoadAsync(sheetStream, LoadOptions.None, ct);
+            XNamespace ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+            var result = new List<List<string>>();
+
+            foreach (var row in doc.Descendants(ns + "row"))
+            {
+                ct.ThrowIfCancellationRequested();
+                var values = new SortedDictionary<int, string>();
+                foreach (var cell in row.Elements(ns + "c"))
+                {
+                    var index = ResolveCellIndex((string?)cell.Attribute("r"));
+                    values[index] = ReadXlsxCellValue(cell, sharedStrings, ns);
+                }
+
+                if (values.Count == 0)
+                    continue;
+
+                var max = values.Keys.Max();
+                var cells = Enumerable.Range(0, max + 1)
+                    .Select(index => values.TryGetValue(index, out var value) ? value : string.Empty)
+                    .ToList();
+                result.Add(cells);
+            }
+
+            return result;
+        }
+
+        private static List<string> LoadSharedStrings(ZipArchive archive)
+        {
+            var entry = archive.GetEntry("xl/sharedStrings.xml");
+            if (entry == null)
+                return new List<string>();
+
+            using var stream = entry.Open();
+            var doc = XDocument.Load(stream);
+            XNamespace ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+            return doc.Descendants(ns + "si")
+                .Select(si => string.Concat(si.Descendants(ns + "t").Select(t => t.Value)))
+                .ToList();
+        }
+
+        private static string ReadXlsxCellValue(XElement cell, List<string> sharedStrings, XNamespace ns)
+        {
+            var type = (string?)cell.Attribute("t");
+            if (string.Equals(type, "s", StringComparison.OrdinalIgnoreCase))
+            {
+                var indexText = cell.Element(ns + "v")?.Value;
+                return int.TryParse(indexText, out var index) && index >= 0 && index < sharedStrings.Count
+                    ? sharedStrings[index]
+                    : string.Empty;
+            }
+
+            if (string.Equals(type, "inlineStr", StringComparison.OrdinalIgnoreCase))
+                return string.Concat(cell.Descendants(ns + "t").Select(t => t.Value));
+
+            return cell.Element(ns + "v")?.Value ?? string.Empty;
+        }
+
+        private static int ResolveCellIndex(string? reference)
+        {
+            if (string.IsNullOrWhiteSpace(reference))
+                return 0;
+
+            var index = 0;
+            foreach (var ch in reference)
+            {
+                if (!char.IsLetter(ch))
+                    break;
+                index = index * 26 + (char.ToUpperInvariant(ch) - 'A' + 1);
+            }
+
+            return Math.Max(0, index - 1);
+        }
+
+        private static void ValidateImportFile(IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+                throw new ArgumentException("Vui lòng chọn file bảng công ngày.");
+            if (file.Length > 10 * 1024 * 1024)
+                throw new ArgumentException("File bảng công ngày không được vượt quá 10MB.");
+
+            var extension = Path.GetExtension(file.FileName);
+            if (!string.Equals(extension, ".xlsx", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(extension, ".csv", StringComparison.OrdinalIgnoreCase))
+                throw new ArgumentException("Hệ thống chỉ hỗ trợ import file .xlsx hoặc .csv.");
+        }
+
+        private static char ResolveDelimiter(string headerLine)
+        {
+            var delimiters = new[] { ',', ';', '\t', '|' };
+            return delimiters
+                .Select(delimiter => new { Delimiter = delimiter, Count = headerLine.Count(ch => ch == delimiter) })
+                .OrderByDescending(x => x.Count)
+                .First().Delimiter;
+        }
+
+        private static List<string> SplitDelimitedLine(string line, char delimiter)
+        {
+            var cells = new List<string>();
+            var current = new StringBuilder();
+            var inQuotes = false;
+
+            for (var i = 0; i < line.Length; i++)
+            {
+                var ch = line[i];
+                if (ch == '"')
+                {
+                    if (inQuotes && i + 1 < line.Length && line[i + 1] == '"')
+                    {
+                        current.Append('"');
+                        i++;
+                    }
+                    else
+                    {
+                        inQuotes = !inQuotes;
+                    }
+                    continue;
+                }
+
+                if (ch == delimiter && !inQuotes)
+                {
+                    cells.Add(current.ToString().Trim());
+                    current.Clear();
+                    continue;
+                }
+
+                current.Append(ch);
+            }
+
+            cells.Add(current.ToString().Trim());
+            return cells;
+        }
+
+        private static string GetCell(IReadOnlyList<string> cells, Dictionary<string, int> headerIndex, int fallbackIndex, params string[] keys)
+        {
+            foreach (var key in keys.Select(NormalizeHeader))
+            {
+                if (headerIndex.TryGetValue(key, out var index) && index >= 0 && index < cells.Count)
+                    return cells[index].Trim();
+            }
+
+            return fallbackIndex >= 0 && fallbackIndex < cells.Count ? cells[fallbackIndex].Trim() : string.Empty;
+        }
+
+        private static string NormalizeHeader(string value)
+        {
+            return NormalizeToken(value)
+                .Replace(" ", string.Empty)
+                .Replace("_", string.Empty)
+                .Replace("-", string.Empty);
+        }
+
+        private static string NormalizeToken(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return string.Empty;
+
+            var normalized = value.Trim().Normalize(NormalizationForm.FormD);
+            var builder = new StringBuilder();
+            foreach (var ch in normalized)
+            {
+                if (CharUnicodeInfo.GetUnicodeCategory(ch) != UnicodeCategory.NonSpacingMark)
+                    builder.Append(char.ToLowerInvariant(ch));
+            }
+
+            return builder.ToString().Normalize(NormalizationForm.FormC);
+        }
+
+        private static int? ParseWorkingMinutes(IReadOnlyList<string> cells, Dictionary<string, int> headerIndex, List<string> errors)
+        {
+            var minutesText = GetCell(cells, headerIndex, -1, "PhutLamViec", "Phút làm việc", "WorkingMinutes", "WorkedMinutes");
+            if (!string.IsNullOrWhiteSpace(minutesText))
+            {
+                if (TryParseInteger(minutesText, out var minutes))
+                    return Math.Max(0, minutes);
+                errors.Add("Phút làm việc không hợp lệ.");
+                return null;
+            }
+
+            var hoursText = GetCell(cells, headerIndex, 2, "GioLam", "Giờ làm", "SoGioLam", "WorkedHours", "Hours");
+            if (TryParseDecimal(hoursText, out var hours))
+                return Math.Max(0, (int)Math.Round(hours * 60m, MidpointRounding.AwayFromZero));
+
+            errors.Add("Giờ làm không hợp lệ.");
+            return null;
+        }
+
+        private static int? ParseOptionalInteger(IReadOnlyList<string> cells, Dictionary<string, int> headerIndex, int fallbackIndex, List<string> errors, string label, params string[] keys)
+        {
+            var text = GetCell(cells, headerIndex, fallbackIndex, keys);
+            if (string.IsNullOrWhiteSpace(text))
+                return 0;
+            if (TryParseInteger(text, out var value))
+                return Math.Max(0, value);
+
+            errors.Add($"{label} không hợp lệ.");
+            return null;
+        }
+
+        private static decimal? ParseWorkdayValue(IReadOnlyList<string> cells, Dictionary<string, int> headerIndex, List<string> errors)
+        {
+            var text = GetCell(cells, headerIndex, 6, "Cong", "Công", "NgayCongQuyDoi", "WorkdayValue", "Workday");
+            if (!TryParseDecimal(text, out var value))
+            {
+                errors.Add("Công quy đổi không hợp lệ.");
+                return null;
+            }
+
+            return Math.Min(1m, Math.Max(0m, value));
+        }
+
+        private static bool TryParseInteger(string value, out int result)
+        {
+            result = 0;
+            if (!TryParseDecimal(value, out var number))
+                return false;
+            result = (int)Math.Round(number, MidpointRounding.AwayFromZero);
+            return true;
+        }
+
+        private static bool TryParseDecimal(string value, out decimal result)
+        {
+            result = 0;
+            if (string.IsNullOrWhiteSpace(value))
+                return false;
+
+            var normalized = value.Trim().Replace(" ", string.Empty).Replace(",", ".");
+            return decimal.TryParse(normalized, NumberStyles.Number, CultureInfo.InvariantCulture, out result);
+        }
+
+        private static bool TryParseDate(string value, out DateTime? result)
+        {
+            result = null;
+            if (string.IsNullOrWhiteSpace(value))
+                return false;
+
+            if (DateTime.TryParse(value, new CultureInfo("vi-VN"), DateTimeStyles.None, out var parsed) ||
+                DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.None, out parsed))
+            {
+                result = parsed.Date;
+                return true;
+            }
+
+            if (double.TryParse(value.Replace(",", "."), NumberStyles.Number, CultureInfo.InvariantCulture, out var serial) &&
+                serial > 20000)
+            {
+                result = DateTime.FromOADate(serial).Date;
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryParseAttendanceStatus(string value, out AttendanceDailyStatus status)
+        {
+            var normalized = NormalizeToken(value);
+            var map = new Dictionary<string, AttendanceDailyStatus>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["present"] = AttendanceDailyStatus.Present,
+                ["comat"] = AttendanceDailyStatus.Present,
+                ["halfday"] = AttendanceDailyStatus.HalfDay,
+                ["nuangay"] = AttendanceDailyStatus.HalfDay,
+                ["paidleave"] = AttendanceDailyStatus.PaidLeave,
+                ["nghihuongluong"] = AttendanceDailyStatus.PaidLeave,
+                ["unpaidleave"] = AttendanceDailyStatus.UnpaidLeave,
+                ["nghikhongluong"] = AttendanceDailyStatus.UnpaidLeave,
+                ["absence"] = AttendanceDailyStatus.Absence,
+                ["vangmat"] = AttendanceDailyStatus.Absence,
+                ["holiday"] = AttendanceDailyStatus.Holiday,
+                ["ngayle"] = AttendanceDailyStatus.Holiday,
+                ["weekend"] = AttendanceDailyStatus.Weekend,
+                ["cuoituan"] = AttendanceDailyStatus.Weekend,
+                ["maternityleave"] = AttendanceDailyStatus.MaternityLeave,
+                ["nghithaisan"] = AttendanceDailyStatus.MaternityLeave,
+                ["sickleave"] = AttendanceDailyStatus.SickLeave,
+                ["nghiom"] = AttendanceDailyStatus.SickLeave,
+                ["manualadjusted"] = AttendanceDailyStatus.ManualAdjusted,
+                ["dieuchinhthucong"] = AttendanceDailyStatus.ManualAdjusted
+            };
+
+            if (map.TryGetValue(NormalizeHeader(normalized), out status))
+                return true;
+
+            return Enum.TryParse(value, true, out status);
         }
 
         private static void ValidatePeriod(byte month, short year)
@@ -889,6 +1508,27 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
             };
         }
 
+        private static AttendanceAdjustmentLogResponseDto MapAdjustmentLogToResponse(AttendanceAdjustmentLog log)
+        {
+            var daily = log.AttendanceDailySummary;
+            return new AttendanceAdjustmentLogResponseDto
+            {
+                Id = log.Id,
+                AttendanceDailySummaryId = log.AttendanceDailySummaryId,
+                EmployeeId = daily.EmployeeId,
+                EmployeeCode = daily.Employee.EmployeeCode,
+                EmployeeName = daily.Employee.FullName,
+                DepartmentName = daily.Employee.Department?.DeptName,
+                WorkDate = daily.WorkDate,
+                AdjustedByAccountId = log.AdjustedByAccountId,
+                AdjustedByName = log.AdjustedByAccount.FullName ?? log.AdjustedByAccount.Email,
+                AdjustedAt = log.AdjustedAt,
+                Reason = log.Reason,
+                OldValueJson = log.OldValueJson,
+                NewValueJson = log.NewValueJson
+            };
+        }
+
         private static string SnapshotDaily(AttendanceDailySummary summary)
         {
             return JsonSerializer.Serialize(new
@@ -903,6 +1543,32 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
                 summary.AdjustmentReason
             });
         }
+
+        private sealed record ParsedAttendanceImportRow(
+            int RowNumber,
+            string EmployeeCode,
+            string WorkDateText,
+            DateTime? WorkDate,
+            int? WorkingMinutes,
+            int? LateMinutes,
+            int? EarlyLeaveMinutes,
+            int? OvertimeMinutes,
+            decimal? WorkdayValue,
+            AttendanceDailyStatus? AttendanceStatus,
+            string? Reason,
+            List<string> ParseErrors);
+
+        private sealed record ValidatedAttendanceImportRow(
+            int RowNumber,
+            Employee Employee,
+            DateTime WorkDate,
+            int WorkingMinutes,
+            int LateMinutes,
+            int EarlyLeaveMinutes,
+            int OvertimeMinutes,
+            decimal WorkdayValue,
+            AttendanceDailyStatus AttendanceStatus,
+            string? Reason);
 
         private sealed record WorkdayPolicy(
             decimal StandardHoursPerDay,

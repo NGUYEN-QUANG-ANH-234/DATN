@@ -4,6 +4,7 @@ using HRM.backend.src.HRM.Application.Interfaces.PersonnelChanges.UseCases;
 using HRM.backend.src.HRM.Core.Entities.PersonnelChanges;
 using HRM.backend.src.HRM.Core.Enums;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories;
+using HRM.backend.src.HRM.Core.Interfaces.Repositories.EmployeeProfile;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.PersonnelChanges;
 
 namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
@@ -14,17 +15,20 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
         private readonly IUnitOfWork _unitOfWork;
         private readonly ILockService _lockService;
         private readonly PersonnelChangeRiskSummaryBuilder _riskSummaryBuilder;
+        private readonly IEmployeeRepository _employeeRepo;
 
         public PersonnelChangeUseCase(
             IPersonnelChangeRepository personnelChangeRepo,
             IUnitOfWork unitOfWork,
             ILockService lockService,
-            PersonnelChangeRiskSummaryBuilder riskSummaryBuilder)
+            PersonnelChangeRiskSummaryBuilder riskSummaryBuilder,
+            IEmployeeRepository employeeRepo)
         {
             _personnelChangeRepo = personnelChangeRepo;
             _unitOfWork = unitOfWork;
             _lockService = lockService;
             _riskSummaryBuilder = riskSummaryBuilder;
+            _employeeRepo = employeeRepo;
         }
 
         public async Task<List<PersonnelChangeListItemDto>> GetListAsync(
@@ -44,6 +48,36 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
                 ct);
 
             return requests.Select(MapListItem).ToList();
+        }
+
+        public async Task<List<PersonnelChangeListItemDto>> GetMyActionItemsAsync(int actorAccountId, CancellationToken ct)
+        {
+            var employee = await _employeeRepo.GetByAccountIdAsync(actorAccountId, ct)
+                ?? throw new UnauthorizedAccessException("Tài khoản chưa liên kết hồ sơ nhân sự.");
+
+            var statuses = new[]
+            {
+                PersonnelChangeStatus.PendingEmployeeConsent,
+                PersonnelChangeStatus.PendingEmployeeExplanation
+            };
+
+            var requests = new List<PersonnelChangeRequest>();
+            foreach (var status in statuses)
+            {
+                requests.AddRange(await _personnelChangeRepo.GetByFilterAsync(
+                    changeType: null,
+                    status: status,
+                    employeeId: employee.Id,
+                    requestedFrom: null,
+                    requestedTo: null,
+                    ct: ct));
+            }
+
+            return requests
+                .OrderByDescending(r => r.RequestedAt)
+                .ThenByDescending(r => r.Id)
+                .Select(MapListItem)
+                .ToList();
         }
 
         public async Task<PersonnelChangeDetailDto> GetDetailAsync(int id, CancellationToken ct)
@@ -156,6 +190,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
             {
                 Id = request.Id,
                 EmployeeId = request.EmployeeId,
+                EmployeeAccountId = request.Employee?.AccountId,
                 EmployeeCode = request.Employee?.EmployeeCode,
                 EmployeeName = request.Employee?.FullName,
                 ChangeType = request.ChangeType,
@@ -182,6 +217,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
             {
                 Id = request.Id,
                 EmployeeId = request.EmployeeId,
+                EmployeeAccountId = request.Employee?.AccountId,
                 EmployeeCode = request.Employee?.EmployeeCode,
                 EmployeeName = request.Employee?.FullName,
                 ChangeType = request.ChangeType,
@@ -205,6 +241,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
                 CurrentPositionId = request.CurrentPositionId,
                 CurrentPositionName = request.CurrentPosition?.Title,
                 CurrentManagerId = request.CurrentManagerId,
+                CurrentManagerAccountId = request.CurrentManager?.AccountId,
                 CurrentManagerName = request.CurrentManager?.FullName,
                 CurrentJobLevelId = request.CurrentJobLevelId,
                 CurrentJobLevelName = request.CurrentJobLevel?.Name,

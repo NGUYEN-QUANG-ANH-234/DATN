@@ -25,6 +25,24 @@ namespace HRM.backend.src.HRM.Application.DTOs.Recruitment
         public string? Reason { get; set; }
     }
 
+    public class ReopenRecruitmentRequestDto
+    {
+        [StringLength(500)]
+        public string? Reason { get; set; }
+        public DateTime? NewDeadline { get; set; }
+    }
+
+    public class CloneRecruitmentRequestDto
+    {
+        [Range(1, 1000)]
+        public int? Quantity { get; set; }
+        public DateTime? Deadline { get; set; }
+        [StringLength(2000)]
+        public string? Description { get; set; }
+        [StringLength(500)]
+        public string? Reason { get; set; }
+    }
+
     public class RecruitmentRequestListItemDto
     {
         public int Id { get; set; }

@@ -6,5 +6,6 @@ namespace HRM.backend.src.HRM.Application.Interfaces.System.UseCases
     {
         Task<IEnumerable<SourceCatalogDto>> GetAllSourceCatalogsAsync(CancellationToken ct = default);
         Task<SourceCatalogDto> SetSourceCatalogActiveAsync(int id, bool isActive, int actorId, CancellationToken ct = default);
+        Task<bool> DeleteSourceCatalogAsync(int id, int actorId, CancellationToken ct = default);
     }
 }

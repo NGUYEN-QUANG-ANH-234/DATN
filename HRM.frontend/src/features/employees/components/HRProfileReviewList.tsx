@@ -14,6 +14,8 @@ const formatDateTime = (value?: string | null) =>
 
 const profileFieldLabels: Record<string, string> = {
   FullName: "Họ tên mới",
+  Nationality: "Quốc tịch",
+  Ethnicity: "Dân tộc",
   IdentityNumber: "CCCD mới",
   TaxCode: "Mã số thuế",
   SocialInsCode: "Mã số BHXH",

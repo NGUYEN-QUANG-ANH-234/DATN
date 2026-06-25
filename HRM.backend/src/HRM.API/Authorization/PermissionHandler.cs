@@ -27,11 +27,12 @@ namespace HRM.backend.src.HRM.API.Authorization
                                 
                 if (!int.TryParse(userIdClaim, out var userId)) return;
 
-                // Logic: Kiểm tra xem User có Role chứa PermissionCode này không
+                // Logic: Admin có toàn bộ quyền; các role khác phải có permission cụ thể.
                 var hasPermission = await dbContext.Accounts
-            .AnyAsync(a => a.Id == userId &&
-                   a.Role != null && // Thêm kiểm tra null để tránh sập
-                   a.Role.RolePermissions.Any(rp => rp.Permission.PermissionCode == requirement.Permission));
+                    .AnyAsync(a => a.Id == userId &&
+                        a.Role != null &&
+                        (a.Role.RoleName == "Admin" ||
+                         a.Role.RolePermissions.Any(rp => rp.Permission.PermissionCode == requirement.Permission)));
 
                 if (hasPermission)
                 {

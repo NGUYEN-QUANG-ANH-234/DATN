@@ -22,5 +22,6 @@ namespace HRM.backend.src.HRM.Core.Entities.System
         public SalaryAggregationType AggregationType { get; set; } = SalaryAggregationType.Latest;
         public bool IsPeriodBased { get; set; }
         public bool IsActive { get; set; } = true;
+        public bool IsDeleted { get; set; }
     }
 }

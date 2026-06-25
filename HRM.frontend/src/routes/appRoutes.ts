@@ -57,17 +57,24 @@ const hiddenRoutes: AppRouteMeta[] = [
     hidden: true,
   },
   {
+    path: "/employee-contract/profile-setup",
+    label: "Thiết lập hồ sơ",
+    module: "Hồ sơ & hợp đồng",
+    roles: ["Admin", "HR", "Director", "Candidate", "Intern"],
+    hidden: true,
+  },
+  {
     path: "/employee-contract/profile-setup/:candidateId",
     label: "Thiết lập hồ sơ",
     module: "Hồ sơ & hợp đồng",
-    roles: ROLE_GROUPS.employeeAdminDirector,
+    roles: ["Admin", "HR", "Director", "Candidate", "Intern"],
     hidden: true,
   },
   {
     path: "/employees/onboarding/:candidateId",
     label: "Thiết lập hồ sơ",
     module: "Hồ sơ & hợp đồng",
-    roles: ROLE_GROUPS.employeeAdminDirector,
+    roles: ["Admin", "HR", "Director", "Candidate", "Intern"],
     hidden: true,
   },
 ];

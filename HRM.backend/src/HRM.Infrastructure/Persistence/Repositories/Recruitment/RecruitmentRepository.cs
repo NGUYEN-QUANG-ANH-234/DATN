@@ -67,6 +67,8 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.Recruitmen
         {
             return await _context.RecruitmentRequests
                 .Include(r => r.Department)
+                    .ThenInclude(d => d!.Manager)
+                        .ThenInclude(m => m!.Account)
                 .Include(r => r.Position)
                 .Include(r => r.Candidates)
                 .FirstOrDefaultAsync(r => r.Id == id, ct);

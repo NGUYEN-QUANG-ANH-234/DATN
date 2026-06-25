@@ -315,8 +315,70 @@ export const DocumentTemplateManager = () => {
         </div>
       )}
 
-      <section className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(390px,0.42fr)]">
-        <div className="grid gap-6 lg:grid-cols-[300px_minmax(0,1fr)]">
+      <section className="space-y-6">
+        <Card
+          title="Bản xem trước"
+          description={
+            previewLoading
+              ? "Đang cập nhật bản xem trước..."
+              : "Xem bố cục biểu mẫu trên vùng hiển thị rộng."
+          }
+          actions={
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              iconLeft={
+                previewLoading ? (
+                  <RefreshCw size={16} className="animate-spin" />
+                ) : (
+                  <Eye size={16} />
+                )
+              }
+              onClick={() => void renderPreview(form)}
+              disabled={previewLoading}
+            >
+              Cập nhật
+            </Button>
+          }
+        >
+          <div className="mb-4 flex flex-wrap gap-2">
+            {preview?.invalidPlaceholders.map((item) => (
+              <Badge key={item} variant="danger">
+                Sai: {item}
+              </Badge>
+            ))}
+            {preview?.missingFields.map((item) => (
+              <Badge key={item} variant="warning">
+                Thiếu: {item}
+              </Badge>
+            ))}
+            {preview?.warnings.map((item) => (
+              <Badge key={item} variant="neutral">
+                {item}
+              </Badge>
+            ))}
+            {preview &&
+              !preview.invalidPlaceholders.length &&
+              !preview.missingFields.length &&
+              !preview.warnings.length && <Badge variant="success">Bản xem trước hợp lệ</Badge>}
+          </div>
+          <div className="overflow-auto rounded-xl border border-[var(--hicas-border)] bg-slate-100 p-4">
+            {preview?.html ? (
+              <iframe
+                title="Bản xem trước biểu mẫu"
+                srcDoc={preview.html}
+                className="h-[calc(100vh-250px)] min-h-[760px] w-full rounded-lg bg-white shadow-sm"
+              />
+            ) : (
+              <div className="py-20 text-center text-sm text-[var(--hicas-text-secondary)]">
+                Chưa có bản xem trước.
+              </div>
+            )}
+          </div>
+        </Card>
+
+        <div className="grid items-start gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
           <Card
             title="Danh sách mẫu"
             description="Chọn mẫu cần chỉnh sửa hoặc tạo mẫu mới."
@@ -516,7 +578,7 @@ export const DocumentTemplateManager = () => {
             </div>
 
             {form.fields.length > 0 && (
-              <div className="space-y-2">
+              <div className="max-h-[320px] space-y-2 overflow-y-auto pr-1">
                 {form.fields.map((field) => (
                   <div key={field.code} className="rounded-xl border border-[var(--hicas-border)] bg-white px-3 py-3">
                     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -571,55 +633,6 @@ export const DocumentTemplateManager = () => {
           </Card>
         </div>
 
-        <aside className="xl:sticky xl:top-6">
-          <Card
-            title="Bản xem trước"
-            description={previewLoading ? "Đang cập nhật bản xem trước..." : "Xem nhanh nội dung sau khi chỉnh sửa."}
-            actions={
-              <Button
-                type="button"
-                size="sm"
-                variant="secondary"
-                iconLeft={previewLoading ? <RefreshCw size={16} className="animate-spin" /> : <Eye size={16} />}
-                onClick={() => void renderPreview(form)}
-                disabled={previewLoading}
-              >
-                Cập nhật
-              </Button>
-            }
-          >
-            <div className="mb-4 flex flex-wrap gap-2">
-              {preview?.invalidPlaceholders.map((item) => (
-                <Badge key={item} variant="danger">Sai: {item}</Badge>
-              ))}
-              {preview?.missingFields.map((item) => (
-                <Badge key={item} variant="warning">Thiếu: {item}</Badge>
-              ))}
-              {preview?.warnings.map((item) => (
-                <Badge key={item} variant="neutral">{item}</Badge>
-              ))}
-              {preview &&
-                !preview.invalidPlaceholders.length &&
-                !preview.missingFields.length &&
-                !preview.warnings.length && (
-                <Badge variant="success">Bản xem trước hợp lệ</Badge>
-              )}
-            </div>
-            <div className="overflow-auto rounded-xl border border-[var(--hicas-border)] bg-slate-100 p-3">
-              {preview?.html ? (
-                <iframe
-                  title="Bản xem trước biểu mẫu"
-                  srcDoc={preview.html}
-                  className="h-[760px] w-full rounded-lg bg-white"
-                />
-              ) : (
-                <div className="py-16 text-center text-sm text-[var(--hicas-text-secondary)]">
-                  Chưa có bản xem trước.
-                </div>
-              )}
-            </div>
-          </Card>
-        </aside>
       </section>
     </div>
   );

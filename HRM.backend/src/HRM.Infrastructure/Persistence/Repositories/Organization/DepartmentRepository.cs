@@ -25,6 +25,11 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.Organizati
                 .AnyAsync(d => d.ParentDeptId == deptId && d.Status == DeptStatus.Active, ct);
         }
 
+        public async Task<bool> HasAnySubDepartmentsAsync(int deptId, CancellationToken ct = default)
+        {
+            return await _dbSet.AnyAsync(d => d.ParentDeptId == deptId, ct);
+        }
+
         public async Task<bool> CheckCodeExistsAsync(string deptCode, CancellationToken ct = default)
         {
             return await _dbSet.AnyAsync(d => d.DeptCode == deptCode, ct);

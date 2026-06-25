@@ -4,7 +4,7 @@ using HRM.backend.src.HRM.Application.Interfaces.PersonnelChanges.Services;
 using HRM.backend.src.HRM.Application.Interfaces.PersonnelChanges.UseCases;
 using HRM.backend.src.HRM.Core.Entities.EmployeeProfile;
 using HRM.backend.src.HRM.Core.Entities.PersonnelChanges;
-using HRM.backend.src.HRM.Core.Entities.RequestHandover;
+using HRM.backend.src.HRM.Core.Entities.WorkflowRequests;
 using HRM.backend.src.HRM.Core.Enums;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.EmployeeProfile;
@@ -54,6 +54,8 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
             int actorAccountId,
             CancellationToken ct)
         {
+            await _accessGuard.EnsureActorHasRoleAsync(actorAccountId, ct, "HR", "Admin");
+
             if (dto.PromotionType == PersonnelChangePromotionType.ConvertToOfficial)
                 throw new ArgumentException("Use create convert official endpoint for ConvertToOfficial.");
 
@@ -82,6 +84,8 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
             int actorAccountId,
             CancellationToken ct)
         {
+            await _accessGuard.EnsureActorHasRoleAsync(actorAccountId, ct, "HR", "Admin");
+
             return await CreateRequestAsync(
                 employeeId: dto.EmployeeId,
                 changeType: PersonnelChangeType.ConvertToOfficial,
@@ -107,6 +111,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
         {
             return MutatePromotionAsync(id, actorAccountId, async (request, innerCt) =>
             {
+                await _accessGuard.EnsureActorHasRoleAsync(actorAccountId, innerCt, "HR", "Admin");
                 EnsureStatus(request, PersonnelChangeStatus.PendingHRReview);
 
                 var oldStatus = request.Status;
@@ -138,6 +143,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
         {
             return MutatePromotionAsync(id, actorAccountId, async (request, innerCt) =>
             {
+                await _accessGuard.EnsureActorHasRoleAsync(actorAccountId, innerCt, "Director", "Admin");
                 EnsureStatus(request, PersonnelChangeStatus.PendingDirectorApproval);
 
                 var oldStatus = request.Status;
@@ -184,6 +190,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
         {
             return MutatePromotionAsync(id, actorAccountId, async (request, innerCt) =>
             {
+                await _accessGuard.EnsureActorHasRoleAsync(actorAccountId, innerCt, "HR", "Admin");
                 EnsureStatus(
                     request,
                     PersonnelChangeStatus.ApprovedByDirector,

@@ -4,7 +4,7 @@ using HRM.backend.src.HRM.Core.Enums;
  using HRM.backend.src.HRM.Core.Entities.EmployeeProfile;
 using HRM.backend.src.HRM.Core.Entities.Organization;
 
-namespace HRM.backend.src.HRM.Core.Entities.RequestHandover
+namespace HRM.backend.src.HRM.Core.Entities.WorkflowRequests
 {
     [Table("requests")]
     public class Request

@@ -21,6 +21,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.Recruitment
         private readonly IEmployeeRepository _employeeRepo;
         private readonly IApprovalWorkflowService _approvalService;
         private readonly ISlaTrackingService _slaService;
+        private readonly IAuditLogRepository _auditLogRepo;
         private readonly IUnitOfWork _unitOfWork;
         private readonly ILockService _lockService;
         private readonly IIdempotencyService _idempotencyService;
@@ -33,6 +34,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.Recruitment
             IEmployeeRepository employeeRepo,
             IApprovalWorkflowService approvalService,
             ISlaTrackingService slaService,
+            IAuditLogRepository auditLogRepo,
             IUnitOfWork unitOfWork,
             ILockService lockService,
             IIdempotencyService idempotencyService)
@@ -44,6 +46,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.Recruitment
             _employeeRepo = employeeRepo;
             _approvalService = approvalService;
             _slaService = slaService;
+            _auditLogRepo = auditLogRepo;
             _unitOfWork = unitOfWork;
             _lockService = lockService;
             _idempotencyService = idempotencyService;
@@ -127,6 +130,11 @@ namespace HRM.backend.src.HRM.Application.UseCases.Recruitment
                 if (request == null)
                     throw new InvalidOperationException("Yêu cầu không tồn tại.");
 
+                if (request.Status != RecruitmentRequestStatus.PendingHR &&
+                    request.Status != RecruitmentRequestStatus.PendingDirector)
+                    throw new InvalidOperationException("Yeu cau tuyen dung khong o trang thai cho phe duyet.");
+
+                await EnsureRecruitmentApprovalWorkflowAsync(request, innerCt);
                 var workflowStatus = await _approvalService.ProcessStepAsync(
                     "RECRUITMENT",
                     requestId,
@@ -237,6 +245,119 @@ namespace HRM.backend.src.HRM.Application.UseCases.Recruitment
 
                 request.Status = RecruitmentRequestStatus.Closed;
                 _reqRepo.Update(request);
+                await _auditLogRepo.LogSystemEventAsync(
+                    "RECRUITMENT_REQUEST_CLOSED",
+                    actorId,
+                    "recruitment_requests",
+                    $"Closed recruitment request #{request.Id}. Reason: {dto.Reason ?? "N/A"}");
+                await _unitOfWork.CommitAsync(innerCt);
+
+                return MapToListItem(request);
+            }, cancellationToken: ct);
+        }
+
+        public async Task<RecruitmentRequestListItemDto> ReopenRequestAsync(int requestId, int actorId, string actorRoleName, ReopenRecruitmentRequestDto dto, CancellationToken ct = default)
+        {
+            if (!CanCloseRecruitmentRequest(actorRoleName))
+                throw new UnauthorizedAccessException("Chỉ HR hoặc Admin được mở lại tin tuyển dụng.");
+
+            return await _lockService.GetWithLockAsync($"recruitment_reopen_{requestId}", async (innerCt) =>
+            {
+                var request = await _reqRepo.GetByIdWithCandidatesAsync(requestId, innerCt);
+                if (request == null)
+                    throw new InvalidOperationException("Không tìm thấy nhu cầu tuyển dụng.");
+
+                var isExpired = IsExpired(request);
+                var canReopenByStatus = request.Status == RecruitmentRequestStatus.Closed
+                    || (request.Status == RecruitmentRequestStatus.Approved && isExpired);
+
+                if (!canReopenByStatus)
+                    throw new InvalidOperationException("Chỉ có thể mở lại tin đã đóng hoặc đã quá hạn.");
+
+                if (IsRequestFull(request))
+                    throw new InvalidOperationException("Tin tuyển dụng đã đủ chỉ tiêu. Vui lòng nhân bản tin hoặc tạo nhu cầu mới.");
+
+                EnsureRecruitmentTargetIsActive(request);
+
+                var today = DateTime.UtcNow.Date;
+                var oldDeadlineIsPast = request.Deadline.HasValue && request.Deadline.Value.Date < today;
+                var needsNewDeadline = isExpired || oldDeadlineIsPast;
+
+                if (needsNewDeadline && !dto.NewDeadline.HasValue)
+                    throw new InvalidOperationException("Vui lòng nhập hạn nhận hồ sơ mới khi mở lại tin đã quá hạn.");
+
+                if (dto.NewDeadline.HasValue)
+                {
+                    if (dto.NewDeadline.Value.Date < today)
+                        throw new InvalidOperationException("Hạn nhận hồ sơ mới không được nhỏ hơn ngày hiện tại.");
+
+                    request.Deadline = dto.NewDeadline.Value.Date;
+                }
+
+                request.Status = RecruitmentRequestStatus.Approved;
+                _reqRepo.Update(request);
+                await _auditLogRepo.LogSystemEventAsync(
+                    "RECRUITMENT_REQUEST_REOPENED",
+                    actorId,
+                    "recruitment_requests",
+                    $"Reopened recruitment request #{request.Id}. NewDeadline={request.Deadline:yyyy-MM-dd}. Reason: {dto.Reason ?? "N/A"}");
+                await _unitOfWork.CommitAsync(innerCt);
+
+                return MapToListItem(request);
+            }, cancellationToken: ct);
+        }
+
+        public async Task<RecruitmentRequestListItemDto> CloneRequestAsync(int requestId, int actorId, string actorRoleName, CloneRecruitmentRequestDto dto, CancellationToken ct = default)
+        {
+            if (!CanCloseRecruitmentRequest(actorRoleName))
+                throw new UnauthorizedAccessException("Chỉ HR hoặc Admin được nhân bản tin tuyển dụng.");
+
+            return await _lockService.GetWithLockAsync($"recruitment_clone_{requestId}_{actorId}", async (innerCt) =>
+            {
+                var source = await _reqRepo.GetByIdWithCandidatesAsync(requestId, innerCt);
+                if (source == null)
+                    throw new InvalidOperationException("Không tìm thấy nhu cầu tuyển dụng.");
+
+                EnsureRecruitmentTargetIsActive(source);
+
+                var quantity = dto.Quantity ?? source.Quantity;
+                if (quantity <= 0)
+                    throw new InvalidOperationException("Số lượng tuyển phải lớn hơn 0.");
+
+                if (dto.Deadline.HasValue && dto.Deadline.Value.Date < DateTime.UtcNow.Date)
+                    throw new InvalidOperationException("Hạn nhận hồ sơ không được nhỏ hơn ngày hiện tại.");
+
+                var request = new RecruitmentRequest
+                {
+                    DeptId = source.DeptId,
+                    PositionId = source.PositionId,
+                    Quantity = quantity,
+                    Description = string.IsNullOrWhiteSpace(dto.Description) ? source.Description : dto.Description,
+                    Deadline = dto.Deadline?.Date,
+                    Status = RecruitmentRequestStatus.PendingHR,
+                    CreatedById = actorId
+                };
+
+                await _reqRepo.AddAsync(request, innerCt);
+                await _unitOfWork.CommitAsync(innerCt);
+
+                var hrAccountIds = await _accountRepo.GetAccountIdsByRoleAsync("HR", innerCt);
+                var directorAccountIds = await _accountRepo.GetAccountIdsByRoleAsync("Director", innerCt);
+
+                if (!hrAccountIds.Any() || !directorAccountIds.Any())
+                    throw new InvalidOperationException("Hệ thống chưa thiết lập tài khoản HR hoặc Director để duyệt yêu cầu này.");
+
+                await _approvalService.CreateWorkflowAsync(
+                    "RECRUITMENT",
+                    request.Id,
+                    new List<int> { hrAccountIds.First(), directorAccountIds.First() },
+                    innerCt);
+                await _slaService.CreateTaskAsync(SlaModuleType.Recruitment, request.Id, innerCt);
+                await _auditLogRepo.LogSystemEventAsync(
+                    "RECRUITMENT_REQUEST_CLONED",
+                    actorId,
+                    "recruitment_requests",
+                    $"Cloned recruitment request #{source.Id} to #{request.Id}. Reason: {dto.Reason ?? "N/A"}");
                 await _unitOfWork.CommitAsync(innerCt);
 
                 return MapToListItem(request);
@@ -259,6 +380,15 @@ namespace HRM.backend.src.HRM.Application.UseCases.Recruitment
         {
             return string.Equals(actorRoleName, "Admin", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(actorRoleName, "HR", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static void EnsureRecruitmentTargetIsActive(RecruitmentRequest request)
+        {
+            if (request.Department != null && request.Department.Status != DeptStatus.Active)
+                throw new InvalidOperationException("Phòng ban của tin tuyển dụng đã tạm tắt hoặc giải thể.");
+
+            if (request.Position != null && !request.Position.IsActive)
+                throw new InvalidOperationException("Vị trí của tin tuyển dụng đã tạm tắt.");
         }
 
         private static RecruitmentRequestListItemDto MapToListItem(RecruitmentRequest request)
@@ -316,6 +446,27 @@ namespace HRM.backend.src.HRM.Application.UseCases.Recruitment
                 throw new UnauthorizedAccessException("Tài khoản Manager chưa được gắn với phòng ban.");
 
             return employee.DeptId.Value;
+        }
+
+        private async Task EnsureRecruitmentApprovalWorkflowAsync(RecruitmentRequest request, CancellationToken ct)
+        {
+            var directorAccountIds = await _accountRepo.GetAccountIdsByRoleAsync("Director", ct);
+            var directorId = directorAccountIds.FirstOrDefault();
+            if (directorId == 0)
+                throw new InvalidOperationException("He thong chua co Giam doc de duyet yeu cau tuyen dung.");
+
+            if (request.Status == RecruitmentRequestStatus.PendingDirector)
+            {
+                await _approvalService.CreateWorkflowAsync("RECRUITMENT", request.Id, new List<int> { directorId }, ct);
+                return;
+            }
+
+            var hrAccountIds = await _accountRepo.GetAccountIdsByRoleAsync("HR", ct);
+            var hrId = hrAccountIds.FirstOrDefault();
+            if (hrId == 0)
+                throw new InvalidOperationException("He thong chua co HR de duyet yeu cau tuyen dung.");
+
+            await _approvalService.CreateWorkflowAsync("RECRUITMENT", request.Id, new List<int> { hrId, directorId }, ct);
         }
     }
 }

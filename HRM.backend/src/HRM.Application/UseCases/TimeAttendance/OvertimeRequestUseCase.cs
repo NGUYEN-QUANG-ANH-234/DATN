@@ -120,7 +120,10 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
             var actorEmployee = IsAdmin(actorRoleName)
                 ? await _employeeRepo.GetByAccountIdAsync(actorAccountId, ct)
                 : await GetEmployeeByAccountAsync(actorAccountId, ct);
-            if (IsManager(actorRoleName) && !IsAdmin(actorRoleName) && !actorEmployee!.DeptId.HasValue)
+            var managedDeptIds = IsManager(actorRoleName) && !IsAdmin(actorRoleName)
+                ? await GetManagedDepartmentIdsAsync(actorAccountId, ct)
+                : new HashSet<int>();
+            if (IsManager(actorRoleName) && !IsAdmin(actorRoleName) && false)
                 throw new UnauthorizedAccessException("Tài khoản Manager chưa được gắn phòng ban.");
 
             var employees = (await _employeeRepo.FindAsync(e => employeeIds.Contains(e.Id), ct)).ToList();
@@ -130,7 +133,10 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
 
             if (IsManager(actorRoleName) && !IsAdmin(actorRoleName))
             {
-                var outsideDept = employees.Where(e => e.DeptId != actorEmployee!.DeptId).Select(e => e.Id).ToList();
+                var outsideDept = employees
+                    .Where(e => !e.DeptId.HasValue || !managedDeptIds.Contains(e.DeptId.Value))
+                    .Select(e => e.Id)
+                    .ToList();
                 if (outsideDept.Count > 0)
                     throw new UnauthorizedAccessException($"Manager chỉ được tạo OT cho nhân viên thuộc phòng ban của mình. Ngoài phạm vi: {string.Join(", ", outsideDept)}.");
             }
@@ -193,14 +199,19 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
             if (IsManager(actorRoleName) && !IsAdmin(actorRoleName))
             {
                 var manager = await GetEmployeeByAccountAsync(actorAccountId, ct);
-                if (!manager.DeptId.HasValue)
+                var managedDeptIds = await GetManagedDepartmentIdsAsync(actorAccountId, ct);
+                if (managedDeptIds.Count == 0)
                     throw new UnauthorizedAccessException("Tài khoản Manager chưa được gắn phòng ban.");
 
                 return await _cache.GetOrSetWithLockAsync(
-                    $"employee_options_dept_{manager.DeptId.Value}",
+                    $"employee_options_managed_depts_{actorAccountId}_{string.Join("_", managedDeptIds.OrderBy(id => id))}",
                     async (innerCt) =>
                     {
-                        var employees = await _employeeRepo.GetActiveByDeptWithDepartmentAsync(manager.DeptId.Value, manager.Id, innerCt);
+                        var employees = (await _employeeRepo.GetActiveWithDepartmentAsync(innerCt))
+                            .Where(e => e.DeptId.HasValue &&
+                                        managedDeptIds.Contains(e.DeptId.Value) &&
+                                        e.Id != manager.Id)
+                            .ToList();
                         return MapEmployeeOptions(employees);
                     },
                     TimeSpan.FromMinutes(10),
@@ -234,11 +245,13 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
             if (IsAdmin(actorRoleName))
                 return (await _overtimeRepo.GetByStatusAsync(OvertimeRequestStatus.PendingManager, ct)).Select(MapToResponse);
 
-            var manager = await GetEmployeeByAccountAsync(actorAccountId, ct);
-            if (!manager.DeptId.HasValue)
+            var managedDeptIds = await GetManagedDepartmentIdsAsync(actorAccountId, ct);
+            if (managedDeptIds.Count == 0)
                 throw new UnauthorizedAccessException("Tài khoản Manager chưa được gắn phòng ban.");
 
-            return (await _overtimeRepo.GetPendingManagerByDeptAsync(manager.DeptId.Value, ct)).Select(MapToResponse);
+            return (await _overtimeRepo.GetByStatusAsync(OvertimeRequestStatus.PendingManager, ct))
+                .Where(r => r.Employee.DeptId.HasValue && managedDeptIds.Contains(r.Employee.DeptId.Value))
+                .Select(MapToResponse);
         }
 
         public async Task<IEnumerable<OvertimeRequestResponseDto>> GetPendingHrAsync(string actorRoleName, CancellationToken ct = default)
@@ -430,7 +443,8 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
             var target = await _employeeRepo.GetByIdAsync(employeeId.Value, ct)
                 ?? throw new InvalidOperationException("Nhân viên được chọn không tồn tại.");
 
-            if (IsManager(actorRoleName) && !IsAdmin(actorRoleName) && target.DeptId != actorEmployee?.DeptId)
+            if (IsManager(actorRoleName) && !IsAdmin(actorRoleName) &&
+                (!target.DeptId.HasValue || !(await GetManagedDepartmentIdsAsync(actorAccountId, ct)).Contains(target.DeptId.Value)))
                 throw new UnauthorizedAccessException("Manager chỉ được tạo OT cho nhân viên thuộc phòng ban của mình.");
 
             return target;
@@ -444,9 +458,17 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
             if (!IsManager(actorRoleName))
                 throw new UnauthorizedAccessException("Chi Manager duoc duyet buoc nghiep vu OT.");
 
-            var manager = await GetEmployeeByAccountAsync(actorAccountId, ct);
-            if (!manager.DeptId.HasValue || targetEmployee.DeptId != manager.DeptId)
+            var managedDeptIds = await GetManagedDepartmentIdsAsync(actorAccountId, ct);
+            if (!targetEmployee.DeptId.HasValue || !managedDeptIds.Contains(targetEmployee.DeptId.Value))
                 throw new UnauthorizedAccessException("Manager chỉ được duyệt OT của nhân viên trong phòng ban mình.");
+        }
+
+        private async Task<HashSet<int>> GetManagedDepartmentIdsAsync(int actorAccountId, CancellationToken ct)
+        {
+            var deptIds = await _employeeRepo.GetManagedDepartmentIdsByAccountIdAsync(actorAccountId, ct);
+            if (deptIds.Count == 0)
+                throw new UnauthorizedAccessException("Tai khoan Manager chua duoc gan phong ban quan ly.");
+            return deptIds.ToHashSet();
         }
 
         private static (DateTime StartAt, DateTime EndAt) ResolveTimeRange(DateTime workDate, TimeSpan startTime, TimeSpan endTime)

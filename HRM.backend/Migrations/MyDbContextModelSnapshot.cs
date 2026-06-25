@@ -684,6 +684,10 @@ namespace HRM.backend.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("varchar(20)");
 
+                    b.Property<string>("Ethnicity")
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)");
+
                     b.Property<string>("FullName")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -716,6 +720,10 @@ namespace HRM.backend.Migrations
 
                     b.Property<int?>("ManagerId")
                         .HasColumnType("int");
+
+                    b.Property<string>("Nationality")
+                        .HasMaxLength(80)
+                        .HasColumnType("varchar(80)");
 
                     b.Property<string>("PermanentAddress")
                         .HasMaxLength(255)
@@ -1633,9 +1641,7 @@ namespace HRM.backend.Migrations
 
                     b.Property<string>("ValidationStatus")
                         .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("VARCHAR(50)")
-                        .HasDefaultValue("Valid");
+                        .HasColumnType("VARCHAR(50)");
 
                     b.Property<DateTime>("WorkDate")
                         .HasColumnType("datetime(6)");
@@ -1748,6 +1754,8 @@ namespace HRM.backend.Migrations
                         .HasColumnType("varchar(80)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CreatedByAccountId");
 
                     b.HasIndex("Code", "EffectiveFrom")
                         .IsUnique()
@@ -1963,6 +1971,8 @@ namespace HRM.backend.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CreatedByAccountId");
+
                     b.HasIndex("Code", "EffectiveFrom")
                         .IsUnique()
                         .HasDatabaseName("UX_overtime_rate_configs_Code_EffectiveFrom");
@@ -2164,6 +2174,8 @@ namespace HRM.backend.Migrations
                         .HasColumnType("varchar(80)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CreatedByAccountId");
 
                     b.HasIndex("Code", "Level", "EffectiveFrom")
                         .IsUnique()
@@ -2946,6 +2958,16 @@ namespace HRM.backend.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ActivatedByAccountId");
+
+                    b.HasIndex("ApprovedByAccountId");
+
+                    b.HasIndex("ArchivedByAccountId");
+
+                    b.HasIndex("CreatedByAccountId");
+
+                    b.HasIndex("SubmittedByAccountId");
+
                     b.HasIndex("FormulaCode", "Version")
                         .HasDatabaseName("IX_payroll_formulas_Code_Version");
 
@@ -3590,6 +3612,30 @@ namespace HRM.backend.Migrations
                             Status = "Active",
                             Version = 1,
                             VersionCode = "PROJECT_BONUS_V1"
+                        },
+                        new
+                        {
+                            Id = 16,
+                            CalculationMethod = "FixedAmount",
+                            Code = "INTERN_ALLOWANCE",
+                            ComponentGroup = "Allowance",
+                            CreatedAt = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            EffectiveFrom = new DateTime(2020, 7, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsActive = true,
+                            IsAllowance = true,
+                            IsBonus = false,
+                            IsDeduction = false,
+                            IsFixed = true,
+                            IsIncome = true,
+                            IsInsuranceBased = false,
+                            IsOvertime = false,
+                            IsTaxable = true,
+                            Name = "Trợ cấp thực tập",
+                            Note = "Default minimum internship allowance. Override per intern through employee salary components when needed.",
+                            ProrationType = "None",
+                            Status = "Active",
+                            Version = 1,
+                            VersionCode = "INTERN_ALLOWANCE_V1"
                         });
                 });
 
@@ -3670,6 +3716,8 @@ namespace HRM.backend.Migrations
                         .HasColumnType("varchar(80)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CreatedByAccountId");
 
                     b.HasIndex("Code", "EffectiveFrom")
                         .IsUnique()
@@ -4213,90 +4261,6 @@ namespace HRM.backend.Migrations
                     b.ToTable("recruitment_requests");
                 });
 
-            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.RequestHandover.EmploymentHistory", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<int?>("ApprovedBy")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("ChangeDate")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<DateTime>("EffectiveDate")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<int?>("EmployeeId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("NewValue")
-                        .HasColumnType("longtext");
-
-                    b.Property<string>("OldValue")
-                        .HasColumnType("longtext");
-
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasColumnType("VARCHAR(50)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ApprovedBy");
-
-                    b.HasIndex("EmployeeId");
-
-                    b.ToTable("employment_history");
-                });
-
-            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.RequestHandover.Request", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Content")
-                        .HasColumnType("longtext");
-
-                    b.Property<int?>("CurrentApproverId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("DeadlineAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<int?>("EmployeeId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("RequestType")
-                        .IsRequired()
-                        .HasColumnType("VARCHAR(50)");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("VARCHAR(50)");
-
-                    b.Property<int?>("TargetDeptId")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("TargetPositionId")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("EmployeeId");
-
-                    b.HasIndex("TargetDeptId");
-
-                    b.HasIndex("TargetPositionId");
-
-                    b.ToTable("requests");
-                });
-
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.System.Account", b =>
                 {
                     b.Property<int>("Id")
@@ -4711,6 +4675,10 @@ namespace HRM.backend.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CreatedByAccountId");
+
+                    b.HasIndex("UpdatedByAccountId");
+
                     b.HasIndex("PolicyType", "Code", "EffectiveFrom")
                         .IsUnique()
                         .HasDatabaseName("UX_payroll_policies_Type_Code_EffectiveFrom");
@@ -4818,6 +4786,25 @@ namespace HRM.backend.Migrations
                             ValueType = "Formula",
                             Version = 1,
                             VersionCode = "HICAS_KPI_BONUS_2026_V1"
+                        },
+                        new
+                        {
+                            Id = 20260610,
+                            ActivatedAt = new DateTime(2026, 6, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Amount = 2000000m,
+                            Code = "HICAS_INTERN_ALLOWANCE_2026",
+                            CreatedAt = new DateTime(2026, 6, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Description = "Mức trợ cấp tối thiểu cho thực tập sinh. HR có thể override bằng thành phần lương INTERN_ALLOWANCE theo từng hồ sơ.",
+                            EffectiveFrom = new DateTime(2026, 6, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsActive = true,
+                            LockedAfterUsed = false,
+                            Name = "Trợ cấp thực tập tối thiểu HICAS 2026",
+                            PolicyType = "Allowance",
+                            SourceRef = "HICAS internship allowance policy 2026",
+                            Status = "Active",
+                            ValueType = "Amount",
+                            Version = 1,
+                            VersionCode = "HICAS_INTERN_ALLOWANCE_2026_V1"
                         });
                 });
 
@@ -4944,6 +4931,9 @@ namespace HRM.backend.Migrations
                         .HasColumnType("varchar(100)");
 
                     b.Property<bool>("IsActive")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("IsDeleted")
                         .HasColumnType("tinyint(1)");
 
                     b.Property<bool>("IsPeriodBased")
@@ -5932,6 +5922,10 @@ namespace HRM.backend.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CreatedByAccountId");
+
+                    b.HasIndex("UpdatedByAccountId");
+
                     b.HasIndex("Year", "VersionCode")
                         .IsUnique()
                         .HasDatabaseName("UX_company_calendars_Year_Version");
@@ -6200,6 +6194,14 @@ namespace HRM.backend.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("DirectorReviewerAccountId");
+
+                    b.HasIndex("HrReviewerAccountId");
+
+                    b.HasIndex("ManagerReviewerAccountId");
+
+                    b.HasIndex("RequestedByAccountId");
+
                     b.HasIndex("EmployeeId", "StartAt", "EndAt")
                         .HasDatabaseName("IX_overtime_requests_EmployeeId_StartAt_EndAt");
 
@@ -6354,6 +6356,10 @@ namespace HRM.backend.Migrations
                     b.HasIndex("CompanyCalendarId")
                         .HasDatabaseName("IX_work_calendar_configs_CompanyCalendarId");
 
+                    b.HasIndex("CreatedByAccountId");
+
+                    b.HasIndex("UpdatedByAccountId");
+
                     b.HasIndex("DeptId", "Month", "Year")
                         .IsUnique()
                         .HasDatabaseName("UX_work_calendar_configs_DeptId_Month_Year");
@@ -6405,6 +6411,90 @@ namespace HRM.backend.Migrations
                         .HasDatabaseName("UX_work_shifts_DeptId");
 
                     b.ToTable("work_shifts");
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.WorkflowRequests.EmploymentHistory", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("ApprovedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("ChangeDate")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime>("EffectiveDate")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int?>("EmployeeId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("NewValue")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("OldValue")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasColumnType("VARCHAR(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApprovedBy");
+
+                    b.HasIndex("EmployeeId");
+
+                    b.ToTable("employment_history");
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.WorkflowRequests.Request", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Content")
+                        .HasColumnType("longtext");
+
+                    b.Property<int?>("CurrentApproverId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("DeadlineAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int?>("EmployeeId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("RequestType")
+                        .IsRequired()
+                        .HasColumnType("VARCHAR(50)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("VARCHAR(50)");
+
+                    b.Property<int?>("TargetDeptId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("TargetPositionId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EmployeeId");
+
+                    b.HasIndex("TargetDeptId");
+
+                    b.HasIndex("TargetPositionId");
+
+                    b.ToTable("requests");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.Contract", b =>
@@ -6754,6 +6844,16 @@ namespace HRM.backend.Migrations
                     b.Navigation("Payroll");
                 });
 
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.InsuranceConfig", b =>
+                {
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.System.Account", "CreatedByAccount")
+                        .WithMany()
+                        .HasForeignKey("CreatedByAccountId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("CreatedByAccount");
+                });
+
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.MonthlyInsuranceStatus", b =>
                 {
                     b.HasOne("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.Employee", "Employee")
@@ -6763,6 +6863,26 @@ namespace HRM.backend.Migrations
                         .IsRequired();
 
                     b.Navigation("Employee");
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.OvertimeRateConfig", b =>
+                {
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.System.Account", "CreatedByAccount")
+                        .WithMany()
+                        .HasForeignKey("CreatedByAccountId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("CreatedByAccount");
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.PITTaxBracket", b =>
+                {
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.System.Account", "CreatedByAccount")
+                        .WithMany()
+                        .HasForeignKey("CreatedByAccountId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("CreatedByAccount");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.Payroll", b =>
@@ -6871,6 +6991,44 @@ namespace HRM.backend.Migrations
                     b.Navigation("Payroll");
                 });
 
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.PayrollFormula", b =>
+                {
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.System.Account", "ActivatedByAccount")
+                        .WithMany()
+                        .HasForeignKey("ActivatedByAccountId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.System.Account", "ApprovedByAccount")
+                        .WithMany()
+                        .HasForeignKey("ApprovedByAccountId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.System.Account", "ArchivedByAccount")
+                        .WithMany()
+                        .HasForeignKey("ArchivedByAccountId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.System.Account", "CreatedByAccount")
+                        .WithMany()
+                        .HasForeignKey("CreatedByAccountId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.System.Account", "SubmittedByAccount")
+                        .WithMany()
+                        .HasForeignKey("SubmittedByAccountId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("ActivatedByAccount");
+
+                    b.Navigation("ApprovedByAccount");
+
+                    b.Navigation("ArchivedByAccount");
+
+                    b.Navigation("CreatedByAccount");
+
+                    b.Navigation("SubmittedByAccount");
+                });
+
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.PayrollFormulaLine", b =>
                 {
                     b.HasOne("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.PayrollFormula", "PayrollFormula")
@@ -6923,6 +7081,16 @@ namespace HRM.backend.Migrations
                     b.Navigation("Batch");
 
                     b.Navigation("Employee");
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PayrollAllowances.TaxConfig", b =>
+                {
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.System.Account", "CreatedByAccount")
+                        .WithMany()
+                        .HasForeignKey("CreatedByAccountId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("CreatedByAccount");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.PersonnelChanges.PersonnelChangeApproval", b =>
@@ -7151,43 +7319,6 @@ namespace HRM.backend.Migrations
                     b.Navigation("Position");
                 });
 
-            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.RequestHandover.EmploymentHistory", b =>
-                {
-                    b.HasOne("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.Employee", "Approver")
-                        .WithMany()
-                        .HasForeignKey("ApprovedBy")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.Employee", "Employee")
-                        .WithMany()
-                        .HasForeignKey("EmployeeId");
-
-                    b.Navigation("Approver");
-
-                    b.Navigation("Employee");
-                });
-
-            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.RequestHandover.Request", b =>
-                {
-                    b.HasOne("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.Employee", "Employee")
-                        .WithMany()
-                        .HasForeignKey("EmployeeId");
-
-                    b.HasOne("HRM.backend.src.HRM.Core.Entities.Organization.Department", "TargetDepartment")
-                        .WithMany()
-                        .HasForeignKey("TargetDeptId");
-
-                    b.HasOne("HRM.backend.src.HRM.Core.Entities.Organization.Position", "TargetPosition")
-                        .WithMany()
-                        .HasForeignKey("TargetPositionId");
-
-                    b.Navigation("Employee");
-
-                    b.Navigation("TargetDepartment");
-
-                    b.Navigation("TargetPosition");
-                });
-
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.System.Account", b =>
                 {
                     b.HasOne("HRM.backend.src.HRM.Core.Entities.System.Role", "Role")
@@ -7224,6 +7355,23 @@ namespace HRM.backend.Migrations
                         .HasForeignKey("AccountId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.System.PayrollPolicy", b =>
+                {
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.System.Account", "CreatedByAccount")
+                        .WithMany()
+                        .HasForeignKey("CreatedByAccountId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.System.Account", "UpdatedByAccount")
+                        .WithMany()
+                        .HasForeignKey("UpdatedByAccountId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("CreatedByAccount");
+
+                    b.Navigation("UpdatedByAccount");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.System.RolePermission", b =>
@@ -7520,6 +7668,23 @@ namespace HRM.backend.Migrations
                     b.Navigation("Employee");
                 });
 
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TimeAttendance.CompanyCalendar", b =>
+                {
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.System.Account", "CreatedByAccount")
+                        .WithMany()
+                        .HasForeignKey("CreatedByAccountId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.System.Account", "UpdatedByAccount")
+                        .WithMany()
+                        .HasForeignKey("UpdatedByAccountId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("CreatedByAccount");
+
+                    b.Navigation("UpdatedByAccount");
+                });
+
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TimeAttendance.CompanyCalendarDay", b =>
                 {
                     b.HasOne("HRM.backend.src.HRM.Core.Entities.TimeAttendance.CompanyCalendar", "Calendar")
@@ -7567,13 +7732,42 @@ namespace HRM.backend.Migrations
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TimeAttendance.OvertimeRequest", b =>
                 {
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.System.Account", "DirectorReviewerAccount")
+                        .WithMany()
+                        .HasForeignKey("DirectorReviewerAccountId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.Employee", "Employee")
                         .WithMany()
                         .HasForeignKey("EmployeeId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.System.Account", "HrReviewerAccount")
+                        .WithMany()
+                        .HasForeignKey("HrReviewerAccountId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.System.Account", "ManagerReviewerAccount")
+                        .WithMany()
+                        .HasForeignKey("ManagerReviewerAccountId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.System.Account", "RequestedByAccount")
+                        .WithMany()
+                        .HasForeignKey("RequestedByAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("DirectorReviewerAccount");
+
                     b.Navigation("Employee");
+
+                    b.Navigation("HrReviewerAccount");
+
+                    b.Navigation("ManagerReviewerAccount");
+
+                    b.Navigation("RequestedByAccount");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TimeAttendance.OvertimeSegment", b =>
@@ -7594,15 +7788,29 @@ namespace HRM.backend.Migrations
                         .HasForeignKey("CompanyCalendarId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.System.Account", "CreatedByAccount")
+                        .WithMany()
+                        .HasForeignKey("CreatedByAccountId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("HRM.backend.src.HRM.Core.Entities.Organization.Department", "Department")
                         .WithMany()
                         .HasForeignKey("DeptId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.System.Account", "UpdatedByAccount")
+                        .WithMany()
+                        .HasForeignKey("UpdatedByAccountId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("CompanyCalendar");
 
+                    b.Navigation("CreatedByAccount");
+
                     b.Navigation("Department");
+
+                    b.Navigation("UpdatedByAccount");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.TimeAttendance.WorkShift", b =>
@@ -7612,6 +7820,43 @@ namespace HRM.backend.Migrations
                         .HasForeignKey("DeptId");
 
                     b.Navigation("Department");
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.WorkflowRequests.EmploymentHistory", b =>
+                {
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.Employee", "Approver")
+                        .WithMany()
+                        .HasForeignKey("ApprovedBy")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.Employee", "Employee")
+                        .WithMany()
+                        .HasForeignKey("EmployeeId");
+
+                    b.Navigation("Approver");
+
+                    b.Navigation("Employee");
+                });
+
+            modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.WorkflowRequests.Request", b =>
+                {
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.Employee", "Employee")
+                        .WithMany()
+                        .HasForeignKey("EmployeeId");
+
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.Organization.Department", "TargetDepartment")
+                        .WithMany()
+                        .HasForeignKey("TargetDeptId");
+
+                    b.HasOne("HRM.backend.src.HRM.Core.Entities.Organization.Position", "TargetPosition")
+                        .WithMany()
+                        .HasForeignKey("TargetPositionId");
+
+                    b.Navigation("Employee");
+
+                    b.Navigation("TargetDepartment");
+
+                    b.Navigation("TargetPosition");
                 });
 
             modelBuilder.Entity("HRM.backend.src.HRM.Core.Entities.EmployeeProfile.Contract", b =>

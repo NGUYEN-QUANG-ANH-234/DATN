@@ -26,6 +26,10 @@ export const salaryVariableApi = {
     });
   },
 
+  deleteCatalog: async (id: number): Promise<BaseResponse<null>> => {
+    return await axiosClient.delete(`${CATALOG_ENDPOINT}/${id}`);
+  },
+
   define: async (payload: SalaryVariable): Promise<BaseResponse<null>> => {
     return await axiosClient.post(ENDPOINT, payload);
   },
@@ -37,5 +41,9 @@ export const salaryVariableApi = {
     return await axiosClient.patch(`${ENDPOINT}/${encodeURIComponent(code)}/active`, {
       isActive,
     });
+  },
+
+  delete: async (code: string): Promise<BaseResponse<null>> => {
+    return await axiosClient.delete(`${ENDPOINT}/${encodeURIComponent(code)}`);
   },
 };

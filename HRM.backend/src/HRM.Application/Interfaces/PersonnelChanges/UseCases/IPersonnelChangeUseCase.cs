@@ -12,6 +12,7 @@ namespace HRM.backend.src.HRM.Application.Interfaces.PersonnelChanges.UseCases
             DateTime? requestedFrom,
             DateTime? requestedTo,
             CancellationToken ct);
+        Task<List<PersonnelChangeListItemDto>> GetMyActionItemsAsync(int actorAccountId, CancellationToken ct);
         Task<PersonnelChangeDetailDto> GetDetailAsync(int id, CancellationToken ct);
         Task<PersonnelChangeRiskSummaryDto> GetRiskSummaryAsync(int id, CancellationToken ct);
         Task<List<PersonnelChangeTimelineDto>> GetTimelineAsync(int id, CancellationToken ct);

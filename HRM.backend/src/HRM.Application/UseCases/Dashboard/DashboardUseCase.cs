@@ -261,7 +261,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.Dashboard
                 .FirstOrDefaultAsync(ct);
 
             var leavePending = await _db.LeaveRequests.AsNoTracking()
-                .Where(l => l.EmployeeId == employeeId && (l.Status == LeaveRequestStatus.Pending || l.Status == LeaveRequestStatus.PendingDept || l.Status == LeaveRequestStatus.PendingDirector))
+                .Where(l => l.EmployeeId == employeeId && (l.Status == LeaveRequestStatus.Pending || l.Status == LeaveRequestStatus.PendingDept || l.Status == LeaveRequestStatus.PendingHR || l.Status == LeaveRequestStatus.PendingDirector))
                 .CountAsync(ct);
 
             var otPending = await _db.OvertimeRequests.AsNoTracking()
@@ -847,14 +847,20 @@ namespace HRM.backend.src.HRM.Application.UseCases.Dashboard
         private async Task<int> CountPendingApprovalsAsync(DashboardActor actor, DashboardPeriod period, CancellationToken ct)
         {
             var count = 0;
+            var payrollRunStatuses = await _db.Payrolls
+                .AsNoTracking()
+                .Where(p => p.Month == period.Month && p.Year == period.Year)
+                .Select(p => p.Status)
+                .ToListAsync(ct);
 
             if (actor.Role is "Admin" or "HR")
             {
                 count += await _db.RecruitmentRequests.AsNoTracking().CountAsync(r => r.Status == RecruitmentRequestStatus.PendingHR, ct);
                 count += await _db.Contracts.AsNoTracking().CountAsync(c => c.Status == ContractStatus.PendingHR || c.Status == ContractStatus.PendingHRRevision, ct);
-                count += await _db.ContractAddendums.AsNoTracking().CountAsync(a => a.Status == AddendumStatus.PendingHR || a.Status == AddendumStatus.PendingHRRevision, ct);
+                count += await _db.ContractAddendums.AsNoTracking().CountAsync(a => a.Status == AddendumStatus.PendingHRRevision, ct);
                 count += await _db.ProfileUpdateRequests.AsNoTracking().CountAsync(p => p.Status == RequestStatus.Pending_HR, ct);
-                count += await _db.Payrolls.AsNoTracking().CountAsync(p => p.Month == period.Month && p.Year == period.Year && p.Status == PayrollStatus.Calculated, ct);
+                count += await _db.LeaveRequests.AsNoTracking().CountAsync(l => l.Status == LeaveRequestStatus.PendingHR, ct);
+                if (IsPayrollRunReadyForSubmission(payrollRunStatuses)) count++;
                 count += await _db.PersonnelChangeRequests.AsNoTracking().CountAsync(p => p.Status == PersonnelChangeStatus.PendingHRReview || p.Status == PersonnelChangeStatus.PendingEmployeeNotification, ct);
             }
 
@@ -863,7 +869,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.Dashboard
                 count += await _db.RecruitmentRequests.AsNoTracking().CountAsync(r => r.Status == RecruitmentRequestStatus.PendingDirector, ct);
                 count += await _db.Contracts.AsNoTracking().CountAsync(c => c.Status == ContractStatus.PendingDirector, ct);
                 count += await _db.ContractAddendums.AsNoTracking().CountAsync(a => a.Status == AddendumStatus.PendingDirector, ct);
-                count += await _db.Payrolls.AsNoTracking().CountAsync(p => p.Month == period.Month && p.Year == period.Year && p.Status == PayrollStatus.PendingApproval, ct);
+                if (IsPayrollRunReadyForDirectorReview(payrollRunStatuses)) count++;
                 count += await _db.PersonnelChangeRequests.AsNoTracking().CountAsync(p => p.Status == PersonnelChangeStatus.PendingDirectorApproval, ct);
             }
 
@@ -886,6 +892,16 @@ namespace HRM.backend.src.HRM.Application.UseCases.Dashboard
 
             return count;
         }
+
+        private static bool IsPayrollRunReadyForSubmission(IReadOnlyCollection<PayrollStatus> statuses) =>
+            statuses.Count > 0 &&
+            statuses.All(status =>
+                status == PayrollStatus.Calculated ||
+                status == PayrollStatus.HRReviewed ||
+                status == PayrollStatus.RevisionRequired);
+
+        private static bool IsPayrollRunReadyForDirectorReview(IReadOnlyCollection<PayrollStatus> statuses) =>
+            statuses.Count > 0 && statuses.All(status => status == PayrollStatus.PendingApproval);
 
         private async Task<decimal> CalculateProfileCompletenessAsync(DashboardActor actor, CancellationToken ct)
         {

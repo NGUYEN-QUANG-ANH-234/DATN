@@ -13,6 +13,7 @@ namespace HRM.backend.src.HRM.Application.DTOs.PersonnelChanges
     {
         public int Id { get; set; }
         public int? EmployeeId { get; set; }
+        public int? EmployeeAccountId { get; set; }
         public string? EmployeeCode { get; set; }
         public string? EmployeeName { get; set; }
         public PersonnelChangeType ChangeType { get; set; }
@@ -39,6 +40,7 @@ namespace HRM.backend.src.HRM.Application.DTOs.PersonnelChanges
         public int? CurrentPositionId { get; set; }
         public string? CurrentPositionName { get; set; }
         public int? CurrentManagerId { get; set; }
+        public int? CurrentManagerAccountId { get; set; }
         public string? CurrentManagerName { get; set; }
         public int? CurrentJobLevelId { get; set; }
         public string? CurrentJobLevelName { get; set; }

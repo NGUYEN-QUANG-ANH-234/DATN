@@ -2,7 +2,7 @@ import type { ChangeEvent, FormEvent } from "react";
 import { useMemo, useState } from "react";
 import { Clock3, Power, PowerOff, Save } from "lucide-react";
 import { PageHeader } from "../../../components/layout";
-import { Badge, Button, Card, DataTable } from "../../../components/ui";
+import { Badge, Button, Card, DataTable, Tabs } from "../../../components/ui";
 import type { DataTableColumn } from "../../../components/ui";
 import { useSla } from "../hooks/useSla";
 import type { SlaConfig, SlaUpdateRequest } from "../types/sla";
@@ -21,6 +21,7 @@ export const SlaManager = () => {
   });
   const [message, setMessage] = useState<MessageState | null>(null);
   const [togglingCode, setTogglingCode] = useState<string | null>(null);
+  const [slaTab, setSlaTab] = useState<"active" | "inactive">("active");
 
   const availableProcesses = useMemo(
     () =>
@@ -32,6 +33,9 @@ export const SlaManager = () => {
       ),
     [slas],
   );
+  const activeSlas = useMemo(() => slas.filter((item) => item.isActive), [slas]);
+  const inactiveSlas = useMemo(() => slas.filter((item) => !item.isActive), [slas]);
+  const visibleSlas = slaTab === "active" ? activeSlas : inactiveSlas;
 
   const handleInputChange = (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = event.target;
@@ -232,14 +236,34 @@ export const SlaManager = () => {
           description="Theo dõi các thời hạn đang áp dụng cho từng quy trình."
           actions={<Clock3 size={20} className="text-[var(--hicas-orange)]" />}
         >
-          <DataTable
-            columns={columns}
-            data={slas}
-            loading={loading}
-            rowKey={(row, index) => `${row.code || row.moduleCode}-${index}`}
-            className="border-0 shadow-none"
-            emptyTitle="Chưa có cấu hình SLA"
+          <div className="mb-4">
+            <Tabs
+              value={slaTab}
+              onChange={(value) => setSlaTab(value as "active" | "inactive")}
+              items={[
+                {
+                  value: "active",
+                  label: "Đang áp dụng",
+                  badge: <Badge variant="success">{activeSlas.length}</Badge>,
+                },
+                {
+                  value: "inactive",
+                  label: "Tạm tắt",
+                  badge: <Badge variant="neutral">{inactiveSlas.length}</Badge>,
+                },
+              ]}
+            />
+          </div>
+          <div className="max-h-[560px] overflow-y-auto pr-1">
+            <DataTable
+              columns={columns}
+              data={visibleSlas}
+              loading={loading}
+              rowKey={(row, index) => `${row.code || row.moduleCode}-${index}`}
+              className="border-0 shadow-none"
+              emptyTitle="Chưa có cấu hình SLA"
           />
+          </div>
         </Card>
       </section>
     </div>

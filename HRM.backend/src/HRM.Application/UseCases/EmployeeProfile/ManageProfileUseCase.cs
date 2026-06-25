@@ -85,6 +85,8 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                 if (!string.IsNullOrEmpty(dto.FullName)) updatePayload["FullName"] = dto.FullName;
                 if (dto.Gender.HasValue) updatePayload["Gender"] = (int)dto.Gender.Value;
                 if (dto.BirthDate.HasValue) updatePayload["BirthDate"] = dto.BirthDate.Value;
+                if (!string.IsNullOrEmpty(dto.Nationality)) updatePayload["Nationality"] = dto.Nationality;
+                if (!string.IsNullOrEmpty(dto.Ethnicity)) updatePayload["Ethnicity"] = dto.Ethnicity;
                 if (!string.IsNullOrEmpty(dto.PhoneNumber)) updatePayload["PhoneNumber"] = dto.PhoneNumber;
                 if (!string.IsNullOrEmpty(dto.PersonalEmail)) updatePayload["PersonalEmail"] = dto.PersonalEmail;
                 if (!string.IsNullOrEmpty(dto.CurrentAddress)) updatePayload["CurrentAddress"] = dto.CurrentAddress;
@@ -176,6 +178,8 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                         if (updateData.ContainsKey("FullName")) employee.FullName = updateData["FullName"].GetString()!;
                         if (updateData.ContainsKey("Gender")) employee.Gender = (Gender)updateData["Gender"].GetInt32();
                         if (updateData.ContainsKey("BirthDate")) employee.BirthDate = updateData["BirthDate"].GetDateTime();
+                        if (updateData.ContainsKey("Nationality")) employee.Nationality = updateData["Nationality"].GetString();
+                        if (updateData.ContainsKey("Ethnicity")) employee.Ethnicity = updateData["Ethnicity"].GetString();
                         if (updateData.ContainsKey("PhoneNumber")) employee.PhoneNumber = updateData["PhoneNumber"].GetString();
                         if (updateData.ContainsKey("PersonalEmail")) employee.PersonalEmail = updateData["PersonalEmail"].GetString();
                         if (updateData.ContainsKey("CurrentAddress")) employee.CurrentAddress = updateData["CurrentAddress"].GetString();
@@ -228,6 +232,8 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                 FullName = emp.FullName,
                 Gender = emp.Gender?.ToString() ?? "Khác",
                 BirthDate = emp.BirthDate?.ToString("yyyy-MM-dd"),
+                Nationality = emp.Nationality,
+                Ethnicity = emp.Ethnicity,
 
                 // --- MAP CÁC TRƯỜNG MỚI ---
                 PhoneNumber = emp.PhoneNumber,

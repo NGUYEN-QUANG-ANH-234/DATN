@@ -39,6 +39,21 @@ namespace HRM.backend.src.HRM.API.Controllers.TimeAttendance
             }
         }
 
+        [HttpGet("pending-approval")]
+        [RequirePermission("ATTENDANCE_SUMMARY_VIEW", GroupName = SystemModules.TimekeepingLeave, Description = "Xem kỳ công chờ duyệt")]
+        public async Task<IActionResult> GetPendingApproval(CancellationToken ct)
+        {
+            try
+            {
+                var data = await _useCase.GetPendingApprovalPeriodsAsync(GetRole(), ct);
+                return Ok(new { Success = true, Data = data });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, new { Success = false, Message = ex.Message });
+            }
+        }
+
         [HttpPost("generate")]
         [RequirePermission("ATTENDANCE_SUMMARY_GENERATE", GroupName = SystemModules.TimekeepingLeave, Description = "Tổng hợp bảng công theo tháng")]
         public async Task<IActionResult> Generate([FromBody] GenerateAttendanceSummaryDto dto, CancellationToken ct)
@@ -134,6 +149,25 @@ namespace HRM.backend.src.HRM.API.Controllers.TimeAttendance
             }
         }
 
+        [HttpGet("daily/adjustment-logs")]
+        [RequirePermission("ATTENDANCE_SUMMARY_VIEW", GroupName = SystemModules.TimekeepingLeave, Description = "Xem lịch sử thay đổi ngày công")]
+        public async Task<IActionResult> GetAdjustmentLogs([FromQuery] byte month, [FromQuery] short year, CancellationToken ct)
+        {
+            try
+            {
+                var data = await _useCase.GetAdjustmentLogsAsync(month, year, GetRole(), ct);
+                return Ok(new { Success = true, Data = data });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, new { Success = false, Message = ex.Message });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { Success = false, Message = ex.Message });
+            }
+        }
+
         [HttpPatch("daily/{id:int}/adjust")]
         [RequirePermission("ATTENDANCE_SUMMARY_GENERATE", GroupName = SystemModules.TimekeepingLeave, Description = "Điều chỉnh bảng công theo ngày")]
         public async Task<IActionResult> AdjustDaily(int id, [FromBody] AdjustAttendanceDailySummaryDto dto, CancellationToken ct)
@@ -142,6 +176,25 @@ namespace HRM.backend.src.HRM.API.Controllers.TimeAttendance
             {
                 var data = await _useCase.AdjustDailyAsync(id, dto, GetAccountId(), GetRole(), ct);
                 return Ok(new { Success = true, Data = data, Message = "Đã điều chỉnh bảng công ngày." });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, new { Success = false, Message = ex.Message });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { Success = false, Message = ex.Message });
+            }
+        }
+
+        [HttpPost("daily/import")]
+        [RequirePermission("ATTENDANCE_SUMMARY_GENERATE", GroupName = SystemModules.TimekeepingLeave, Description = "Import điều chỉnh bảng công theo ngày")]
+        public async Task<IActionResult> ImportDaily([FromForm] ImportAttendanceDailySummaryDto dto, CancellationToken ct)
+        {
+            try
+            {
+                var data = await _useCase.ImportDailyAdjustmentsAsync(dto, GetAccountId(), GetRole(), ct);
+                return Ok(new { Success = true, Data = data, Message = $"Đã import bảng công ngày. Cập nhật {data.UpdatedRows}, tạo mới {data.CreatedRows}, lỗi {data.ErrorRows}." });
             }
             catch (UnauthorizedAccessException ex)
             {

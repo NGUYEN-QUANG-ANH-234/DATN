@@ -26,4 +26,18 @@ export const myProfileApi = {
   }): Promise<{ success: boolean; data: PaginatedHistoryResponse }> => {
     return await axiosClient.get("/employees/me/history", { params });
   },
+
+  getEmployeeHistory: async (
+    employeeId: number,
+    params: {
+      year?: number | "";
+      type?: HistoryEventType;
+      page?: number;
+      size?: number;
+    },
+  ): Promise<{ success: boolean; data: PaginatedHistoryResponse }> => {
+    return await axiosClient.get("/employees/history", {
+      params: { ...params, employeeId },
+    });
+  },
 };

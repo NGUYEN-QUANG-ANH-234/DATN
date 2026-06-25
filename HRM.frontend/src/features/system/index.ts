@@ -1,5 +1,7 @@
 export { AttendanceConfigManager } from "./components/AttendanceConfigManager";
 export { PayrollPolicyManager } from "./components/PayrollPolicyManager";
+export { PayrollFeatureTogglePage } from "./components/PayrollFeatureTogglePage";
+export { PayrollSourceCatalogManager } from "./components/PayrollSourceCatalogManager";
 export { SalaryVariableManager } from "./components/SalaryVariableManager";
 export { SlaManager } from "./components/SlaManager";
 export { TemplateManager } from "./components/TemplateManager";

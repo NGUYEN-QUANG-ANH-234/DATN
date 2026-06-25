@@ -7,7 +7,9 @@ import { getFirstAccessiblePath } from "./routes/appRoutes";
 import { MainLayout } from "./core/layouts/MainLayout";
 import {
   AttendanceConfigManager,
+  PayrollFeatureTogglePage,
   PayrollPolicyManager,
+  PayrollSourceCatalogManager,
   SalaryVariableManager,
   SlaManager,
   TemplateManager,
@@ -50,6 +52,7 @@ import {
 } from "./features/recruitment";
 import {
   KpiImportPage,
+  LearningWorkspacePage,
   PerformanceEvaluationPage,
   TaskWorkspacePage,
   TrainingEvaluationPage,
@@ -64,7 +67,7 @@ import {
   SalaryFormulaPage,
 } from "./features/payroll";
 import { PenaltyRecordPage } from "./features/penalties";
-import { PersonnelChangePage } from "./features/personnel-change";
+import { PersonnelChangePage, PersonnelChangeTrackingPage } from "./features/personnel-change";
 import { DocumentFormsPage } from "./features/document-forms";
 
 const Redirect = ({ to }: { to: string }) => <Navigate to={to} replace />;
@@ -77,6 +80,7 @@ const RoleRedirect = ({ candidates }: { candidates: string[] }) => {
 const SYSTEM_CONFIG_ROUTES = [
   "/system-config/positions-departments",
   "/system-config/salary-variables",
+  "/system-config/payroll-sources",
   "/system-config/sla",
   "/system-config/notification-templates",
   "/system-config/document-templates",
@@ -84,6 +88,7 @@ const SYSTEM_CONFIG_ROUTES = [
   "/system-config/work-schedules",
   "/system-config/company-calendar",
   "/system-config/payroll-policies",
+  "/system-config/payroll-feature-toggles",
 ];
 
 const ADMIN_ROUTES = [
@@ -101,11 +106,11 @@ const RECRUITMENT_ROUTES = [
 ];
 
 const EMPLOYEE_CONTRACT_ROUTES = [
+  "/employee-contract/profile-setup",
   "/employee-contract/my-profile",
   "/employee-contract/profile-change",
   "/employee-contract/contracts",
   "/employee-contract/contract-requests",
-  "/employee-contract/profile-setup",
   "/employee-contract/hr-contracts",
   "/employee-contract/appendices",
   "/employee-contract/history",
@@ -120,6 +125,7 @@ const ATTENDANCE_ROUTES = [
 
 const PERFORMANCE_ROUTES = [
   "/performance-training/criteria",
+  "/performance-training/my-learning",
   "/performance-training/result-update",
   "/performance-training/penalties",
   "/performance-training/review-finalize",
@@ -137,6 +143,7 @@ const PAYROLL_ROUTES = [
 ];
 
 const PERSONNEL_CHANGE_ROUTES = [
+  "/personnel-change/tracking",
   "/personnel-change/promotion",
   "/personnel-change/senior-appointment",
   "/personnel-change/termination",
@@ -151,6 +158,11 @@ function App() {
         <Routes>
           <Route path="/" element={<LoginPage />} />
           <Route path="/careers" element={<PublicCareersPage />} />
+          <Route
+            path="/employee-contract/profile-setup/:candidateId"
+            element={<OnboardingForm />}
+          />
+          <Route path="/employees/onboarding/:candidateId" element={<OnboardingForm />} />
 
           <Route element={<ProtectedRoute />}>
             <Route element={<MainLayout />}>
@@ -171,8 +183,16 @@ function App() {
                 element={<SalaryVariableManager />}
               />
               <Route
+                path="/system-config/payroll-sources"
+                element={<PayrollSourceCatalogManager />}
+              />
+              <Route
                 path="/system-config/payroll-policies"
                 element={<PayrollPolicyManager />}
+              />
+              <Route
+                path="/system-config/payroll-feature-toggles"
+                element={<PayrollFeatureTogglePage />}
               />
               <Route path="/system-config/sla" element={<SlaManager />} />
               <Route
@@ -223,14 +243,10 @@ function App() {
               />
               <Route path="/employee-contract/my-profile" element={<MyProfile />} />
               <Route path="/employee-contract/profile-setup" element={<OnboardingForm />} />
-              <Route
-                path="/employee-contract/profile-setup/:candidateId"
-                element={<OnboardingForm />}
-              />
               <Route path="/employee-contract/profile-change" element={<ProfileUpdateForm />} />
               <Route
                 path="/employee-contract/profile-review"
-                element={<Redirect to={getApprovalRedirect("PROFILE")} />}
+                element={<Redirect to={getApprovalRedirect("ONBOARDING")} />}
               />
               <Route path="/employee-contract/contracts" element={<MyContracts />} />
               <Route
@@ -270,6 +286,10 @@ function App() {
               />
               <Route path="/performance-training/criteria" element={<KpiImportPage />} />
               <Route
+                path="/performance-training/my-learning"
+                element={<LearningWorkspacePage />}
+              />
+              <Route
                 path="/performance-training/result-update"
                 element={<TaskWorkspacePage />}
               />
@@ -301,6 +321,10 @@ function App() {
               <Route
                 path="/personnel-change"
                 element={<RoleRedirect candidates={PERSONNEL_CHANGE_ROUTES} />}
+              />
+              <Route
+                path="/personnel-change/tracking"
+                element={<PersonnelChangeTrackingPage />}
               />
               <Route
                 path="/personnel-change/promotion"
@@ -335,8 +359,16 @@ function App() {
                 element={<Redirect to="/system-config/salary-variables" />}
               />
               <Route
+                path="/system/payroll-sources"
+                element={<Redirect to="/system-config/payroll-sources" />}
+              />
+              <Route
                 path="/system/payroll-policies"
                 element={<Redirect to="/system-config/payroll-policies" />}
+              />
+              <Route
+                path="/system/payroll-feature-toggles"
+                element={<Redirect to="/system-config/payroll-feature-toggles" />}
               />
               <Route path="/system/sla" element={<Redirect to="/system-config/sla" />} />
               <Route
@@ -397,7 +429,7 @@ function App() {
               />
               <Route
                 path="/employees/hr-profile-review"
-                element={<Redirect to={getApprovalRedirect("PROFILE")} />}
+                element={<Redirect to={getApprovalRedirect("ONBOARDING")} />}
               />
               <Route
                 path="/employees/my-contracts"
@@ -427,7 +459,6 @@ function App() {
                 path="/employees/onboarding"
                 element={<Redirect to="/employee-contract/profile-setup" />}
               />
-              <Route path="/employees/onboarding/:candidateId" element={<OnboardingForm />} />
 
               <Route
                 path="/attendance"
@@ -457,6 +488,10 @@ function App() {
               <Route
                 path="/tasks/workspace"
                 element={<Redirect to="/performance-training/result-update" />}
+              />
+              <Route
+                path="/tasks/my-learning"
+                element={<Redirect to="/performance-training/my-learning" />}
               />
               <Route
                 path="/tasks/penalties"

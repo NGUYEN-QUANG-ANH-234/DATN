@@ -48,6 +48,23 @@ export const useSalarySlips = (period: string) => {
     );
   };
 
+  const setSelectedSlipIds = (ids: number[]) => {
+    setSelectedIds(Array.from(new Set(ids)));
+  };
+
+  const selectSlips = (ids: number[]) => {
+    setSelectedIds((current) => Array.from(new Set([...current, ...ids])));
+  };
+
+  const unselectSlips = (ids: number[]) => {
+    const removeIds = new Set(ids);
+    setSelectedIds((current) => current.filter((id) => !removeIds.has(id)));
+  };
+
+  const clearSelected = () => {
+    setSelectedIds([]);
+  };
+
   const exportSelected = async () => {
     if (selectedIds.length === 0) {
       triggerAlert("warning", "Chưa chọn phiếu lương", "Vui lòng chọn ít nhất một phiếu để kết xuất.");
@@ -86,6 +103,10 @@ export const useSalarySlips = (period: string) => {
     loadSlips,
     openDetail,
     toggleSelected,
+    setSelectedSlipIds,
+    selectSlips,
+    unselectSlips,
+    clearSelected,
     exportSelected,
   };
 };

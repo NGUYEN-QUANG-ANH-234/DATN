@@ -44,15 +44,22 @@ namespace HRM.backend.src.HRM.Application.UseCases.TasksTraining
 
         public async Task<List<PerformanceEvaluationDto>> GetPendingEvaluationsAsync(int actorAccountId, string role, CancellationToken ct = default)
         {
-            var reviewer = await _employeeRepo.GetByAccountIdAsync(actorAccountId, ct)
-                ?? throw new UnauthorizedAccessException("Account is not linked to an employee profile.");
-            if (!IsManager(role) && !IsHrOrAdmin(role))
-                throw new UnauthorizedAccessException("Only Manager, HR or Admin can evaluate performance.");
+            if (IsAdmin(role))
+            {
+                var allReviews = await _reviewRepo.GetByStatusAsync(ReviewStatus.PendingEvaluation, ct);
+                return allReviews.Select(r => MapReview(r, 0)).ToList();
+            }
 
-            var reviews = IsManager(role)
-                ? await _reviewRepo.GetPendingEvaluationAsync(reviewer.DeptId ?? 0, ct)
-                : await _reviewRepo.GetByStatusAsync(ReviewStatus.PendingEvaluation, ct);
+            if (!IsManager(role))
+                return new List<PerformanceEvaluationDto>();
 
+            var managedDeptIds = (await _employeeRepo.GetManagedDepartmentIdsByAccountIdAsync(actorAccountId, ct)).ToHashSet();
+            if (managedDeptIds.Count == 0)
+                return new List<PerformanceEvaluationDto>();
+
+            var reviews = (await _reviewRepo.GetByStatusAsync(ReviewStatus.PendingEvaluation, ct))
+                .Where(r => r.DeptId.HasValue && managedDeptIds.Contains(r.DeptId.Value))
+                .ToList();
             return reviews.Select(r => MapReview(r, 0)).ToList();
         }
 
@@ -242,16 +249,23 @@ namespace HRM.backend.src.HRM.Application.UseCases.TasksTraining
 
         private async Task EnsureReviewerAsync(PerformanceReview review, int actorAccountId, string role, CancellationToken ct)
         {
-            if (IsHrOrAdmin(role))
+            if (IsAdmin(role))
                 return;
             if (!IsManager(role))
-                throw new UnauthorizedAccessException("Only Manager, HR or Admin can evaluate performance.");
+                throw new UnauthorizedAccessException("Only Manager or Admin can evaluate performance.");
 
-            var reviewer = await _employeeRepo.GetByAccountIdAsync(actorAccountId, ct)
-                ?? throw new UnauthorizedAccessException("Account is not linked to an employee profile.");
-            if (review.DeptId.HasValue && reviewer.DeptId == review.DeptId)
+            var managedDeptIds = await GetManagedDepartmentIdsAsync(actorAccountId, ct);
+            if (review.DeptId.HasValue && managedDeptIds.Contains(review.DeptId.Value))
                 return;
             throw new UnauthorizedAccessException("Manager can only evaluate employees in their department.");
+        }
+
+        private async Task<HashSet<int>> GetManagedDepartmentIdsAsync(int actorAccountId, CancellationToken ct)
+        {
+            var deptIds = await _employeeRepo.GetManagedDepartmentIdsByAccountIdAsync(actorAccountId, ct);
+            if (deptIds.Count == 0)
+                throw new UnauthorizedAccessException("Manager account is not linked to a managed department.");
+            return deptIds.ToHashSet();
         }
 
         private static PerformanceEvaluationDto MapReview(PerformanceReview review, decimal systemPenalty)
@@ -325,8 +339,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.TasksTraining
             role.Equals("Manager", StringComparison.OrdinalIgnoreCase) ||
             role.Equals("Truong phong", StringComparison.OrdinalIgnoreCase);
 
-        private static bool IsHrOrAdmin(string role) =>
-            role.Equals("HR", StringComparison.OrdinalIgnoreCase) ||
+        private static bool IsAdmin(string role) =>
             role.Equals("Admin", StringComparison.OrdinalIgnoreCase);
     }
 }

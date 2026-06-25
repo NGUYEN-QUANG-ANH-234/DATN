@@ -70,6 +70,8 @@ namespace HRM.backend.src.HRM.Application.Handlers
                         if (updateData.ContainsKey("BirthDate")) employee.BirthDate = updateData["BirthDate"].GetDateTime();
 
                         // --- ĐỌC CÁC TRƯỜNG MỚI TỪ JSON VÀ GHI VÀO DB ---
+                        if (updateData.ContainsKey("Nationality")) employee.Nationality = updateData["Nationality"].GetString();
+                        if (updateData.ContainsKey("Ethnicity")) employee.Ethnicity = updateData["Ethnicity"].GetString();
                         if (updateData.ContainsKey("PhoneNumber")) employee.PhoneNumber = updateData["PhoneNumber"].GetString();
                         if (updateData.ContainsKey("PersonalEmail")) employee.PersonalEmail = updateData["PersonalEmail"].GetString();
                         if (updateData.ContainsKey("CurrentAddress")) employee.CurrentAddress = updateData["CurrentAddress"].GetString();

@@ -77,6 +77,9 @@ export const OvertimeTable = ({
         rowKey={(row) => row.id}
         emptyTitle={emptyText}
         className="border-0 shadow-none"
+        tableClassName="min-w-[1080px]"
+        scrollContainerClassName="max-h-[500px] overflow-auto"
+        stickyHeader
       />
     </Card>
   );

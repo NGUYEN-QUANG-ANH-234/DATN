@@ -8,5 +8,12 @@ namespace HRM.backend.src.HRM.Application.Interfaces.EmployeeProfile.Usecases
             int accountId,
             HistoryFilterDto filter,
             CancellationToken ct = default);
+
+        Task<PaginatedHistoryResponse> GetEmployeeConsolidatedHistoryAsync(
+            int actorAccountId,
+            string actorRoleName,
+            int employeeId,
+            HistoryFilterDto filter,
+            CancellationToken ct = default);
     }
 }

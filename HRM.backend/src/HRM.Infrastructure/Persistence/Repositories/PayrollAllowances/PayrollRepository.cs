@@ -252,6 +252,33 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.PayrollAll
                 .ToList();
         }
 
+        public async Task<List<OvertimeRateConfig>> GetOvertimeRateConfigsAsync(bool includeInactive = true, CancellationToken ct = default)
+        {
+            return await _context.OvertimeRateConfigs
+                .Where(o => includeInactive || o.IsActive)
+                .OrderBy(o => o.OvertimeType)
+                .ThenByDescending(o => o.EffectiveFrom)
+                .ThenByDescending(o => o.Version)
+                .AsNoTracking()
+                .ToListAsync(ct);
+        }
+
+        public async Task<OvertimeRateConfig?> GetOvertimeRateConfigForUpdateAsync(int id, CancellationToken ct = default)
+        {
+            return await _context.OvertimeRateConfigs
+                .FirstOrDefaultAsync(o => o.Id == id, ct);
+        }
+
+        public async Task AddOvertimeRateConfigAsync(OvertimeRateConfig config, CancellationToken ct = default)
+        {
+            await _context.OvertimeRateConfigs.AddAsync(config, ct);
+        }
+
+        public void UpdateOvertimeRateConfig(OvertimeRateConfig config)
+        {
+            _context.OvertimeRateConfigs.Update(config);
+        }
+
         public async Task<List<PayrollPolicy>> GetActivePayrollPoliciesAsync(PayrollPolicyType policyType, DateTime effectiveDate, CancellationToken ct = default)
         {
             return await _context.PayrollPolicies

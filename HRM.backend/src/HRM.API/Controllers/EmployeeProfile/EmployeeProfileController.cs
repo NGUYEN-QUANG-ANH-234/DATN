@@ -109,6 +109,38 @@ namespace HRM.backend.src.HRM.API.Controllers.EmployeeProfile
             }
         }
 
+        [HttpGet("history")]
+        [RequirePermission("PROFILE_REQUEST_VIEW", GroupName = SystemModules.ProfileContract, Description = "Xem lịch sử biến động hồ sơ, hợp đồng và phụ lục theo phạm vi phân quyền")]
+        public async Task<IActionResult> GetEmployeeHistory([FromQuery] int employeeId, [FromQuery] HistoryFilterDto filter, CancellationToken ct)
+        {
+            try
+            {
+                if (employeeId <= 0)
+                    return BadRequest(new { Success = false, Message = "Vui lòng chọn nhân sự cần xem lịch sử." });
+
+                var history = await _historyUseCase.GetEmployeeConsolidatedHistoryAsync(
+                    GetAccountId(),
+                    GetRole(),
+                    employeeId,
+                    filter,
+                    ct);
+
+                return Ok(new { Success = true, Data = history });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { Success = false, Message = ex.Message });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, new { Success = false, Message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { Success = false, Message = "Lỗi xử lý hệ thống: " + ex.Message });
+            }
+        }
+
         [HttpPatch("profile-requests/{id}/review")]
         [RequirePermission("PROFILE_REQUEST_REVIEW", GroupName = SystemModules.ProfileContract, Description = "Phê duyệt hoặc từ chối yêu cầu cập nhật hồ sơ từ nhân viên")]
         public async Task<IActionResult> ReviewProfileRequest(int id, [FromBody] ReviewProfileUpdateDto dto, CancellationToken ct)

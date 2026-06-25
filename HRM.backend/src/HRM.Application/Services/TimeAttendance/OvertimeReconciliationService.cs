@@ -152,12 +152,18 @@ namespace HRM.backend.src.HRM.Application.Services.TimeAttendance
             string policyCode)
         {
             if (config != null)
-                return decimal.Round(config.BaseMultiplier + config.NightAllowanceRate + config.NightOvertimeExtraRate, 4);
+                return CalculateRateMultiplier(config);
 
             if (policy?.RatePercent > 0)
                 return decimal.Round(policy.RatePercent.Value / 100m, 4);
 
             throw new InvalidOperationException($"Thiếu cấu hình hệ số làm thêm cho chính sách {policyCode}.");
+        }
+
+        private static decimal CalculateRateMultiplier(Core.Entities.PayrollAllowances.OvertimeRateConfig config)
+        {
+            var nightOvertimeExtra = config.BaseMultiplier * config.NightOvertimeExtraRate;
+            return decimal.Round(config.BaseMultiplier + config.NightAllowanceRate + nightOvertimeExtra, 4);
         }
 
         private static string BuildPolicySnapshot(
@@ -176,6 +182,8 @@ namespace HRM.backend.src.HRM.Application.Services.TimeAttendance
                 config?.BaseMultiplier,
                 config?.NightAllowanceRate,
                 config?.NightOvertimeExtraRate,
+                NightOvertimeExtraAmount = config == null ? (decimal?)null : decimal.Round(config.BaseMultiplier * config.NightOvertimeExtraRate, 4),
+                Formula = config == null ? "RatePercent / 100" : "BaseMultiplier + NightAllowanceRate + (BaseMultiplier * NightOvertimeExtraRate)",
                 PolicyVersion = policy?.Version,
                 policy?.RatePercent,
                 RateMultiplier = rateMultiplier,

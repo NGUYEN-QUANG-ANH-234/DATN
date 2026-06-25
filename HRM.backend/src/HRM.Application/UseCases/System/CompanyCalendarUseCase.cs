@@ -25,6 +25,13 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
             _unitOfWork = unitOfWork;
         }
 
+        public async Task<CompanyCalendarDto?> GetActiveByYearAsync(short year, CancellationToken ct = default)
+        {
+            ValidateYear(year);
+            var calendar = await _calendarRepo.GetActiveByYearAsync(year, ct);
+            return calendar is null ? null : Map(calendar);
+        }
+
         public async Task<List<CompanyCalendarDto>> GetByYearAsync(short year, CancellationToken ct = default)
         {
             ValidateYear(year);

@@ -7,6 +7,7 @@ export type ApprovalModule =
   | "PROFILE"
   | "ONBOARDING"
   | "ADDENDUM"
+  | "ATTENDANCE"
   | "OVERTIME"
   | "LEAVE"
   | "PAYROLL"
@@ -119,6 +120,7 @@ export const APPROVAL_MODULES: Array<{
   value: "ALL" | ApprovalModule;
   label: string;
 }> = [
+  { value: "ATTENDANCE", label: "Chấm công" },
   { value: "ALL", label: "Tất cả" },
   { value: "RECRUITMENT", label: "Tuyển dụng" },
   { value: "CANDIDATE", label: "Ứng viên" },

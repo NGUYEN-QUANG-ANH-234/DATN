@@ -14,16 +14,25 @@ import {
 type Props = {
   request?: PersonnelChangeDetail | null;
   saving?: boolean;
+  canApprove?: boolean;
+  canExecute?: boolean;
   onApprove: (id: number, payload: DirectorApproveDismissalRequest) => Promise<boolean>;
   onExecute: (id: number, payload: ExecutePersonnelChangeRequest) => Promise<boolean>;
 };
 
-export const DismissalDirectorApprovalPanel = ({ request, saving, onApprove, onExecute }: Props) => {
+export const DismissalDirectorApprovalPanel = ({
+  request,
+  saving,
+  canApprove = true,
+  canExecute = true,
+  onApprove,
+  onExecute,
+}: Props) => {
   const [isApproved, setIsApproved] = useState("true");
   const [note, setNote] = useState("");
   const [executeNote, setExecuteNote] = useState("");
   const executeBlockedReason = getContractFlowExecutionBlockReason(request);
-  const executeDisabled = !request || saving || !canExecutePersonnelChange(request);
+  const executeDisabled = !request || saving || !canExecute || !canExecutePersonnelChange(request);
 
   const approve = async (event: FormEvent) => {
     event.preventDefault();
@@ -44,6 +53,7 @@ export const DismissalDirectorApprovalPanel = ({ request, saving, onApprove, onE
 
   return (
     <Card title="Phê duyệt kỷ luật" description="Phê duyệt hồ sơ và thực hiện sau khi xử lý hợp đồng hoàn tất.">
+      {canApprove ? (
       <form className="space-y-4" onSubmit={approve}>
         <Select
           label="Quyết định"
@@ -66,6 +76,8 @@ export const DismissalDirectorApprovalPanel = ({ request, saving, onApprove, onE
           Gửi phê duyệt
         </Button>
       </form>
+      ) : null}
+      {canExecute ? (
       <div className="mt-5 border-t border-[var(--hicas-border-soft)] pt-5">
         <label className="mb-3 block">
           <span className="mb-1 block text-sm font-medium text-[var(--hicas-text-main)]">Ghi chú thực hiện</span>
@@ -85,6 +97,7 @@ export const DismissalDirectorApprovalPanel = ({ request, saving, onApprove, onE
           Thực hiện kỷ luật
         </Button>
       </div>
+      ) : null}
     </Card>
   );
 };

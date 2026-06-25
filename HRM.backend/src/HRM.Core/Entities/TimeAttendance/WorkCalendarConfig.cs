@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using HRM.backend.src.HRM.Core.Entities.Organization;
+using HRM.backend.src.HRM.Core.Entities.System;
 using HRM.backend.src.HRM.Core.Enums;
 
 namespace HRM.backend.src.HRM.Core.Entities.TimeAttendance
@@ -47,6 +48,7 @@ namespace HRM.backend.src.HRM.Core.Entities.TimeAttendance
 
         public int? SupersedesVersionId { get; set; }
         public int? CreatedByAccountId { get; set; }
+        [ForeignKey(nameof(CreatedByAccountId))] public virtual Account? CreatedByAccount { get; set; }
         public DateTime? ActivatedAt { get; set; }
         public bool LockedAfterUsed { get; set; }
 
@@ -56,5 +58,6 @@ namespace HRM.backend.src.HRM.Core.Entities.TimeAttendance
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime? UpdatedAt { get; set; }
         public int? UpdatedByAccountId { get; set; }
+        [ForeignKey(nameof(UpdatedByAccountId))] public virtual Account? UpdatedByAccount { get; set; }
     }
 }

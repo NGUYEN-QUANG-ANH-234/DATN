@@ -8,6 +8,7 @@ import {
   Power,
   RefreshCcw,
   Save,
+  Trash2,
   UsersRound,
   X,
 } from "lucide-react";
@@ -19,6 +20,7 @@ import {
   ConfirmDialog,
   EmptyState,
   LoadingState,
+  Tabs,
 } from "../../../components/ui";
 import { useNotification } from "../../../core/context/NotificationContext";
 import { useDepartments } from "../hooks/useDepartments";
@@ -59,6 +61,17 @@ const flattenDepartments = (
     { ...node, level },
     ...flattenDepartments(node.children || [], level + 1),
   ]);
+
+const filterDepartmentTree = (
+  nodes: DepartmentTree[],
+  predicate: (node: DepartmentTree) => boolean,
+): DepartmentTree[] =>
+  nodes
+    .filter(predicate)
+    .map((node) => ({
+      ...node,
+      children: filterDepartmentTree(node.children || [], predicate),
+    }));
 
 const normalizeStatus = (status?: string | null) => status?.toLowerCase() ?? "";
 
@@ -265,6 +278,8 @@ export const DepartmentManagement = () => {
     loading,
     handleUpdateDepartment,
     handleDeactivate,
+    handleActivate,
+    handleDelete,
     handleCreate,
   } = useDepartments();
   const { triggerAlert } = useNotification();
@@ -275,11 +290,26 @@ export const DepartmentManagement = () => {
     id: number;
     name: string;
   } | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<{
+    id: number;
+    name: string;
+  } | null>(null);
+  const [departmentTab, setDepartmentTab] = useState<"active" | "inactive">("active");
   const [saving, setSaving] = useState(false);
   const [deactivating, setDeactivating] = useState(false);
+  const [activatingId, setActivatingId] = useState<number | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const flatDepartments = useMemo(() => flattenDepartments(treeData), [treeData]);
   const parentOptions = useMemo(() => toParentOptions(flatDepartments), [flatDepartments]);
+  const activeTreeData = useMemo(
+    () => filterDepartmentTree(treeData, (department) => isActiveDepartment(department.status)),
+    [treeData],
+  );
+  const inactiveDepartments = useMemo(
+    () => flatDepartments.filter((department) => !isActiveDepartment(department.status)),
+    [flatDepartments],
+  );
 
   const activeCount = flatDepartments.filter((department) =>
     isActiveDepartment(department.status),
@@ -349,6 +379,43 @@ export const DepartmentManagement = () => {
       "warning",
       "Chưa thể tạm ngừng",
       "Hãy chuyển nhân sự ra khỏi phòng ban này trước khi tiếp tục.",
+    );
+  };
+
+  const onConfirmDelete = async () => {
+    if (!pendingDelete) return;
+
+    setDeleting(true);
+    const success = await handleDelete(pendingDelete.id);
+    setDeleting(false);
+
+    if (success) {
+      triggerAlert("success", "Đã xóa phòng ban", `${pendingDelete.name} đã được xóa khỏi danh sách.`);
+      setPendingDelete(null);
+      return;
+    }
+
+    triggerAlert(
+      "warning",
+      "Chưa thể xóa phòng ban",
+      "Phòng ban còn dữ liệu liên quan, hãy giữ ở trạng thái tạm ngừng.",
+    );
+  };
+
+  const onActivateDepartment = async (id: number, name: string) => {
+    setActivatingId(id);
+    const success = await handleActivate(id);
+    setActivatingId(null);
+
+    if (success) {
+      triggerAlert("success", "Đã bật lại", `${name} đã sẵn sàng sử dụng.`);
+      return;
+    }
+
+    triggerAlert(
+      "warning",
+      "Chưa thể bật lại",
+      "Hãy kiểm tra phòng ban cha trước khi bật lại phòng ban này.",
     );
   };
 
@@ -481,9 +548,75 @@ export const DepartmentManagement = () => {
         title="Sơ đồ phòng ban"
         description="Điều chỉnh phòng ban trực thuộc hoặc tạm ngừng phòng ban không còn sử dụng."
       >
-        {treeData.length ? (
-          <div className="space-y-3">
-            {treeData.map((node) => (
+        <div className="mb-4">
+          <Tabs
+            value={departmentTab}
+            onChange={(value) => setDepartmentTab(value as "active" | "inactive")}
+            items={[
+              {
+                value: "active",
+                label: "Đang hoạt động",
+                badge: <Badge variant="success">{activeCount}</Badge>,
+              },
+              {
+                value: "inactive",
+                label: "Tạm ngừng",
+                badge: <Badge variant="neutral">{inactiveDepartments.length}</Badge>,
+              },
+            ]}
+          />
+        </div>
+
+        {departmentTab === "inactive" && (
+          <div className="max-h-[640px] space-y-3 overflow-y-auto pr-1">
+            {inactiveDepartments.map((department) => (
+              <div
+                key={department.id}
+                className="flex flex-col gap-3 rounded-[var(--radius-lg)] border border-[var(--hicas-border)] bg-white p-4 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="font-semibold text-[var(--hicas-text-main)]">{department.deptName}</h3>
+                    <Badge variant="neutral">{getStatusLabel(department.status)}</Badge>
+                  </div>
+                  <p className="mt-1 text-sm text-[var(--hicas-text-secondary)]">
+                    {department.deptCode} · {department.children?.length || 0} phòng ban trực thuộc
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    iconLeft={<RefreshCcw size={15} />}
+                    isLoading={activatingId === department.id}
+                    onClick={() => onActivateDepartment(department.id, department.deptName)}
+                  >
+                    Bật lại
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="danger"
+                    iconLeft={<Trash2 size={15} />}
+                    onClick={() => setPendingDelete({ id: department.id, name: department.deptName })}
+                  >
+                    Xóa hẳn
+                  </Button>
+                </div>
+              </div>
+            ))}
+            {!inactiveDepartments.length && (
+              <EmptyState
+                icon={<UsersRound size={22} />}
+                title="Chưa có phòng ban tạm ngừng"
+                description="Các phòng ban đã tạm ngừng sẽ được hiển thị tại đây."
+              />
+            )}
+          </div>
+        )}
+
+        {departmentTab === "active" && activeTreeData.length ? (
+          <div className="max-h-[680px] space-y-3 overflow-y-auto pr-1">
+            {activeTreeData.map((node) => (
               <DepartmentTreeRow
                 key={node.id}
                 node={node}
@@ -493,7 +626,7 @@ export const DepartmentManagement = () => {
               />
             ))}
           </div>
-        ) : (
+        ) : departmentTab === "active" ? (
           <EmptyState
             icon={<UsersRound size={22} />}
             title="Chưa có phòng ban"
@@ -504,7 +637,7 @@ export const DepartmentManagement = () => {
               </Button>
             }
           />
-        )}
+        ) : null}
       </Card>
 
       <ConfirmDialog
@@ -521,6 +654,22 @@ export const DepartmentManagement = () => {
         isLoading={deactivating}
         onConfirm={onConfirmDeactivate}
         onClose={() => setPendingDeactivate(null)}
+      />
+
+      <ConfirmDialog
+        open={Boolean(pendingDelete)}
+        title="Xóa hẳn phòng ban?"
+        description={
+          pendingDelete
+            ? `Phòng ban ${pendingDelete.name} sẽ bị xóa khỏi danh sách nếu không còn dữ liệu liên quan.`
+            : undefined
+        }
+        confirmLabel="Xóa hẳn"
+        cancelLabel="Hủy"
+        tone="danger"
+        isLoading={deleting}
+        onConfirm={onConfirmDelete}
+        onClose={() => setPendingDelete(null)}
       />
     </div>
   );

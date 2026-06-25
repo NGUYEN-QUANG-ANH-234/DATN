@@ -1,11 +1,21 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ClipboardCheck, Eye, RefreshCw } from "lucide-react";
+import {
+  CheckCircle2,
+  ClipboardCheck,
+  Eye,
+  FileText,
+  RefreshCw,
+  Search,
+  XCircle,
+} from "lucide-react";
 import { BACKEND_URL } from "../../../core/api/config";
+import { useCurrentUser } from "../../../core/auth/hooks/useCurrentUser";
 import {
   EmptyState,
   FeatureCard,
   FeaturePage,
+  dangerButtonClass,
   primaryButtonClass,
   secondaryButtonClass,
 } from "../../../core/components/FeatureShell";
@@ -14,18 +24,18 @@ import { candidateApi } from "../api/candidateApi";
 import type { CandidateHistoryDto } from "../types/candidate";
 
 const statusLabels: Record<string, string> = {
-  New: "Mới nộp",
-  Interview_Pending: "Chờ phỏng vấn",
+  New: "Chờ HR sàng lọc",
+  Interview_Pending: "Chờ phỏng vấn chuyên môn",
   Interview_Passed: "Đã qua phỏng vấn",
-  Offer: "Đã gửi offer",
+  Offer: "Chờ hoàn thiện hồ sơ",
   Hired: "Đã tuyển",
-  Rejected: "Từ chối",
+  Rejected: "Không phù hợp",
   SLA_Expired: "Quá hạn xử lý",
 };
 
 const statusClasses: Record<string, string> = {
-  New: "bg-blue-50 text-blue-700 ring-blue-100",
-  Interview_Pending: "bg-amber-50 text-amber-700 ring-amber-100",
+  New: "bg-amber-50 text-amber-700 ring-amber-100",
+  Interview_Pending: "bg-blue-50 text-blue-700 ring-blue-100",
   Interview_Passed: "bg-indigo-50 text-indigo-700 ring-indigo-100",
   Offer: "bg-emerald-50 text-emerald-700 ring-emerald-100",
   Hired: "bg-green-50 text-green-700 ring-green-100",
@@ -47,12 +57,37 @@ const getFileUrl = (path?: string) => {
   return `${BACKEND_URL}${path.startsWith("/") ? "" : "/"}${path}`;
 };
 
+const getErrorMessage = (error: unknown) => {
+  const err = error as {
+    message?: string;
+    response?: {
+      data?: {
+        message?: string;
+        Message?: string;
+      };
+    };
+  };
+
+  return (
+    err.response?.data?.message ||
+    err.response?.data?.Message ||
+    err.message ||
+    "Không thể xử lý hồ sơ. Vui lòng thử lại."
+  );
+};
+
+const canScreenByRole = (role?: string | null) => role === "Admin" || role === "HR";
+
 export const CandidateManagement = () => {
+  const { user } = useCurrentUser();
   const { triggerAlert } = useNotification();
   const [candidates, setCandidates] = useState<CandidateHistoryDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("ALL");
+  const [submittingKey, setSubmittingKey] = useState<string | null>(null);
+
+  const canHrScreen = canScreenByRole(user?.role);
 
   const loadCandidates = useCallback(async () => {
     setLoading(true);
@@ -81,7 +116,7 @@ export const CandidateManagement = () => {
         candidate.email,
         candidate.jobTitle,
         candidate.departmentName,
-        candidate.status,
+        getStatusLabel(candidate.status),
       ]
         .filter(Boolean)
         .join(" ")
@@ -91,20 +126,111 @@ export const CandidateManagement = () => {
     });
   }, [candidates, query, status]);
 
+  const pendingHrCandidates = useMemo(
+    () =>
+      candidates
+        .filter((candidate) => candidate.status === "New")
+        .sort((a, b) => new Date(b.appliedDate).getTime() - new Date(a.appliedDate).getTime()),
+    [candidates],
+  );
+
   const stats = useMemo(
     () => ({
       total: candidates.length,
+      pendingHr: pendingHrCandidates.length,
       active: candidates.filter((candidate) => activeStatuses.has(candidate.status)).length,
-      offer: candidates.filter((candidate) => candidate.status === "Offer").length,
       hired: candidates.filter((candidate) => candidate.status === "Hired").length,
     }),
-    [candidates],
+    [candidates, pendingHrCandidates.length],
   );
+
+  const handleHrScreen = async (candidate: CandidateHistoryDto, passed: boolean) => {
+    if (!passed) {
+      const confirmed = window.confirm(
+        `Xác nhận đánh dấu hồ sơ của ${candidate.fullName} là không phù hợp?`,
+      );
+      if (!confirmed) return;
+    }
+
+    const actionKey = `${candidate.candidateId}-${passed ? "pass" : "reject"}`;
+    setSubmittingKey(actionKey);
+
+    try {
+      if (passed) {
+        await candidateApi.hrApprove(candidate.candidateId);
+        triggerAlert(
+          "success",
+          "Đã qua vòng HR",
+          "Hồ sơ đã được chuyển sang vòng phỏng vấn chuyên môn.",
+        );
+      } else {
+        await candidateApi.rejectCandidate(candidate.candidateId);
+        triggerAlert("success", "Đã cập nhật hồ sơ", "Ứng viên đã được đánh dấu không phù hợp.");
+      }
+
+      await loadCandidates();
+    } catch (error) {
+      console.error("Không thể xử lý sàng lọc ứng viên:", error);
+      triggerAlert("error", "Không thể xử lý hồ sơ", getErrorMessage(error));
+    } finally {
+      setSubmittingKey(null);
+    }
+  };
+
+  const renderCandidateActions = (candidate: CandidateHistoryDto) => {
+    const isPendingHr = candidate.status === "New";
+    const passKey = `${candidate.candidateId}-pass`;
+    const rejectKey = `${candidate.candidateId}-reject`;
+
+    return (
+      <div className="flex flex-wrap justify-end gap-2">
+        {candidate.cvFilePath ? (
+          <a
+            href={getFileUrl(candidate.cvFilePath)}
+            target="_blank"
+            rel="noreferrer"
+            className={secondaryButtonClass}
+          >
+            <Eye size={16} />
+            Xem CV
+          </a>
+        ) : (
+          <span className="inline-flex items-center gap-2 rounded-md bg-gray-50 px-3 py-2 text-sm text-[var(--hicas-text-secondary)]">
+            <FileText size={16} />
+            Chưa có CV
+          </span>
+        )}
+
+        {canHrScreen && isPendingHr && (
+          <>
+            <button
+              type="button"
+              onClick={() => void handleHrScreen(candidate, true)}
+              className={primaryButtonClass}
+              disabled={submittingKey === passKey}
+            >
+              <CheckCircle2 size={16} />
+              Đạt sơ lọc
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleHrScreen(candidate, false)}
+              className={dangerButtonClass}
+              disabled={submittingKey === rejectKey}
+            >
+              <XCircle size={16} />
+              Không phù hợp
+            </button>
+          </>
+        )}
+      </div>
+    );
+  };
 
   return (
     <FeaturePage
       title="Ứng viên"
-      description="Theo dõi hồ sơ ứng tuyển, trạng thái xử lý và CV đã nộp."
+      description="Theo dõi hồ sơ ứng tuyển, CV đã nộp và các bước xử lý tuyển dụng."
       actions={
         <div className="flex flex-wrap gap-2">
           <button
@@ -118,7 +244,7 @@ export const CandidateManagement = () => {
           </button>
           <Link to="/approvals?module=CANDIDATE" className={primaryButtonClass}>
             <ClipboardCheck size={16} />
-            Mở phê duyệt
+            Bàn phê duyệt
           </Link>
         </div>
       }
@@ -126,28 +252,81 @@ export const CandidateManagement = () => {
       <div className="grid gap-3 md:grid-cols-4">
         {[
           ["Tổng ứng viên", stats.total],
+          ["Chờ HR sàng lọc", stats.pendingHr],
           ["Đang xử lý", stats.active],
-          ["Đã offer", stats.offer],
           ["Đã tuyển", stats.hired],
         ].map(([label, value]) => (
           <div key={label} className="hicas-card hicas-card-padded">
-            <p className="text-sm text-[var(--hicas-text-secondary)]">{label}</p>
+            <p className="text-sm font-medium text-[var(--hicas-text-secondary)]">{label}</p>
             <p className="mt-2 text-2xl font-bold text-[var(--hicas-text-main)]">{value}</p>
           </div>
         ))}
       </div>
 
+      {canHrScreen && (
+        <FeatureCard
+          title="HR sàng lọc"
+          description="Kiểm tra hồ sơ mới nộp trước khi chuyển sang vòng chuyên môn."
+        >
+          {loading ? (
+            <div className="py-8 text-center text-sm text-[var(--hicas-text-secondary)]">
+              Đang tải dữ liệu...
+            </div>
+          ) : pendingHrCandidates.length === 0 ? (
+            <EmptyState
+              title="Không có hồ sơ chờ sàng lọc"
+              description="Các hồ sơ mới phù hợp sẽ xuất hiện tại đây để HR xử lý nhanh."
+            />
+          ) : (
+            <div className="grid gap-3">
+              {pendingHrCandidates.slice(0, 5).map((candidate) => (
+                <div
+                  key={candidate.candidateId}
+                  className="rounded-[var(--radius-md)] border border-[var(--hicas-border)] bg-white p-4"
+                >
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="min-w-0">
+                      <p className="text-base font-semibold text-[var(--hicas-text-main)]">
+                        {candidate.fullName}
+                      </p>
+                      <p className="mt-1 text-sm text-[var(--hicas-text-secondary)]">
+                        {[candidate.email, candidate.jobTitle, candidate.departmentName]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </p>
+                      <p className="mt-2 text-xs font-medium text-[var(--hicas-text-muted)]">
+                        Nộp ngày{" "}
+                        {candidate.appliedDate
+                          ? new Date(candidate.appliedDate).toLocaleDateString("vi-VN")
+                          : "-"}
+                      </p>
+                    </div>
+                    {renderCandidateActions(candidate)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </FeatureCard>
+      )}
+
       <FeatureCard
         title="Danh sách ứng viên"
-        description="Các quyết định duyệt hoặc từ chối được xử lý trong bàn phê duyệt chung."
+        description="Tra cứu hồ sơ và theo dõi trạng thái xử lý của từng ứng viên."
       >
         <div className="mb-4 grid gap-3 md:grid-cols-[1fr_220px]">
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Tìm theo tên, email, vị trí hoặc phòng ban"
-            className="hicas-input"
-          />
+          <label className="relative block">
+            <Search
+              size={18}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--hicas-text-muted)]"
+            />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Tìm theo tên, email, vị trí hoặc phòng ban"
+              className="hicas-input pl-10"
+            />
+          </label>
           <select
             value={status}
             onChange={(event) => setStatus(event.target.value)}
@@ -172,12 +351,12 @@ export const CandidateManagement = () => {
             description="Đổi bộ lọc hoặc tải lại danh sách để xem thêm hồ sơ."
           />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-[var(--hicas-border-soft)] text-sm">
-              <thead className="bg-[var(--hicas-bg-soft)] text-left text-xs font-semibold uppercase tracking-wide text-[var(--hicas-text-secondary)]">
+          <div className="max-h-[620px] overflow-auto rounded-[var(--radius-md)] border border-[var(--hicas-border)]">
+            <table className="min-w-[980px] divide-y divide-[var(--hicas-border-soft)] text-sm">
+              <thead className="sticky top-0 z-10 bg-[var(--hicas-bg-soft)] text-left text-xs font-semibold uppercase tracking-wide text-[var(--hicas-text-secondary)]">
                 <tr>
                   <th className="px-4 py-3">Ứng viên</th>
-                  <th className="px-4 py-3">Vị trí</th>
+                  <th className="px-4 py-3">Vị trí ứng tuyển</th>
                   <th className="px-4 py-3">Ngày nộp</th>
                   <th className="px-4 py-3">Trạng thái</th>
                   <th className="px-4 py-3 text-right">Thao tác</th>
@@ -215,19 +394,7 @@ export const CandidateManagement = () => {
                       </span>
                     </td>
                     <td className="px-4 py-4 text-right">
-                      {candidate.cvFilePath ? (
-                        <a
-                          href={getFileUrl(candidate.cvFilePath)}
-                          target="_blank"
-                          rel="noreferrer"
-                          className={secondaryButtonClass}
-                        >
-                          <Eye size={16} />
-                          Xem CV
-                        </a>
-                      ) : (
-                        <span className="text-sm text-[var(--hicas-text-secondary)]">Chưa có CV</span>
-                      )}
+                      {renderCandidateActions(candidate)}
                     </td>
                   </tr>
                 ))}

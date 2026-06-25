@@ -39,13 +39,18 @@ namespace HRM.backend.src.HRM.Application.DTOs.PayrollAllowances
         public string StatusText { get; set; } = string.Empty;
         public DateTime? DeadlineAt { get; set; }
         public int? CreatedByAccountId { get; set; }
+        public string? CreatedByName { get; set; }
         public int? SubmittedByAccountId { get; set; }
+        public string? SubmittedByName { get; set; }
         public DateTime? SubmittedAt { get; set; }
         public int? ApprovedByAccountId { get; set; }
+        public string? ApprovedByName { get; set; }
         public DateTime? ApprovedAt { get; set; }
         public int? ActivatedByAccountId { get; set; }
+        public string? ActivatedByName { get; set; }
         public DateTime? ActivatedAt { get; set; }
         public int? ArchivedByAccountId { get; set; }
+        public string? ArchivedByName { get; set; }
         public DateTime? ArchivedAt { get; set; }
         public string? RejectReason { get; set; }
         public string? ReviewNote { get; set; }

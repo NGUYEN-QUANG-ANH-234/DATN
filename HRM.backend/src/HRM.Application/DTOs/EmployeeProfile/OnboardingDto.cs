@@ -3,10 +3,13 @@
     public class SubmitOnboardingDto
     {
         public int CandidateId { get; set; }
+        public string TrackingCode { get; set; } = null!;
         public string FullName { get; set; } = null!;
         public string Email { get; set; } = null!;
         public string? Gender { get; set; }
         public DateTime? BirthDate { get; set; }
+        public string? Nationality { get; set; }
+        public string? Ethnicity { get; set; }
         public string? TaxCode { get; set; }
         public string? SocialInsCode { get; set; }
         public string? BankAccount { get; set; }
@@ -36,6 +39,26 @@
         public int? RoleId { get; set; }
         public int? DepartmentId { get; set; }
         public int? PositionId { get; set; }
+    }
+
+    public class ResolveOnboardingCandidateDto
+    {
+        public string Email { get; set; } = string.Empty;
+        public string TrackingCode { get; set; } = string.Empty;
+    }
+
+    public class OnboardingCandidateLookupDto
+    {
+        public int CandidateId { get; set; }
+        public string TrackingCode { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string FullName { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
+        public int? RecruitmentRequestId { get; set; }
+        public int? DepartmentId { get; set; }
+        public string? DepartmentName { get; set; }
+        public int? PositionId { get; set; }
+        public string? PositionName { get; set; }
     }
 
     public class PendingOnboardingRequestDto

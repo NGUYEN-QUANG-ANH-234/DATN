@@ -36,13 +36,15 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
             _cache = cache;
         }
 
-        public async Task<List<DepartmentTreeDto>> GetOrganizationTreeAsync(CancellationToken ct = default)
+        public async Task<List<DepartmentTreeDto>> GetOrganizationTreeAsync(bool includeInactive = false, CancellationToken ct = default)
         {
             return await _cache.GetOrSetWithLockAsync(
-                DepartmentTreeCacheKey,
+                BuildDepartmentTreeCacheKey(includeInactive),
                 async (innerCt) =>
                 {
-            var allDepts = await _deptRepo.GetAllActiveAsync(innerCt);
+            var allDepts = includeInactive
+                ? (await _deptRepo.GetAllAsync(innerCt)).ToList()
+                : await _deptRepo.GetAllActiveAsync(innerCt);
 
             // 2. buildTreeStructure (O(N) Complexity)
             var lookup = allDepts.ToDictionary(d => d.Id, d => new DepartmentTreeDto
@@ -100,7 +102,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
 
                 // 4. commitAsync
                 await _unitOfWork.CommitAsync(innerCt);
-                await _cache.RemoveAsync(DepartmentTreeCacheKey, innerCt);
+                await RemoveDepartmentTreeCachesAsync(innerCt);
 
                 return true;
             }, TimeSpan.FromSeconds(10), ct);
@@ -134,7 +136,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
                 );
 
                 await _unitOfWork.CommitAsync(innerCt);
-                await _cache.RemoveAsync(DepartmentTreeCacheKey, innerCt);
+                await RemoveDepartmentTreeCachesAsync(innerCt);
 
                 return true;
             }, TimeSpan.FromSeconds(10), ct);
@@ -176,7 +178,76 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
 
                 // 4. commitAsync
                 await _unitOfWork.CommitAsync(innerCt);
-                await _cache.RemoveAsync(DepartmentTreeCacheKey, innerCt);
+                await RemoveDepartmentTreeCachesAsync(innerCt);
+
+                return true;
+            }, TimeSpan.FromSeconds(10), ct);
+        }
+
+        public async Task<bool> ActivateDepartmentAsync(int deptId, int actorId, CancellationToken ct = default)
+        {
+            return await _lockService.GetWithLockAsync($"dept_activate_{deptId}", async (innerCt) =>
+            {
+                var department = await _deptRepo.GetByIdAsync(deptId, innerCt);
+                if (department == null)
+                    throw new KeyNotFoundException("Phòng ban không tồn tại.");
+
+                if (department.Status == DeptStatus.Active)
+                    return true;
+
+                if (department.ParentDeptId.HasValue)
+                {
+                    var parent = await _deptRepo.GetByIdAsync(department.ParentDeptId.Value, innerCt);
+                    if (parent == null || parent.Status != DeptStatus.Active)
+                        throw new InvalidOperationException("Cần bật lại phòng ban cha trước khi bật lại phòng ban này.");
+                }
+
+                department.Status = DeptStatus.Active;
+
+                await _auditLogRepo.LogSystemEventAsync(
+                    actionType: "ACTIVATE_DEPARTMENT",
+                    accountId: actorId,
+                    module: "departments",
+                    message: $"Bật lại phòng ban {department.DeptCode}"
+                );
+
+                await _unitOfWork.CommitAsync(innerCt);
+                await RemoveDepartmentTreeCachesAsync(innerCt);
+
+                return true;
+            }, TimeSpan.FromSeconds(10), ct);
+        }
+
+        public async Task<bool> DeleteDepartmentAsync(int deptId, int actorId, CancellationToken ct = default)
+        {
+            return await _lockService.GetWithLockAsync($"dept_delete_{deptId}", async (innerCt) =>
+            {
+                var department = await _deptRepo.GetByIdAsync(deptId, innerCt);
+                if (department == null)
+                    throw new KeyNotFoundException("Phòng ban không tồn tại.");
+
+                if (department.Status == DeptStatus.Active)
+                    throw new InvalidOperationException("Hãy tạm ngừng phòng ban trước khi xóa hẳn.");
+
+                var employeesCount = await _employeeRepo.CountInDeptAsync(deptId, innerCt);
+                if (employeesCount > 0)
+                    throw new InvalidOperationException($"Không thể xóa hẳn. Phòng ban này còn {employeesCount} hồ sơ nhân sự liên quan.");
+
+                var hasSubDepartments = await _deptRepo.HasAnySubDepartmentsAsync(deptId, innerCt);
+                if (hasSubDepartments)
+                    throw new InvalidOperationException("Không thể xóa hẳn phòng ban khi còn phòng ban con liên quan.");
+
+                _deptRepo.Remove(department);
+
+                await _auditLogRepo.LogSystemEventAsync(
+                    actionType: "DELETE_DEPARTMENT",
+                    accountId: actorId,
+                    module: "departments",
+                    message: $"Xóa hẳn phòng ban {department.DeptCode}"
+                );
+
+                await _unitOfWork.CommitAsync(innerCt);
+                await RemoveDepartmentTreeCachesAsync(innerCt);
 
                 return true;
             }, TimeSpan.FromSeconds(10), ct);
@@ -210,9 +281,18 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
             );
 
             await _unitOfWork.CommitAsync(ct);
-            await _cache.RemoveAsync(DepartmentTreeCacheKey, ct);
+            await RemoveDepartmentTreeCachesAsync(ct);
 
             return newDept.Id;
+        }
+
+        private static string BuildDepartmentTreeCacheKey(bool includeInactive) =>
+            includeInactive ? $"{DepartmentTreeCacheKey}_all" : $"{DepartmentTreeCacheKey}_active";
+
+        private async Task RemoveDepartmentTreeCachesAsync(CancellationToken ct)
+        {
+            await _cache.RemoveAsync(BuildDepartmentTreeCacheKey(false), ct);
+            await _cache.RemoveAsync(BuildDepartmentTreeCacheKey(true), ct);
         }
 
         private async Task ValidateParentAsync(int deptId, int? newParentId, CancellationToken ct)

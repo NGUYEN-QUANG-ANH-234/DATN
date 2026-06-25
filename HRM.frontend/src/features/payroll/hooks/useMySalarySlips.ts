@@ -3,6 +3,8 @@ import { useNotification } from "../../../core/context/NotificationContext";
 import { payrollApi } from "../api/payrollApi";
 import type { SalarySlip } from "../types/payroll";
 
+type SalarySlipAccessMode = "self" | "scope";
+
 const byLatestSlip = (a: SalarySlip, b: SalarySlip) => {
   const aTime = new Date(a.lockedAt || a.approvedAt || a.calculatedAt || 0).getTime();
   const bTime = new Date(b.lockedAt || b.approvedAt || b.calculatedAt || 0).getTime();
@@ -11,7 +13,7 @@ const byLatestSlip = (a: SalarySlip, b: SalarySlip) => {
   return b.id - a.id;
 };
 
-export const useMySalarySlips = (period: string) => {
+export const useMySalarySlips = (period: string, mode: SalarySlipAccessMode = "self") => {
   const { triggerAlert } = useNotification();
   const [loading, setLoading] = useState(false);
   const [slips, setSlips] = useState<SalarySlip[]>([]);
@@ -20,12 +22,18 @@ export const useMySalarySlips = (period: string) => {
   const loadSlips = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await payrollApi.getMySalarySlips(period);
+      const response =
+        mode === "scope"
+          ? await payrollApi.getSalarySlips(period)
+          : await payrollApi.getMySalarySlips(period);
       const nextSlips = [...(response.data ?? [])].sort(byLatestSlip);
       setSlips(nextSlips);
 
       if (nextSlips[0]) {
-        const detail = await payrollApi.getMySalarySlipDetail(nextSlips[0].id);
+        const detail =
+          mode === "scope"
+            ? await payrollApi.getSalarySlipDetail(nextSlips[0].id)
+            : await payrollApi.getMySalarySlipDetail(nextSlips[0].id);
         setActiveSlip(detail.data);
       } else {
         setActiveSlip(null);
@@ -38,7 +46,7 @@ export const useMySalarySlips = (period: string) => {
     } finally {
       setLoading(false);
     }
-  }, [period, triggerAlert]);
+  }, [mode, period, triggerAlert]);
 
   useEffect(() => {
     void loadSlips();
@@ -47,7 +55,10 @@ export const useMySalarySlips = (period: string) => {
   const openSlip = async (id: number) => {
     setLoading(true);
     try {
-      const response = await payrollApi.getMySalarySlipDetail(id);
+      const response =
+        mode === "scope"
+          ? await payrollApi.getSalarySlipDetail(id)
+          : await payrollApi.getMySalarySlipDetail(id);
       setActiveSlip(response.data);
     } catch (error) {
       console.error(error);

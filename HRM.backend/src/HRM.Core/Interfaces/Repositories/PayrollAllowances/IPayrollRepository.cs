@@ -32,6 +32,10 @@ namespace HRM.backend.src.HRM.Core.Interfaces.Repositories.PayrollAllowances
         Task<List<PayrollAdjustment>> GetPayrollAdjustmentsAsync(byte month, short year, CancellationToken ct = default);
         Task AddPayrollAdjustmentAsync(PayrollAdjustment adjustment, CancellationToken ct = default);
         Task<List<OvertimeRateConfig>> GetActiveOvertimeRateConfigsAsync(DateTime effectiveDate, CancellationToken ct = default);
+        Task<List<OvertimeRateConfig>> GetOvertimeRateConfigsAsync(bool includeInactive = true, CancellationToken ct = default);
+        Task<OvertimeRateConfig?> GetOvertimeRateConfigForUpdateAsync(int id, CancellationToken ct = default);
+        Task AddOvertimeRateConfigAsync(OvertimeRateConfig config, CancellationToken ct = default);
+        void UpdateOvertimeRateConfig(OvertimeRateConfig config);
         Task<List<PayrollPolicy>> GetActivePayrollPoliciesAsync(PayrollPolicyType policyType, DateTime effectiveDate, CancellationToken ct = default);
         Task<List<WorkCalendarConfig>> GetWorkCalendarConfigsAsync(byte month, short year, CancellationToken ct = default);
         Task<List<EmploymentServicePeriod>> GetEmploymentServicePeriodsAsync(IEnumerable<int> employeeIds, DateTime periodEnd, CancellationToken ct = default);

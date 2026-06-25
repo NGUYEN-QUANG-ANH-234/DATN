@@ -1,11 +1,13 @@
 import type { ApprovalModule } from "./types";
+import { normalizeRole } from "../../core/auth/roleAccess";
 
 export const unwrapData = <T,>(value: unknown): T[] => {
   const raw = value as { data?: T[]; Data?: T[] };
   return raw?.data || raw?.Data || [];
 };
 
-export const getRole = (role?: string | null) => String(role || "").trim();
+export const getRole = (role?: string | null) =>
+  normalizeRole(role) || String(role || "").trim();
 
 export const roleLabel = (role?: string | null) => {
   const map: Record<string, string> = {
@@ -23,8 +25,10 @@ export const roleLabel = (role?: string | null) => {
   return map[normalized] || normalized || "Người dùng";
 };
 
-export const isApprovalRole = (role: string) =>
-  ["Admin", "HR", "Manager", "Director", "Employee"].includes(role);
+export const isApprovalRole = (role: string) => {
+  const normalized = getRole(role);
+  return ["Admin", "HR", "Manager", "Director", "Employee", "Intern", "Collaborator"].includes(normalized);
+};
 
 export const formatDate = (value?: string | null) => {
   if (!value) return "-";
@@ -44,6 +48,7 @@ export const moduleTone = (module: ApprovalModule) => {
     PROFILE: "bg-cyan-50 text-cyan-700 border-cyan-200",
     ONBOARDING: "bg-indigo-50 text-indigo-700 border-indigo-200",
     ADDENDUM: "bg-amber-50 text-amber-700 border-amber-200",
+    ATTENDANCE: "bg-slate-50 text-slate-700 border-slate-200",
     OVERTIME: "bg-orange-50 text-orange-700 border-orange-200",
     LEAVE: "bg-rose-50 text-rose-700 border-rose-200",
     PAYROLL: "bg-lime-50 text-lime-700 border-lime-200",
@@ -87,6 +92,7 @@ export const statusLabel = (status: string) => {
     EmployeeDeclined: "Nhân viên từ chối",
     RejectedByDept: "Trưởng phòng từ chối",
     RejectedByDirector: "Giám đốc từ chối",
+    RejectedByHR: "HR không ghi nhận",
     Locked: "Đã khóa",
     Finalized: "Đã chốt",
     Paid: "Đã chi trả",

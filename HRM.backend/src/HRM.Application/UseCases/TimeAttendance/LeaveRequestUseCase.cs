@@ -92,23 +92,30 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
                         }
                     }
 
-                    var requiresDirectorApproval = await _approvalConflictGuard.RequiresDirectorApprovalAsync(employee.Id, innerCt);
+                    var skipsManagerReview = await _approvalConflictGuard.RequiresDirectorApprovalAsync(employee.Id, innerCt);
+                    var startDate = dto.StartDate.Date;
+                    var endDate = dto.EndDate.Date;
+
+                    await EnsureLeaveRequestDoesNotConflictAsync(employee.Id, finalLeaveType.Id, startDate, endDate, innerCt);
 
                     var request = new LeaveRequest
                     {
                         EmployeeId = employee.Id,
                         LeaveTypeId = finalLeaveType.Id,
-                        StartDate = dto.StartDate.Date,
-                        EndDate = dto.EndDate.Date,
+                        StartDate = startDate,
+                        EndDate = endDate,
                         Reason = dto.Reason.Trim(),
-                        Status = requiresDirectorApproval ? LeaveRequestStatus.PendingDirector : LeaveRequestStatus.PendingDept,
-                        DeadlineAt = DateTime.UtcNow.AddHours(requiresDirectorApproval ? 24 : 48)
+                        Status = skipsManagerReview ? LeaveRequestStatus.PendingHR : LeaveRequestStatus.PendingDept,
+                        DeadlineAt = DateTime.UtcNow.AddHours(skipsManagerReview ? 24 : 48)
                     };
 
                     await _leaveReqRepo.AddRequestAsync(request);
                     await _unitOfWork.CommitAsync(innerCt);
-                    await _idempotencyService.SaveAsync("LEAVE_CREATE", idempotencyKey ?? string.Empty, "LeaveRequest", request.Id, actorAccountId, innerCt);
-                    await _unitOfWork.CommitAsync(innerCt);
+                    if (!string.IsNullOrWhiteSpace(idempotencyKey))
+                    {
+                        await _idempotencyService.SaveAsync("LEAVE_CREATE", idempotencyKey, "LeaveRequest", request.Id, actorAccountId, innerCt);
+                        await _unitOfWork.CommitAsync(innerCt);
+                    }
                     await SendLeaveNotificationAsync("LEAVE_REQUEST_CREATED", request, employee, finalLeaveType, requestedDays, innerCt);
                     return request.Id;
                 },
@@ -129,17 +136,25 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
             if (!IsManager(actorRoleName))
                 throw new UnauthorizedAccessException("Chỉ Trưởng phòng hoặc Admin được xem đơn nghỉ chờ thẩm định.");
 
-            var manager = await GetEmployeeByAccountAsync(actorAccountId, ct);
-            if (!manager.DeptId.HasValue)
+            var managedDeptIds = await GetManagedDepartmentIdsAsync(actorAccountId, ct);
+            if (managedDeptIds.Count == 0)
                 throw new UnauthorizedAccessException("Tài khoản Trưởng phòng chưa được gắn phòng ban.");
 
-            return (await _leaveReqRepo.GetPendingDeptAsync(manager.DeptId.Value, ct)).Select(MapToResponse);
+            return (await _leaveReqRepo.GetPendingDeptAsync(null, ct))
+                .Where(r => r.Employee?.DeptId.HasValue == true && managedDeptIds.Contains(r.Employee.DeptId.Value))
+                .Select(MapToResponse);
         }
 
         public async Task<IEnumerable<LeaveRequestResponseDto>> GetPendingDirectorAsync(string actorRoleName, CancellationToken ct = default)
         {
             EnsureDirectorOrAdmin(actorRoleName);
             return (await _leaveReqRepo.GetByStatusAsync(LeaveRequestStatus.PendingDirector, ct)).Select(MapToResponse);
+        }
+
+        public async Task<IEnumerable<LeaveRequestResponseDto>> GetPendingHRAsync(string actorRoleName, CancellationToken ct = default)
+        {
+            EnsureHrOrAdmin(actorRoleName);
+            return (await _leaveReqRepo.GetByStatusAsync(LeaveRequestStatus.PendingHR, ct)).Select(MapToResponse);
         }
 
         public async Task<bool> ReviewByDeptAsync(int id, ReviewLeaveRequestDto dto, int actorAccountId, string actorRoleName, CancellationToken ct = default)
@@ -153,11 +168,49 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
                 await EnsureManagerCanAccessAsync(request.Employee, actorAccountId, actorRoleName, innerCt);
                 await _approvalConflictGuard.EnsureNotSelfApprovalForEmployeeAsync(request.EmployeeId!.Value, actorAccountId, innerCt);
 
-                request.Status = dto.IsApproved ? LeaveRequestStatus.PendingDirector : LeaveRequestStatus.RejectedByDept;
+                request.Status = dto.IsApproved ? LeaveRequestStatus.PendingHR : LeaveRequestStatus.RejectedByDept;
                 request.DeadlineAt = dto.IsApproved ? DateTime.UtcNow.AddHours(24) : null;
 
                 await _leaveReqRepo.UpdateAsync(request, innerCt);
                 await _unitOfWork.CommitAsync(innerCt);
+                return true;
+            }, cancellationToken: ct);
+        }
+
+        public async Task<bool> HrConfirmAsync(int id, ReviewLeaveRequestDto dto, int actorAccountId, string actorRoleName, CancellationToken ct = default)
+        {
+            EnsureHrOrAdmin(actorRoleName);
+
+            return await _lockService.GetWithLockAsync($"leave_{id}", async (innerCt) =>
+            {
+                var request = await GetRequestOrThrowAsync(id, innerCt);
+                if (request.Status != LeaveRequestStatus.PendingHR)
+                    throw new InvalidOperationException("Đơn nghỉ phép không ở trạng thái chờ HR ghi nhận.");
+
+                await _approvalConflictGuard.EnsureNotSelfApprovalForEmployeeAsync(request.EmployeeId!.Value, actorAccountId, innerCt);
+
+                if (!dto.IsApproved)
+                {
+                    request.Status = LeaveRequestStatus.RejectedByHR;
+                    request.DeadlineAt = null;
+                    await _leaveReqRepo.UpdateAsync(request, innerCt);
+                    await _unitOfWork.CommitAsync(innerCt);
+                    var rejectedDays = await CountBusinessDaysAsync(request.StartDate!.Value, request.EndDate!.Value, innerCt);
+                    await SendLeaveNotificationAsync("LEAVE_REQUEST_REJECTED", request, request.Employee, request.LeaveType, rejectedDays, innerCt, dto.Note);
+                    return true;
+                }
+
+                await _lockService.GetWithLockAsync(
+                    $"leave_balance_{request.EmployeeId!.Value}_{request.StartDate!.Value.Year}",
+                    async (balanceCt) =>
+                    {
+                        await ApproveAndSyncAsync(request, LeaveRequestStatus.Approved, actorAccountId, balanceCt);
+                        return true;
+                    },
+                    cancellationToken: innerCt);
+
+                var approvedDays = await CountBusinessDaysAsync(request.StartDate!.Value, request.EndDate!.Value, innerCt);
+                await SendLeaveNotificationAsync("LEAVE_REQUEST_APPROVED", request, request.Employee, request.LeaveType, approvedDays, innerCt);
                 return true;
             }, cancellationToken: ct);
         }
@@ -314,6 +367,39 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
                 ?? throw new UnauthorizedAccessException("Tài khoản chưa liên kết hồ sơ nhân sự.");
         }
 
+        private async Task EnsureLeaveRequestDoesNotConflictAsync(
+            int employeeId,
+            int leaveTypeId,
+            DateTime startDate,
+            DateTime endDate,
+            CancellationToken ct)
+        {
+            var exactDuplicate = (await _leaveReqRepo.FindAsync(r =>
+                r.EmployeeId == employeeId &&
+                r.LeaveTypeId == leaveTypeId &&
+                r.StartDate == startDate &&
+                r.EndDate == endDate,
+                ct)).FirstOrDefault();
+
+            if (exactDuplicate != null)
+                throw new InvalidOperationException($"Đã có đơn nghỉ phép #{exactDuplicate.Id} cho loại nghỉ và khoảng thời gian này. Vui lòng kiểm tra lại danh sách đơn nghỉ phép.");
+
+            var overlappingRequest = (await _leaveReqRepo.FindAsync(r =>
+                r.EmployeeId == employeeId &&
+                r.StartDate.HasValue &&
+                r.EndDate.HasValue &&
+                r.StartDate.Value <= endDate &&
+                r.EndDate.Value >= startDate &&
+                r.Status != LeaveRequestStatus.Rejected &&
+                r.Status != LeaveRequestStatus.RejectedByDept &&
+                r.Status != LeaveRequestStatus.RejectedByDirector &&
+                r.Status != LeaveRequestStatus.RejectedByHR,
+                ct)).FirstOrDefault();
+
+            if (overlappingRequest != null)
+                throw new InvalidOperationException($"Đã có đơn nghỉ phép #{overlappingRequest.Id} trùng thời gian với khoảng nghỉ này. Vui lòng kiểm tra lại trước khi gửi đơn mới.");
+        }
+
         private async Task SendLeaveNotificationAsync(
             string templateKey,
             LeaveRequest request,
@@ -356,9 +442,17 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
             if (targetEmployee == null)
                 throw new InvalidOperationException("Đơn nghỉ phép chưa liên kết nhân viên.");
 
-            var manager = await GetEmployeeByAccountAsync(actorAccountId, ct);
-            if (!manager.DeptId.HasValue || targetEmployee.DeptId != manager.DeptId)
+            var managedDeptIds = await GetManagedDepartmentIdsAsync(actorAccountId, ct);
+            if (!targetEmployee.DeptId.HasValue || !managedDeptIds.Contains(targetEmployee.DeptId.Value))
                 throw new UnauthorizedAccessException("Trưởng phòng chỉ được thẩm định đơn nghỉ của nhân viên trong phòng ban mình.");
+        }
+
+        private async Task<HashSet<int>> GetManagedDepartmentIdsAsync(int actorAccountId, CancellationToken ct)
+        {
+            var deptIds = await _employeeRepo.GetManagedDepartmentIdsByAccountIdAsync(actorAccountId, ct);
+            if (deptIds.Count == 0)
+                throw new UnauthorizedAccessException("Tai khoan Truong phong chua duoc gan phong ban quan ly.");
+            return deptIds.ToHashSet();
         }
 
         private static void ValidateDateRange(DateTime startDate, DateTime endDate)
@@ -445,6 +539,12 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
                 throw new UnauthorizedAccessException("Chỉ Giám đốc hoặc Admin được phê duyệt cuối cùng đơn nghỉ phép.");
         }
 
+        private static void EnsureHrOrAdmin(string actorRoleName)
+        {
+            if (!IsHr(actorRoleName) && !IsAdmin(actorRoleName))
+                throw new UnauthorizedAccessException("Chỉ HR hoặc Admin được ghi nhận đơn nghỉ phép.");
+        }
+
         private static LeaveRequestResponseDto MapToResponse(LeaveRequest request)
         {
             return new LeaveRequestResponseDto
@@ -470,6 +570,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.TimeAttendance
         }
 
         private static bool IsAdmin(string role) => string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase);
+        private static bool IsHr(string role) => string.Equals(role, "HR", StringComparison.OrdinalIgnoreCase);
         private static bool IsManager(string role) => string.Equals(role, "Manager", StringComparison.OrdinalIgnoreCase);
         private static bool IsDirector(string role) => string.Equals(role, "Director", StringComparison.OrdinalIgnoreCase);
         private static bool ShouldDeductLeaveBalance(LeaveType leaveType) =>

@@ -40,7 +40,8 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
                 {
                     var matrix = (await _rbacRepo.FetchRolesWithPermissionsAsync(innerCt)).ToList();
                     var allPermissionCodes = (await _rbacRepo.GetAllPermissionCodesAsync(innerCt)).ToList();
-                    var adminRole = matrix.FirstOrDefault(r => r.RoleId == 1);
+                    var adminRole = matrix.FirstOrDefault(r =>
+                        string.Equals(r.RoleName, "Admin", StringComparison.OrdinalIgnoreCase));
 
                     if (adminRole != null)
                     {
@@ -56,7 +57,11 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
 
         public async Task<bool> UpdateRolePermissionsAsync(UpdateRolePermissionsDto dto, int adminId, CancellationToken ct = default)
         {
-            if (dto.RoleId == 1)
+            var targetRole = (await _roleRepo.GetAllRolesAsync(ct))
+                .FirstOrDefault(r => r.Id == dto.RoleId);
+
+            if (targetRole != null &&
+                string.Equals(targetRole.RoleName, "Admin", StringComparison.OrdinalIgnoreCase))
                 throw new ArgumentException("Hành động bị từ chối: Không thể thay đổi hay xóa quyền của Super Admin (Root).");
 
             bool isSuccess = false;

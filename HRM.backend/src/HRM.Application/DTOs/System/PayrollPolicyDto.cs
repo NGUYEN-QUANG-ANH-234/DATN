@@ -59,4 +59,47 @@ namespace HRM.backend.src.HRM.Application.DTOs.System
     public class UpdatePayrollPolicyDto : CreatePayrollPolicyDto
     {
     }
+
+    public class OvertimeRateConfigDto
+    {
+        public int Id { get; set; }
+        public string Code { get; set; } = string.Empty;
+        public OvertimeType OvertimeType { get; set; }
+        public string OvertimeTypeText { get; set; } = string.Empty;
+        public decimal BaseMultiplier { get; set; }
+        public decimal NightAllowanceRate { get; set; }
+        public decimal NightOvertimeExtraRate { get; set; }
+        public decimal NightOvertimeExtraAmount { get; set; }
+        public decimal RateMultiplier { get; set; }
+        public DateTime EffectiveFrom { get; set; }
+        public DateTime? EffectiveTo { get; set; }
+        public int Version { get; set; }
+        public string? VersionCode { get; set; }
+        public PolicyVersionStatus Status { get; set; }
+        public string? SourceRef { get; set; }
+        public int? SupersedesVersionId { get; set; }
+        public int? CreatedByAccountId { get; set; }
+        public DateTime? ActivatedAt { get; set; }
+        public bool LockedAfterUsed { get; set; }
+        public bool IsActive { get; set; }
+        public string? Note { get; set; }
+        public DateTime CreatedAt { get; set; }
+    }
+
+    public class SaveOvertimeRateConfigDto
+    {
+        public string Code { get; set; } = string.Empty;
+        public OvertimeType OvertimeType { get; set; }
+        public decimal BaseMultiplier { get; set; }
+        public decimal NightAllowanceRate { get; set; }
+        public decimal NightOvertimeExtraRate { get; set; }
+        public DateTime EffectiveFrom { get; set; }
+        public DateTime? EffectiveTo { get; set; }
+        public int Version { get; set; } = 1;
+        public string? VersionCode { get; set; }
+        public PolicyVersionStatus Status { get; set; } = PolicyVersionStatus.Active;
+        public string? SourceRef { get; set; }
+        public bool IsActive { get; set; } = true;
+        public string? Note { get; set; }
+    }
 }

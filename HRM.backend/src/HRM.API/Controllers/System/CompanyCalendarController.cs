@@ -10,7 +10,7 @@ namespace HRM.backend.src.HRM.API.Controllers.System
 {
     [ApiController]
     [Route("api/v1/system/company-calendar")]
-    [Authorize(Roles = "Admin,HR")]
+    [Authorize]
     public class CompanyCalendarController : ControllerBase
     {
         private readonly ICompanyCalendarUseCase _useCase;
@@ -20,7 +20,15 @@ namespace HRM.backend.src.HRM.API.Controllers.System
             _useCase = useCase;
         }
 
+        [HttpGet("active/{year:int}")]
+        public async Task<IActionResult> GetActiveByYear(short year, CancellationToken ct)
+        {
+            var data = await _useCase.GetActiveByYearAsync(year, ct);
+            return Ok(new { success = true, data });
+        }
+
         [HttpGet("{year:int}")]
+        [Authorize(Roles = "Admin,HR")]
         [RequirePermission("ATTENDANCE_CONFIG_VIEW", GroupName = SystemModules.TimekeepingLeave, Description = "Xem lịch nghỉ công ty")]
         public async Task<IActionResult> GetByYear(short year, CancellationToken ct)
         {
@@ -29,6 +37,7 @@ namespace HRM.backend.src.HRM.API.Controllers.System
         }
 
         [HttpPut("{year:int}")]
+        [Authorize(Roles = "Admin,HR")]
         [RequirePermission("ATTENDANCE_CONFIG_UPDATE", GroupName = SystemModules.TimekeepingLeave, Description = "Cập nhật lịch nghỉ công ty")]
         public async Task<IActionResult> Save(short year, [FromBody] SaveCompanyCalendarDto dto, CancellationToken ct)
         {

@@ -22,11 +22,11 @@ namespace HRM.backend.src.HRM.API.Controllers.Organization
 
         [HttpGet("tree")]
         [RequirePermission("ORG_TREE_VIEW", GroupName = SystemModules.SystemManagement, Description = "Xem sơ đồ tổ chức phòng ban")]
-        public async Task<IActionResult> GetTree(CancellationToken ct)
+        public async Task<IActionResult> GetTree([FromQuery] bool includeInactive = false, CancellationToken ct = default)
         {
             try
             {
-                var tree = await _orgTreeUseCase.GetOrganizationTreeAsync(ct);
+                var tree = await _orgTreeUseCase.GetOrganizationTreeAsync(includeInactive, ct);
                 return Ok(new { Success = true, Data = tree });
             }
             catch (Exception ex)
@@ -105,6 +105,52 @@ namespace HRM.backend.src.HRM.API.Controllers.Organization
             catch (Exception ex)
             {
                 return BadRequest(new { Message = ex.Message });
+            }
+        }
+
+        [HttpPatch("{id}/activate")]
+        [RequirePermission("ORG_TREE_UPDATE", GroupName = SystemModules.SystemManagement, Description = "Bật lại phòng ban")]
+        public async Task<IActionResult> Activate(int id, CancellationToken ct)
+        {
+            try
+            {
+                int actorId = User.GetAccountIdOrThrow();
+                await _orgTreeUseCase.ActivateDepartmentAsync(id, actorId, ct);
+
+                return Ok(new { Success = true, Message = "Đã bật lại phòng ban." });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Conflict(new { Message = ex.Message });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { Message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = ex.Message });
+            }
+        }
+
+        [HttpDelete("{id}")]
+        [RequirePermission("ORG_TREE_DELETE", GroupName = SystemModules.SystemManagement, Description = "Xóa hẳn phòng ban")]
+        public async Task<IActionResult> Delete(int id, CancellationToken ct)
+        {
+            try
+            {
+                int actorId = User.GetAccountIdOrThrow();
+                await _orgTreeUseCase.DeleteDepartmentAsync(id, actorId, ct);
+
+                return Ok(new { Success = true, Message = "Đã xóa phòng ban." });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Conflict(new { Message = ex.Message });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { Message = ex.Message });
             }
         }
 

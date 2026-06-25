@@ -20,6 +20,8 @@ export type DataTableProps<T> = {
   emptyDescription?: string;
   className?: string;
   tableClassName?: string;
+  scrollContainerClassName?: string;
+  stickyHeader?: boolean;
   page?: number;
   pageSize?: number;
   totalItems?: number;
@@ -35,6 +37,8 @@ export const DataTable = <T,>({
   emptyDescription,
   className,
   tableClassName,
+  scrollContainerClassName,
+  stickyHeader = false,
   page,
   pageSize,
   totalItems,
@@ -48,9 +52,14 @@ export const DataTable = <T,>({
 
   return (
     <div className={cn("hicas-card overflow-hidden", className)} aria-busy={loading}>
-      <div className="overflow-x-auto">
+      <div className={cn("overflow-x-auto", scrollContainerClassName)}>
         <table className={cn("hicas-table min-w-[760px] text-left md:min-w-full", tableClassName)}>
-          <thead>
+          <thead
+            className={cn(
+              stickyHeader &&
+                "sticky top-0 z-10 bg-[var(--hicas-bg-soft)] shadow-[0_1px_0_var(--hicas-border)]",
+            )}
+          >
             <tr>
               {columns.map((column) => (
                 <th key={column.key} className={cn("px-4 py-3", column.headerClassName)}>

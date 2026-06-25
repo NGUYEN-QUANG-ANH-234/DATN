@@ -1,5 +1,5 @@
 ﻿using HRM.backend.src.HRM.Application.DTOs.Events;
-using HRM.backend.src.HRM.Core.Entities.RequestHandover;
+using HRM.backend.src.HRM.Core.Entities.WorkflowRequests;
 using HRM.backend.src.HRM.Core.Enums;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories;
 using MediatR;

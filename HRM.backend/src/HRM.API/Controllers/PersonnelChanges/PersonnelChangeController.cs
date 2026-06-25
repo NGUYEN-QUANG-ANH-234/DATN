@@ -34,6 +34,17 @@ namespace HRM.backend.src.HRM.API.Controllers.PersonnelChanges
             return Ok(new { Success = true, Data = data });
         }
 
+        [HttpGet("my-actions")]
+        [RequirePermission("PERSONNEL_CHANGE_EMPLOYEE_CONSENT", GroupName = SystemModules.PersonnelChanges, Description = "View my pending personnel change actions")]
+        public async Task<IActionResult> GetMyActionItems(CancellationToken ct)
+        {
+            return await ExecuteAsync(async () =>
+            {
+                var data = await _useCase.GetMyActionItemsAsync(ActorAccountId, ct);
+                return Ok(new { Success = true, Data = data });
+            });
+        }
+
         [HttpGet("{id:int}")]
         [RequirePermission("PERSONNEL_CHANGE_VIEW", GroupName = SystemModules.PersonnelChanges, Description = "View personnel change request detail")]
         public async Task<IActionResult> GetDetail(int id, CancellationToken ct)

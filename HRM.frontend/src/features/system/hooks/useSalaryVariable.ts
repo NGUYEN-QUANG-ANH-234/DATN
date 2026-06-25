@@ -75,9 +75,33 @@ export const useSalaryVariable = () => {
     }
   };
 
+  const deleteVariable = async (code: string) => {
+    try {
+      const res = await salaryVariableApi.delete(code);
+      if (res.success) {
+        await fetchVariables();
+      }
+      return res;
+    } catch (error: unknown) {
+      throw extractErrorMessage(error);
+    }
+  };
+
   const setCatalogActive = async (id: number, isActive: boolean) => {
     try {
       const res = await salaryVariableApi.setCatalogActive(id, isActive);
+      if (res.success) {
+        await fetchCatalogs();
+      }
+      return res;
+    } catch (error: unknown) {
+      throw extractErrorMessage(error);
+    }
+  };
+
+  const deleteCatalog = async (id: number) => {
+    try {
+      const res = await salaryVariableApi.deleteCatalog(id);
       if (res.success) {
         await fetchCatalogs();
       }
@@ -98,6 +122,8 @@ export const useSalaryVariable = () => {
     loading,
     defineVariable,
     setVariableActive,
+    deleteVariable,
     setCatalogActive,
+    deleteCatalog,
   };
 };

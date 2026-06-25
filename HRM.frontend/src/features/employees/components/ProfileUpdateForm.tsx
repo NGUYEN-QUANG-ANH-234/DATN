@@ -16,6 +16,8 @@ const initialFormState: ProfileUpdateFormState = {
   fullName: "",
   gender: "",
   birthDate: "",
+  nationality: "",
+  ethnicity: "",
   phoneNumber: "",
   personalEmail: "",
   currentAddress: "",
@@ -164,6 +166,8 @@ export const ProfileUpdateForm: React.FC = () => {
     appendIfPresent(formData, "FullName", formState.fullName);
     appendIfPresent(formData, "Gender", formState.gender);
     appendIfPresent(formData, "BirthDate", formState.birthDate);
+    appendIfPresent(formData, "Nationality", formState.nationality);
+    appendIfPresent(formData, "Ethnicity", formState.ethnicity);
     appendIfPresent(formData, "PhoneNumber", formState.phoneNumber);
     appendIfPresent(formData, "PersonalEmail", formState.personalEmail);
     appendIfPresent(formData, "CurrentAddress", formState.currentAddress);
@@ -281,6 +285,16 @@ export const ProfileUpdateForm: React.FC = () => {
                 type="date"
                 value={formState.birthDate}
                 onChange={(value) => updateField("birthDate", value)}
+              />
+              <TextInput
+                label="Quốc tịch"
+                value={formState.nationality}
+                onChange={(value) => updateField("nationality", value)}
+              />
+              <TextInput
+                label="Dân tộc"
+                value={formState.ethnicity}
+                onChange={(value) => updateField("ethnicity", value)}
               />
               <TextInput
                 label="Số điện thoại"

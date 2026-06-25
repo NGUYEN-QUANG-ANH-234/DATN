@@ -1,4 +1,5 @@
 using HRM.backend.src.HRM.Core.Entities.TimeAttendance;
+using HRM.backend.src.HRM.Core.Enums;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.TimeAttendance;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,6 +16,20 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.TimeAttend
                 .ThenInclude(e => e.Department)
                 .Where(x => x.Month == month && x.Year == year)
                 .OrderBy(x => x.Employee.FullName)
+                .ToListAsync(ct);
+        }
+
+        public async Task<List<AttendanceSummary>> GetPendingApprovalAsync(CancellationToken ct = default)
+        {
+            return await _dbSet
+                .Include(x => x.Employee)
+                .ThenInclude(e => e.Department)
+                .Where(x =>
+                    x.ApprovalStatus == AttendancePayrollApprovalStatus.PendingHRReview &&
+                    !x.IsPayrollLocked)
+                .OrderBy(x => x.Year)
+                .ThenBy(x => x.Month)
+                .ThenBy(x => x.Employee.FullName)
                 .ToListAsync(ct);
         }
 
@@ -52,6 +67,21 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.TimeAttend
             var date = workDate.Date;
             return await _context.AttendanceDailySummaries
                 .FirstOrDefaultAsync(x => x.EmployeeId == employeeId && x.WorkDate == date, ct);
+        }
+
+        public async Task<List<AttendanceAdjustmentLog>> GetAdjustmentLogsByPeriodAsync(byte month, short year, CancellationToken ct = default)
+        {
+            var start = new DateTime(year, month, 1);
+            var end = start.AddMonths(1);
+            return await _context.AttendanceAdjustmentLogs
+                .Include(x => x.AttendanceDailySummary)
+                .ThenInclude(x => x.Employee)
+                .ThenInclude(e => e.Department)
+                .Include(x => x.AdjustedByAccount)
+                .Where(x => x.AttendanceDailySummary.WorkDate >= start && x.AttendanceDailySummary.WorkDate < end)
+                .OrderByDescending(x => x.AdjustedAt)
+                .ThenBy(x => x.AttendanceDailySummary.Employee.FullName)
+                .ToListAsync(ct);
         }
 
         public async Task AddDailyAsync(AttendanceDailySummary summary, CancellationToken ct = default)

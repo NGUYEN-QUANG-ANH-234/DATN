@@ -3,6 +3,8 @@ export interface ProfileUpdateFormState {
   fullName: string;
   gender: string;
   birthDate: string;
+  nationality: string;
+  ethnicity: string;
 
   // --- Thông tin liên hệ (MỚI) ---
   phoneNumber: string;

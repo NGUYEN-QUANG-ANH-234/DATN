@@ -380,7 +380,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
                 EffectiveDate = request.EffectiveDate ?? DateTime.UtcNow.Date,
                 Content = $"Personnel change request #{request.Id}: {request.Reason}",
                 OtherChangesJson = BuildOtherChangesJson(request),
-                Status = AddendumStatus.PendingHR
+                Status = AddendumStatus.Draft
             };
 
             await _contractAddendumRepo.AddAsync(addendum, ct);

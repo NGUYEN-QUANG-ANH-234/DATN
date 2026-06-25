@@ -1,5 +1,6 @@
 import axiosClient from "../../../core/api/axiosClient";
 import type {
+  OnboardingCandidateLookup,
   PendingOnboardingRequest,
   ReviewOnboardingDto,
 } from "../types/onboarding";
@@ -7,7 +8,13 @@ import type {
 const ENDPOINT = "/onboarding-requests";
 
 export const onboardingApi = {
-  // Dành cho Nhân viên mới / Ứng viên nộp hồ sơ
+  resolveCandidate: async (payload: {
+    email: string;
+    trackingCode: string;
+  }): Promise<{ success: boolean; data: OnboardingCandidateLookup }> => {
+    return await axiosClient.post(`${ENDPOINT}/resolve`, payload);
+  },
+
   submitProfile: async (
     formData: FormData,
   ): Promise<{ success: boolean; message: string }> => {
@@ -16,7 +23,6 @@ export const onboardingApi = {
     });
   },
 
-  // Dành cho HR lấy danh sách chờ duyệt (Giả định Backend có endpoint GET /onboarding-requests/pending)
   getPendingRequests: async (): Promise<{
     success: boolean;
     data: PendingOnboardingRequest[];
@@ -24,7 +30,6 @@ export const onboardingApi = {
     return await axiosClient.get(`${ENDPOINT}/pending`);
   },
 
-  // Dành cho HR duyệt hồ sơ và cấp Role
   reviewRequest: async (
     id: number,
     payload: ReviewOnboardingDto,

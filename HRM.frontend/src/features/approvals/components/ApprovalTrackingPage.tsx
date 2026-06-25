@@ -173,9 +173,9 @@ export const ApprovalTrackingPage = () => {
         ) : filteredItems.length === 0 ? (
           <EmptyState title="Chưa có bản ghi phù hợp" />
         ) : (
-          <div className="overflow-x-auto">
+          <div className="max-h-[620px] overflow-auto rounded-[var(--radius-md)] border border-[var(--hicas-border)]">
             <table className="w-full min-w-[920px] text-left text-sm">
-              <thead className="border-b bg-gray-50 text-xs uppercase text-gray-500">
+              <thead className="sticky top-0 z-10 border-b bg-gray-50 text-xs uppercase text-gray-500 shadow-sm">
                 <tr>
                   <th className="px-3 py-2">Phân hệ</th>
                   <th className="px-3 py-2">Nội dung</th>
@@ -355,13 +355,21 @@ export const ApprovalTrackingPage = () => {
 
   async function loadLeaves(target: TrackingItem[]) {
     try {
-      const res = ["Admin", "Manager"].includes(role)
-        ? await leaveRequestApi.getPendingDept()
-        : ["Director"].includes(role)
-          ? await leaveRequestApi.getPendingDirector()
-          : await leaveRequestApi.getMy();
+      const responses = [];
+      if (["Admin", "Manager"].includes(role)) {
+        responses.push(await leaveRequestApi.getPendingDept());
+      }
+      if (["Admin", "HR"].includes(role)) {
+        responses.push(await leaveRequestApi.getPendingHR());
+      }
+      if (["Admin", "Director"].includes(role)) {
+        responses.push(await leaveRequestApi.getPendingDirector());
+      }
+      if (responses.length === 0) {
+        responses.push(await leaveRequestApi.getMy());
+      }
 
-      unwrapData<LeaveRequest>(res).forEach((item) =>
+      responses.flatMap((res) => unwrapData<LeaveRequest>(res)).forEach((item) =>
         target.push({
           id: `leave-${item.id}`,
           module: "LEAVE",

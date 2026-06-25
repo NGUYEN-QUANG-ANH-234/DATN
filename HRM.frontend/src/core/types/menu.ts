@@ -33,6 +33,11 @@ export const MENU_ITEMS: MenuItem[] = [
         roles: ROLE_GROUPS.hrAdmin,
       },
       {
+        path: "/system-config/payroll-sources",
+        label: "Nguồn dữ liệu lương",
+        roles: ROLE_GROUPS.hrAdmin,
+      },
+      {
         path: "/system-config/sla",
         label: "Thời hạn xử lý",
         roles: ROLE_GROUPS.hrAdmin,
@@ -65,6 +70,11 @@ export const MENU_ITEMS: MenuItem[] = [
       {
         path: "/system-config/payroll-policies",
         label: "Chính sách lương",
+        roles: ROLE_GROUPS.hrAdmin,
+      },
+      {
+        path: "/system-config/payroll-feature-toggles",
+        label: "Nguồn tính lương",
         roles: ROLE_GROUPS.hrAdmin,
       },
     ],
@@ -125,9 +135,14 @@ export const MENU_ITEMS: MenuItem[] = [
   },
   {
     label: "Hồ sơ & hợp đồng",
-    roles: ["Admin", "HR", "Manager", "Director", "Employee", "Intern"],
+    roles: ["Admin", "HR", "Manager", "Director", "Employee", "Intern", "Collaborator", "Candidate"],
     icon: "profile",
     children: [
+      {
+        path: "/employee-contract/profile-setup",
+        label: "Thiết lập hồ sơ",
+        roles: ["Candidate", "Intern"],
+      },
       {
         path: "/employee-contract/my-profile",
         label: "Hồ sơ cá nhân",
@@ -136,7 +151,7 @@ export const MENU_ITEMS: MenuItem[] = [
       {
         path: "/employee-contract/profile-change",
         label: "Cập nhật hồ sơ",
-        roles: ROLE_GROUPS.employeeSelf,
+        roles: ROLE_GROUPS.employeeProfileUpdate,
       },
       {
         path: "/employee-contract/contracts",
@@ -146,17 +161,12 @@ export const MENU_ITEMS: MenuItem[] = [
       {
         path: "/employee-contract/contract-requests",
         label: "Ký/gia hạn hợp đồng",
-        roles: ["Employee", "Manager", "Intern"],
-      },
-      {
-        path: "/employee-contract/profile-setup",
-        label: "Thiết lập hồ sơ",
-        roles: ROLE_GROUPS.employeeAdminDirector,
+        roles: ROLE_GROUPS.employeeContractRequest,
       },
       {
         path: "/employee-contract/hr-contracts",
         label: "Soạn thảo hợp đồng",
-        roles: ROLE_GROUPS.employeeAdmin,
+        roles: ROLE_GROUPS.employeeContractWorkflow,
       },
       {
         path: "/employee-contract/appendices",
@@ -166,7 +176,7 @@ export const MENU_ITEMS: MenuItem[] = [
       {
         path: "/employee-contract/history",
         label: "Lịch sử biến động",
-        roles: ["Admin", "HR", "Manager", "Director", "Employee", "Intern"],
+        roles: ["Admin", "HR", "Manager", "Director", "Employee", "Intern", "Collaborator"],
       },
     ],
   },
@@ -183,7 +193,7 @@ export const MENU_ITEMS: MenuItem[] = [
       {
         path: "/attendance-leave/overtime",
         label: "Làm thêm giờ",
-        roles: ROLE_GROUPS.attendanceSelf,
+        roles: ROLE_GROUPS.overtimeSelf,
       },
       {
         path: "/attendance-leave/timesheet-summary",
@@ -199,13 +209,18 @@ export const MENU_ITEMS: MenuItem[] = [
   },
   {
     label: "Hiệu suất & đào tạo",
-    roles: ["Admin", "HR", "Manager", "Director", "Employee", "Intern"],
+    roles: ["Admin", "HR", "Manager", "Director", "Employee", "Intern", "Collaborator"],
     icon: "training",
     children: [
       {
         path: "/performance-training/criteria",
         label: "Bộ chỉ tiêu KPI",
         roles: ROLE_GROUPS.performanceManagers,
+      },
+      {
+        path: "/performance-training/my-learning",
+        label: "Việc học tập của tôi",
+        roles: ROLE_GROUPS.performanceContributors,
       },
       {
         path: "/performance-training/result-update",
@@ -220,7 +235,7 @@ export const MENU_ITEMS: MenuItem[] = [
       {
         path: "/performance-training/review-finalize",
         label: "Chốt đánh giá",
-        roles: ROLE_GROUPS.performanceManagers,
+        roles: ROLE_GROUPS.performanceReviewers,
       },
       {
         path: "/performance-training/development-training",
@@ -273,9 +288,14 @@ export const MENU_ITEMS: MenuItem[] = [
   },
   {
     label: "Biến động nhân sự",
-    roles: ROLE_GROUPS.personnelChange,
+    roles: ROLE_GROUPS.personnelChangeTracking,
     icon: "personnel",
     children: [
+      {
+        path: "/personnel-change/tracking",
+        label: "Theo dõi biến động",
+        roles: ROLE_GROUPS.personnelChangeTracking,
+      },
       {
         path: "/personnel-change/promotion",
         label: "Thăng tiến & chính thức",
@@ -312,7 +332,7 @@ export const MENU_ITEMS: MenuItem[] = [
   },
   {
     label: "Phê duyệt",
-    roles: ["Admin", "HR", "Manager", "Director", "Employee", "Intern", "Candidate"],
+    roles: ROLE_GROUPS.approvalTracking,
     icon: "approvals",
     children: [
       {

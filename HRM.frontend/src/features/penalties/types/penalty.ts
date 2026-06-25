@@ -72,6 +72,10 @@ export interface ReviewPenaltyRecordRequest {
   note?: string | null;
 }
 
+export interface SubmitPenaltyExplanationRequest {
+  explanation: string;
+}
+
 export interface PenaltyApiResponse<T> {
   success?: boolean;
   message?: string;

@@ -62,7 +62,8 @@ namespace HRM.backend.src.HRM.Core.Enums
     {
         Pending_HR,
         Completed,
-        Rejected
+        Rejected,
+        PendingCandidateProfile
     }
 
     public enum PenaltySourceType
@@ -167,7 +168,9 @@ namespace HRM.backend.src.HRM.Core.Enums
         RejectedByDept,
         RejectedByDirector,
         AutoDeptApproved,
-        AutoFinalApproved
+        AutoFinalApproved,
+        PendingHR,
+        RejectedByHR
     }
     public enum OvertimeRequestStatus
     {
@@ -360,7 +363,7 @@ namespace HRM.backend.src.HRM.Core.Enums
     }
 
     // ==========================================
-    // MODULE 9: Requests & Handover
+    // MODULE 9: Workflow Requests
     // ==========================================
     public enum RequestStatus
     {

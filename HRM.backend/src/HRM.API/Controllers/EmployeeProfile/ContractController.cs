@@ -148,7 +148,7 @@ namespace HRM.backend.src.HRM.API.Controllers.EmployeeProfile
         [HttpGet("pending-dept")]
         public async Task<IActionResult> GetPendingDept(CancellationToken ct)
         {
-            var result = await _useCase.GetPendingDeptAsync(ct);
+            var result = await _useCase.GetPendingDeptAsync(GetAccountId(), GetRole(), ct);
             return Ok(new { Success = true, Data = result });
         }
 

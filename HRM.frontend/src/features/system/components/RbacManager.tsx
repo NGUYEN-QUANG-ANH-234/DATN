@@ -51,7 +51,7 @@ export const RbacManager: React.FC = () => {
   );
 
   const selectedRole = roles.find((role: RolePermission) => role.roleId === selectedRoleId);
-  const isRootRole = Number(selectedRole?.roleId) === 1;
+  const isRootRole = selectedRole?.roleName?.toLowerCase() === "admin";
 
   const handleCheckboxChange = (code: string) => {
     setCurrentPermissions((prev) =>
@@ -191,7 +191,7 @@ export const RbacManager: React.FC = () => {
             <div className="max-h-[640px] space-y-2 overflow-y-auto pr-1">
               {roles.map((role: RolePermission) => {
                 const selected = selectedRoleId === role.roleId;
-                const root = Number(role.roleId) === 1;
+                const root = role.roleName?.toLowerCase() === "admin";
 
                 return (
                   <button
@@ -251,7 +251,7 @@ export const RbacManager: React.FC = () => {
                 </div>
               )}
 
-              <div className="grid gap-4 2xl:grid-cols-2">
+              <div className="grid max-h-[720px] gap-4 overflow-y-auto pr-1 2xl:grid-cols-2">
                 {availableModulesTyped.map((module: PermissionModule) => {
                   const selectedCount = module.codes.filter((item) =>
                     currentPermissions.includes(item.code),
@@ -284,7 +284,7 @@ export const RbacManager: React.FC = () => {
                         </Button>
                       </div>
 
-                      <div className="space-y-2">
+                      <div className="max-h-[360px] space-y-2 overflow-y-auto pr-1">
                         {module.codes.map((item: PermissionItem) => {
                           const checked = currentPermissions.includes(item.code);
 

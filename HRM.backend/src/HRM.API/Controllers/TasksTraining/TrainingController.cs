@@ -20,6 +20,21 @@ namespace HRM.backend.src.HRM.API.Controllers.TasksTraining
             _useCase = useCase;
         }
 
+        [HttpGet("my-learning")]
+        [RequirePermission("TASK_VIEW_SELF", GroupName = SystemModules.PerformanceTraining, Description = "Xem việc học tập cá nhân")]
+        public async Task<IActionResult> GetMyLearning(CancellationToken ct)
+        {
+            try
+            {
+                var data = await _useCase.GetMyLearningAsync(GetAccountId(), ct);
+                return Ok(new { Success = true, Data = data });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new { Success = false, Message = ex.Message });
+            }
+        }
+
         [HttpGet("pending-evaluation")]
         [RequirePermission("TRAINING_EVALUATE", GroupName = SystemModules.PerformanceTraining, Description = "Xem hồ sơ đào tạo chờ đánh giá")]
         public async Task<IActionResult> GetPending(CancellationToken ct)

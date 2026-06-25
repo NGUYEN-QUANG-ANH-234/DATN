@@ -1,5 +1,5 @@
 ﻿using HRM.backend.src.HRM.Core.Entities.EmployeeProfile;
-using HRM.backend.src.HRM.Core.Entities.RequestHandover;
+using HRM.backend.src.HRM.Core.Entities.WorkflowRequests;
 using HRM.backend.src.HRM.Core.Enums;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.EmployeeProfile;
 using Microsoft.EntityFrameworkCore;
@@ -17,6 +17,11 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.EmployeePr
                 .CountAsync(e => e.DeptId == deptId && e.Status != EmployeeStatus.Terminated, ct);
         }
 
+        public async Task<int> CountInDeptAsync(int deptId, CancellationToken ct = default)
+        {
+            return await _dbSet.CountAsync(e => e.DeptId == deptId, ct);
+        }
+
         public async Task<bool> CheckIdentityNumberExistsAsync(string identityNumber, int excludeEmployeeId, CancellationToken ct = default)
         {
             return await _dbSet.AnyAsync(e => e.IdentityNumber == identityNumber && e.Id != excludeEmployeeId, ct);
@@ -31,6 +36,9 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.EmployeePr
         {
             return await _dbSet
                 .Include(e => e.Account)
+                .Include(e => e.Department)
+                    .ThenInclude(d => d!.Manager)
+                        .ThenInclude(m => m!.Account)
                 .FirstOrDefaultAsync(e => e.AccountId == accountId, ct);
         }
 
@@ -76,6 +84,29 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.EmployeePr
                 .Where(e => e.Status != EmployeeStatus.Terminated)
                 .AsNoTracking()
                 .ToListAsync(ct);
+        }
+
+        public async Task<List<int>> GetManagedDepartmentIdsByAccountIdAsync(int accountId, CancellationToken ct = default)
+        {
+            var manager = await _dbSet
+                .AsNoTracking()
+                .Where(e => e.AccountId == accountId)
+                .Select(e => new { e.Id, e.DeptId })
+                .FirstOrDefaultAsync(ct);
+
+            if (manager == null)
+                return new List<int>();
+
+            var deptIds = await _context.Departments
+                .AsNoTracking()
+                .Where(d => d.ManagerId == manager.Id)
+                .Select(d => d.Id)
+                .ToListAsync(ct);
+
+            if (manager.DeptId.HasValue)
+                deptIds.Add(manager.DeptId.Value);
+
+            return deptIds.Distinct().ToList();
         }
     }
 }

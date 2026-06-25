@@ -8,7 +8,7 @@ using HRM.backend.src.HRM.Application.Interfaces;
 using HRM.backend.src.HRM.Application.Interfaces.EmployeeProfile.Usecases;
 using HRM.backend.src.HRM.Application.Interfaces.System.Services;
 using HRM.backend.src.HRM.Core.Entities.EmployeeProfile;
-using HRM.backend.src.HRM.Core.Entities.RequestHandover;
+using HRM.backend.src.HRM.Core.Entities.WorkflowRequests;
 using HRM.backend.src.HRM.Core.Enums;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.EmployeeProfile;
@@ -301,7 +301,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                 await EnsureManagerCanAccessAsync(addendum, actorAccountId, actorRoleName, innerCt);
                 await _approvalConflictGuard.EnsureNotSelfApprovalForEmployeeAsync(GetTargetEmployeeId(addendum), actorAccountId, innerCt);
 
-                addendum.Status = dto.IsApproved ? AddendumStatus.PendingHR : AddendumStatus.PendingHRRevision;
+                addendum.Status = dto.IsApproved ? AddendumStatus.PendingEmployee : AddendumStatus.PendingHRRevision;
                 addendum.RejectReason = dto.IsApproved
                     ? null
                     : string.IsNullOrWhiteSpace(dto.RejectReason)
@@ -578,9 +578,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                 ?? throw new UnauthorizedAccessException("Tài khoản Trưởng phòng chưa liên kết hồ sơ nhân sự.");
 
             return addendums
-                .Where(a => a.Contract?.Employee?.DeptId.HasValue == true &&
-                            manager.DeptId.HasValue &&
-                            a.Contract.Employee.DeptId.Value == manager.DeptId.Value)
+                .Where(a => a.Contract?.Employee?.Department?.Manager?.AccountId == actorAccountId)
                 .Select(Map);
         }
 
@@ -1223,8 +1221,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
             var manager = await _employeeRepo.GetByAccountIdAsync(actorAccountId, ct)
                 ?? throw new UnauthorizedAccessException("Tài khoản Trưởng phòng chưa liên kết hồ sơ nhân sự.");
 
-            var employeeDeptId = addendum.Contract?.Employee?.DeptId;
-            if (!manager.DeptId.HasValue || !employeeDeptId.HasValue || manager.DeptId.Value != employeeDeptId.Value)
+            if (addendum.Contract?.Employee?.Department?.Manager?.AccountId != actorAccountId)
                 throw new UnauthorizedAccessException("Trưởng phòng chỉ được xác nhận phụ lục của nhân viên trong phòng ban mình.");
         }
 

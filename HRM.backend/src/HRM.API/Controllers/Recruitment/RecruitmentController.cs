@@ -138,6 +138,58 @@ namespace HRM.backend.src.HRM.API.Controllers.Recruitment
             }
         }
 
+        [HttpPatch("requests/{id}/reopen")]
+        [Authorize]
+        [RequirePermission("RECRUITMENT_REQUEST_REVIEW", GroupName = SystemModules.Recruitment, Description = "Mở lại tin tuyển dụng")]
+        public async Task<IActionResult> ReopenRequest(int id, [FromBody] ReopenRecruitmentRequestDto dto, CancellationToken ct)
+        {
+            try
+            {
+                var actorId = User.GetAccountIdOrThrow();
+                var actorRoleName = GetRole();
+                var request = await _useCase.ReopenRequestAsync(id, actorId, actorRoleName, dto, ct);
+                return Ok(new { Success = true, Data = request, Message = "Đã mở lại tin tuyển dụng." });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, new { Success = false, Message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return UnprocessableEntity(new { Success = false, Message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Success = false, Message = ex.Message });
+            }
+        }
+
+        [HttpPost("requests/{id}/clone")]
+        [Authorize]
+        [RequirePermission("RECRUITMENT_REQUEST_CREATE", GroupName = SystemModules.Recruitment, Description = "Nhân bản tin tuyển dụng")]
+        public async Task<IActionResult> CloneRequest(int id, [FromBody] CloneRecruitmentRequestDto dto, CancellationToken ct)
+        {
+            try
+            {
+                var actorId = User.GetAccountIdOrThrow();
+                var actorRoleName = GetRole();
+                var request = await _useCase.CloneRequestAsync(id, actorId, actorRoleName, dto, ct);
+                return Ok(new { Success = true, Data = request, Message = "Đã tạo nhu cầu tuyển dụng mới từ tin cũ." });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, new { Success = false, Message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return UnprocessableEntity(new { Success = false, Message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Success = false, Message = ex.Message });
+            }
+        }
+
         [HttpGet("active-jobs")]
         [AllowAnonymous] // Public cho Cổng Ứng viên gọi để hiển thị danh sách Job
         public async Task<IActionResult> GetActiveJobs(CancellationToken ct)

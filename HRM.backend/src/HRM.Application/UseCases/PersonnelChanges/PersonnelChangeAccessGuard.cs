@@ -131,6 +131,59 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
                 : Task.CompletedTask;
         }
 
+        public async Task EnsureActorHasRoleAsync(
+            int actorAccountId,
+            CancellationToken ct,
+            params string[] allowedRoles)
+        {
+            var actor = await GetActorContextAsync(actorAccountId, ct);
+            if (allowedRoles.Any(role => IsAny(actor.RoleName, role)))
+                return;
+
+            throw new UnauthorizedAccessException("Tài khoản không có quyền thực hiện bước xử lý này.");
+        }
+
+        public async Task EnsureEmployeeAccountCanActAsync(
+            int employeeId,
+            int actorAccountId,
+            string actionName,
+            CancellationToken ct)
+        {
+            var actor = await GetActorContextAsync(actorAccountId, ct);
+            if (IsAdmin(actor.RoleName))
+                return;
+
+            var employee = await _employeeRepo.GetByIdAsync(employeeId, ct)
+                ?? throw new KeyNotFoundException("Employee was not found.");
+
+            if (employee.AccountId.HasValue && employee.AccountId.Value == actorAccountId)
+                return;
+
+            throw new UnauthorizedAccessException($"Only the selected employee can {actionName}.");
+        }
+
+        public async Task EnsureCurrentManagerCanActAsync(
+            int? currentManagerId,
+            int actorAccountId,
+            string actionName,
+            CancellationToken ct)
+        {
+            var actor = await GetActorContextAsync(actorAccountId, ct);
+            if (IsAdmin(actor.RoleName))
+                return;
+
+            if (!currentManagerId.HasValue)
+                throw new UnauthorizedAccessException("No current manager is assigned for this request.");
+
+            var manager = await _employeeRepo.GetByIdAsync(currentManagerId.Value, ct)
+                ?? throw new KeyNotFoundException("Current manager was not found.");
+
+            if (manager.AccountId.HasValue && manager.AccountId.Value == actorAccountId)
+                return;
+
+            throw new UnauthorizedAccessException($"Only the current manager can {actionName}.");
+        }
+
         public async Task EnsurePerformanceReviewBelongsToEmployeeAsync(
             int? performanceReviewId,
             int employeeId,
@@ -214,6 +267,9 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
 
         private static bool CanViewAllEmployees(string roleName) =>
             IsAny(roleName, "Admin", "HR", "Director");
+
+        private static bool IsAdmin(string roleName) =>
+            IsAny(roleName, "Admin");
 
         private static bool IsManager(string roleName) =>
             IsAny(roleName, "Manager", "Truong phong", "Trưởng phòng");

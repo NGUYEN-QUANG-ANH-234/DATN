@@ -3,10 +3,10 @@ using HRM.backend.src.HRM.Core.Entities.Organization;
 using HRM.backend.src.HRM.Core.Entities.PayrollAllowances;
 using HRM.backend.src.HRM.Core.Entities.PersonnelChanges;
 using HRM.backend.src.HRM.Core.Entities.Recruitment;
-using HRM.backend.src.HRM.Core.Entities.RequestHandover;
 using HRM.backend.src.HRM.Core.Entities.System;
 using HRM.backend.src.HRM.Core.Entities.TasksTraining;
 using HRM.backend.src.HRM.Core.Entities.TimeAttendance;
+using HRM.backend.src.HRM.Core.Entities.WorkflowRequests;
 using HRM.backend.src.HRM.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
@@ -755,6 +755,30 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
                 .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<OvertimeRequest>()
+                .HasOne(o => o.RequestedByAccount)
+                .WithMany()
+                .HasForeignKey(o => o.RequestedByAccountId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<OvertimeRequest>()
+                .HasOne(o => o.ManagerReviewerAccount)
+                .WithMany()
+                .HasForeignKey(o => o.ManagerReviewerAccountId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<OvertimeRequest>()
+                .HasOne(o => o.HrReviewerAccount)
+                .WithMany()
+                .HasForeignKey(o => o.HrReviewerAccountId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<OvertimeRequest>()
+                .HasOne(o => o.DirectorReviewerAccount)
+                .WithMany()
+                .HasForeignKey(o => o.DirectorReviewerAccountId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<OvertimeRequest>()
                 .HasMany(o => o.Segments)
                 .WithOne(s => s.OvertimeRequest)
                 .HasForeignKey(s => s.OvertimeRequestId)
@@ -902,10 +926,6 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
                 .HasForeignKey(l => l.PayrollId)
                 .OnDelete(DeleteBehavior.SetNull);
 
-            modelBuilder.Entity<ExternalTimesheetLine>()
-                .Property(l => l.ValidationStatus)
-                .HasDefaultValue(ProjectBonusLineValidationStatus.Valid);
-
             modelBuilder.Entity<ProjectBonusImportBatch>()
                 .HasOne(b => b.UploadedByAccount)
                 .WithMany()
@@ -931,6 +951,36 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
                 .OnDelete(DeleteBehavior.SetNull);
 
             modelBuilder.Entity<PayrollFormula>()
+                .HasOne(f => f.CreatedByAccount)
+                .WithMany()
+                .HasForeignKey(f => f.CreatedByAccountId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<PayrollFormula>()
+                .HasOne(f => f.SubmittedByAccount)
+                .WithMany()
+                .HasForeignKey(f => f.SubmittedByAccountId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<PayrollFormula>()
+                .HasOne(f => f.ApprovedByAccount)
+                .WithMany()
+                .HasForeignKey(f => f.ApprovedByAccountId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<PayrollFormula>()
+                .HasOne(f => f.ActivatedByAccount)
+                .WithMany()
+                .HasForeignKey(f => f.ActivatedByAccountId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<PayrollFormula>()
+                .HasOne(f => f.ArchivedByAccount)
+                .WithMany()
+                .HasForeignKey(f => f.ArchivedByAccountId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<PayrollFormula>()
                 .HasMany(f => f.Lines)
                 .WithOne(l => l.PayrollFormula)
                 .HasForeignKey(l => l.PayrollFormulaId)
@@ -941,6 +991,42 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
                 .WithMany()
                 .HasForeignKey(l => l.SalaryComponentTypeId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<TaxConfig>()
+                .HasOne(t => t.CreatedByAccount)
+                .WithMany()
+                .HasForeignKey(t => t.CreatedByAccountId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<PITTaxBracket>()
+                .HasOne(t => t.CreatedByAccount)
+                .WithMany()
+                .HasForeignKey(t => t.CreatedByAccountId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<InsuranceConfig>()
+                .HasOne(i => i.CreatedByAccount)
+                .WithMany()
+                .HasForeignKey(i => i.CreatedByAccountId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<OvertimeRateConfig>()
+                .HasOne(o => o.CreatedByAccount)
+                .WithMany()
+                .HasForeignKey(o => o.CreatedByAccountId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<PayrollPolicy>()
+                .HasOne(p => p.CreatedByAccount)
+                .WithMany()
+                .HasForeignKey(p => p.CreatedByAccountId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<PayrollPolicy>()
+                .HasOne(p => p.UpdatedByAccount)
+                .WithMany()
+                .HasForeignKey(p => p.UpdatedByAccountId)
+                .OnDelete(DeleteBehavior.SetNull);
 
             modelBuilder.Entity<EmployeeSalaryComponent>()
                 .HasOne(s => s.Employee)
@@ -1006,11 +1092,35 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
                 .HasForeignKey(w => w.CompanyCalendarId)
                 .OnDelete(DeleteBehavior.SetNull);
 
+            modelBuilder.Entity<WorkCalendarConfig>()
+                .HasOne(w => w.CreatedByAccount)
+                .WithMany()
+                .HasForeignKey(w => w.CreatedByAccountId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<WorkCalendarConfig>()
+                .HasOne(w => w.UpdatedByAccount)
+                .WithMany()
+                .HasForeignKey(w => w.UpdatedByAccountId)
+                .OnDelete(DeleteBehavior.SetNull);
+
             modelBuilder.Entity<CompanyCalendar>()
                 .HasMany(c => c.Days)
                 .WithOne(d => d.Calendar)
                 .HasForeignKey(d => d.CalendarId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<CompanyCalendar>()
+                .HasOne(c => c.CreatedByAccount)
+                .WithMany()
+                .HasForeignKey(c => c.CreatedByAccountId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<CompanyCalendar>()
+                .HasOne(c => c.UpdatedByAccount)
+                .WithMany()
+                .HasForeignKey(c => c.UpdatedByAccountId)
+                .OnDelete(DeleteBehavior.SetNull);
 
             SeedPayrollPhaseOneReferenceData(modelBuilder);
 
@@ -1360,6 +1470,30 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
                     IsActive = true,
                     CreatedAt = pitEffectiveFrom,
                     Note = "Approved project bonus imported from ERP/accounting and included as taxable bonus income by default."
+                },
+                new SalaryComponentType
+                {
+                    Id = 16,
+                    Code = "INTERN_ALLOWANCE",
+                    Name = "Trợ cấp thực tập",
+                    ComponentGroup = SalaryComponentGroup.Allowance,
+                    IsIncome = true,
+                    IsDeduction = false,
+                    IsTaxable = true,
+                    IsInsuranceBased = false,
+                    IsFixed = true,
+                    IsAllowance = true,
+                    IsBonus = false,
+                    IsOvertime = false,
+                    ProrationType = ProrationType.None,
+                    CalculationMethod = CalculationMethod.FixedAmount,
+                    EffectiveFrom = pitEffectiveFrom,
+                    Version = 1,
+                    VersionCode = "INTERN_ALLOWANCE_V1",
+                    Status = PolicyVersionStatus.Active,
+                    IsActive = true,
+                    CreatedAt = pitEffectiveFrom,
+                    Note = "Default minimum internship allowance. Override per intern through employee salary components when needed."
                 }
             );
 
@@ -1492,7 +1626,8 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence
                 new PayrollPolicy { Id = 20260102, PolicyType = PayrollPolicyType.MinimumWage, Code = "VN_MIN_WAGE_REGION_2_2026", Name = "Lương tối thiểu vùng II 2026", ValueType = PayrollPolicyValueType.Amount, Amount = 4730000m, EffectiveFrom = insurance2026EffectiveFrom, Version = 1, VersionCode = "VN_MIN_WAGE_2026", Status = PolicyVersionStatus.Active, SourceRef = "Vietnam regional minimum wage 2026", ActivatedAt = insurance2026EffectiveFrom, IsActive = true, CreatedAt = insurance2026EffectiveFrom, Description = "Theo dõi lương tối thiểu vùng để đối chiếu trần/sàn chính sách bảo hiểm và lương." },
                 new PayrollPolicy { Id = 20260103, PolicyType = PayrollPolicyType.MinimumWage, Code = "VN_MIN_WAGE_REGION_3_2026", Name = "Lương tối thiểu vùng III 2026", ValueType = PayrollPolicyValueType.Amount, Amount = 4140000m, EffectiveFrom = insurance2026EffectiveFrom, Version = 1, VersionCode = "VN_MIN_WAGE_2026", Status = PolicyVersionStatus.Active, SourceRef = "Vietnam regional minimum wage 2026", ActivatedAt = insurance2026EffectiveFrom, IsActive = true, CreatedAt = insurance2026EffectiveFrom, Description = "Theo dõi lương tối thiểu vùng để đối chiếu trần/sàn chính sách bảo hiểm và lương." },
                 new PayrollPolicy { Id = 20260104, PolicyType = PayrollPolicyType.MinimumWage, Code = "VN_MIN_WAGE_REGION_4_2026", Name = "Lương tối thiểu vùng IV 2026", ValueType = PayrollPolicyValueType.Amount, Amount = 3700000m, EffectiveFrom = insurance2026EffectiveFrom, Version = 1, VersionCode = "VN_MIN_WAGE_2026", Status = PolicyVersionStatus.Active, SourceRef = "Vietnam regional minimum wage 2026", ActivatedAt = insurance2026EffectiveFrom, IsActive = true, CreatedAt = insurance2026EffectiveFrom, Description = "Theo dõi lương tối thiểu vùng để đối chiếu trần/sàn chính sách bảo hiểm và lương." },
-                new PayrollPolicy { Id = 20260601, PolicyType = PayrollPolicyType.KpiBonus, Code = "HICAS_KPI_BONUS_2026", Name = "Quy chế thưởng KPI HICAS 2026", ValueType = PayrollPolicyValueType.Formula, FormulaJson = "{\"kpiBonusTargetSource\":\"EmployeeSalaryComponent.KPI_BONUS\",\"scoreFormula\":\"Điểm KPI chính thức = tổng max(0, trọng số KPI * điểm trưởng phòng / 100 - điểm trừ).\",\"payoutFormula\":\"Thưởng KPI thực nhận = mức thưởng KPI tối đa * điểm KPI / 100.\",\"eligibilityRule\":\"Người lao động chỉ nhận thưởng KPI khi kết quả KPI kỳ đó đã được chốt, không thuộc trường hợp bị hủy hoặc không áp dụng theo quy chế lương thưởng và quyết định kỷ luật liên quan.\",\"paymentPeriod\":\"Chi trả theo kỳ lương sau khi kết quả KPI được chốt và bảng lương được phê duyệt.\",\"approverRole\":\"Trưởng phòng chốt điểm KPI; HR kiểm tra chính sách; Giám đốc phê duyệt bảng lương.\"}", EffectiveFrom = new DateTime(2026, 6, 1), Version = 1, VersionCode = "HICAS_KPI_BONUS_2026_V1", Status = PolicyVersionStatus.Active, SourceRef = "HICAS compensation policy 2026", ActivatedAt = new DateTime(2026, 6, 1), IsActive = true, CreatedAt = new DateTime(2026, 6, 1), Description = "Lưu quy chế thưởng KPI theo version. Hợp đồng chỉ viện dẫn nguyên tắc; thay đổi công thức tạo version mới, không cần ký lại phụ lục từng lần." }
+                new PayrollPolicy { Id = 20260601, PolicyType = PayrollPolicyType.KpiBonus, Code = "HICAS_KPI_BONUS_2026", Name = "Quy chế thưởng KPI HICAS 2026", ValueType = PayrollPolicyValueType.Formula, FormulaJson = "{\"kpiBonusTargetSource\":\"EmployeeSalaryComponent.KPI_BONUS\",\"scoreFormula\":\"Điểm KPI chính thức = tổng max(0, trọng số KPI * điểm trưởng phòng / 100 - điểm trừ).\",\"payoutFormula\":\"Thưởng KPI thực nhận = mức thưởng KPI tối đa * điểm KPI / 100.\",\"eligibilityRule\":\"Người lao động chỉ nhận thưởng KPI khi kết quả KPI kỳ đó đã được chốt, không thuộc trường hợp bị hủy hoặc không áp dụng theo quy chế lương thưởng và quyết định kỷ luật liên quan.\",\"paymentPeriod\":\"Chi trả theo kỳ lương sau khi kết quả KPI được chốt và bảng lương được phê duyệt.\",\"approverRole\":\"Trưởng phòng chốt điểm KPI; HR kiểm tra chính sách; Giám đốc phê duyệt bảng lương.\"}", EffectiveFrom = new DateTime(2026, 6, 1), Version = 1, VersionCode = "HICAS_KPI_BONUS_2026_V1", Status = PolicyVersionStatus.Active, SourceRef = "HICAS compensation policy 2026", ActivatedAt = new DateTime(2026, 6, 1), IsActive = true, CreatedAt = new DateTime(2026, 6, 1), Description = "Lưu quy chế thưởng KPI theo version. Hợp đồng chỉ viện dẫn nguyên tắc; thay đổi công thức tạo version mới, không cần ký lại phụ lục từng lần." },
+                new PayrollPolicy { Id = 20260610, PolicyType = PayrollPolicyType.Allowance, Code = "HICAS_INTERN_ALLOWANCE_2026", Name = "Trợ cấp thực tập tối thiểu HICAS 2026", ValueType = PayrollPolicyValueType.Amount, Amount = 2000000m, EffectiveFrom = new DateTime(2026, 6, 1), Version = 1, VersionCode = "HICAS_INTERN_ALLOWANCE_2026_V1", Status = PolicyVersionStatus.Active, SourceRef = "HICAS internship allowance policy 2026", ActivatedAt = new DateTime(2026, 6, 1), IsActive = true, CreatedAt = new DateTime(2026, 6, 1), Description = "Mức trợ cấp tối thiểu cho thực tập sinh. HR có thể override bằng thành phần lương INTERN_ALLOWANCE theo từng hồ sơ." }
             );
         }
         

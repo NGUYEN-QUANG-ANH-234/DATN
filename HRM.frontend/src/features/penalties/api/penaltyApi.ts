@@ -4,6 +4,7 @@ import type {
   PenaltyApiResponse,
   PenaltyRecord,
   ReviewPenaltyRecordRequest,
+  SubmitPenaltyExplanationRequest,
 } from "../types/penalty";
 
 export const penaltyApi = {
@@ -38,6 +39,12 @@ export const penaltyApi = {
   directorReview: (id: number, payload: ReviewPenaltyRecordRequest) =>
     axiosClient.patch<PenaltyApiResponse<PenaltyRecord>, PenaltyApiResponse<PenaltyRecord>>(
       `/penalties/${id}/director-review`,
+      payload,
+    ),
+
+  submitExplanation: (id: number, payload: SubmitPenaltyExplanationRequest) =>
+    axiosClient.patch<PenaltyApiResponse<PenaltyRecord>, PenaltyApiResponse<PenaltyRecord>>(
+      `/penalties/${id}/explanation`,
       payload,
     ),
 };

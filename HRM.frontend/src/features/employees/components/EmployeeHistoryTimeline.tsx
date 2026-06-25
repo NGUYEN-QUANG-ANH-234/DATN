@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { normalizeRole } from "../../../core/auth/roleAccess";
+import { useCurrentUser } from "../../../core/auth/hooks/useCurrentUser";
 import {
   EmptyState,
   FeatureCard,
@@ -9,6 +11,8 @@ import {
   secondaryButtonClass,
 } from "../../../core/components/FeatureShell";
 import { useNotification } from "../../../core/context/NotificationContext";
+import { personnelChangeApi } from "../../personnel-change/api/personnelChangeApi";
+import type { PersonnelChangeEmployeeOption } from "../../personnel-change/types/personnelChange";
 import { myProfileApi } from "../api/myProfileApi";
 import type {
   ConsolidatedHistoryItem,
@@ -63,11 +67,19 @@ const parseHistoryType = (value: string | null): HistoryEventType => {
 };
 
 export const EmployeeHistoryTimeline = () => {
+  const { user } = useCurrentUser();
+  const role = normalizeRole(user?.role);
+  const canViewEmployeeHistory = role === "Admin" || role === "HR" || role === "Director" || role === "Manager";
   const [searchParams, setSearchParams] = useSearchParams();
   const [year, setYear] = useState<number | "">("");
   const [type, setType] = useState<HistoryEventType>(() =>
     parseHistoryType(new URLSearchParams(window.location.search).get("type")),
   );
+  const [employeeOptions, setEmployeeOptions] = useState<PersonnelChangeEmployeeOption[]>([]);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<number | "">(() => {
+    const value = Number(new URLSearchParams(window.location.search).get("employeeId"));
+    return Number.isFinite(value) && value > 0 ? value : "";
+  });
   const [page, setPage] = useState(1);
   const [history, setHistory] = useState<PaginatedHistoryResponse>(defaultPage);
   const [loading, setLoading] = useState(false);
@@ -80,22 +92,65 @@ export const EmployeeHistoryTimeline = () => {
 
   useEffect(() => {
     const nextType = parseHistoryType(searchParams.get("type"));
+    const nextEmployeeId = Number(searchParams.get("employeeId"));
     setType((current) => (current === nextType ? current : nextType));
+    if (canViewEmployeeHistory) {
+      setSelectedEmployeeId((current) =>
+        Number.isFinite(nextEmployeeId) && nextEmployeeId > 0 && current !== nextEmployeeId
+          ? nextEmployeeId
+          : current,
+      );
+    }
     setPage(1);
-  }, [searchParams]);
+  }, [canViewEmployeeHistory, searchParams]);
+
+  useEffect(() => {
+    if (!canViewEmployeeHistory) return;
+
+    let cancelled = false;
+
+    const loadEmployees = async () => {
+      try {
+        const res = await personnelChangeApi.getEmployeeOptions();
+        if (cancelled) return;
+
+        const employees = res.data ?? [];
+        setEmployeeOptions(employees);
+        setSelectedEmployeeId((current) => current || employees[0]?.id || "");
+      } catch (error) {
+        if (!cancelled) {
+          console.error("Không thể tải danh sách nhân sự:", error);
+          triggerAlert("error", "Không thể tải danh sách nhân sự", "Vui lòng thử lại.");
+        }
+      }
+    };
+
+    void loadEmployees();
+    return () => {
+      cancelled = true;
+    };
+  }, [canViewEmployeeHistory, triggerAlert]);
 
   useEffect(() => {
     let cancelled = false;
 
     const fetchHistory = async () => {
+      if (canViewEmployeeHistory && !selectedEmployeeId) {
+        setHistory(defaultPage);
+        return;
+      }
+
       setLoading(true);
       try {
-        const res = await myProfileApi.getHistory({
+        const params = {
           ...(year ? { year } : {}),
           type,
           page,
           size: 10,
-        });
+        };
+        const res = canViewEmployeeHistory
+          ? await myProfileApi.getEmployeeHistory(Number(selectedEmployeeId), params)
+          : await myProfileApi.getHistory(params);
         if (!cancelled) setHistory(res.data || defaultPage);
       } catch (error) {
         if (!cancelled) {
@@ -111,7 +166,7 @@ export const EmployeeHistoryTimeline = () => {
     return () => {
       cancelled = true;
     };
-  }, [year, type, page, triggerAlert]);
+  }, [canViewEmployeeHistory, page, selectedEmployeeId, triggerAlert, type, year]);
 
   const updateQueryType = (nextType: HistoryEventType) => {
     const next = new URLSearchParams(searchParams);
@@ -137,6 +192,17 @@ export const EmployeeHistoryTimeline = () => {
     setPage(1);
   };
 
+  const handleEmployeeChange = (nextEmployeeId: string) => {
+    const parsed = Number(nextEmployeeId);
+    setSelectedEmployeeId(Number.isFinite(parsed) && parsed > 0 ? parsed : "");
+    setPage(1);
+
+    const next = new URLSearchParams(searchParams);
+    if (Number.isFinite(parsed) && parsed > 0) next.set("employeeId", String(parsed));
+    else next.delete("employeeId");
+    setSearchParams(next);
+  };
+
   return (
     <FeaturePage
       title="Lịch sử hồ sơ & hợp đồng"
@@ -144,7 +210,27 @@ export const EmployeeHistoryTimeline = () => {
       width="wide"
     >
       <FeatureCard>
-        <div className="grid gap-4 md:grid-cols-[1fr_1fr_auto] md:items-end">
+        <div className={`grid gap-4 md:items-end ${canViewEmployeeHistory ? "md:grid-cols-[1.2fr_1fr_1fr_auto]" : "md:grid-cols-[1fr_1fr_auto]"}`}>
+          {canViewEmployeeHistory ? (
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Nhân sự
+              </label>
+              <select
+                className={fieldClass}
+                value={selectedEmployeeId}
+                onChange={(event) => handleEmployeeChange(event.target.value)}
+              >
+                <option value="">Chọn nhân sự</option>
+                {employeeOptions.map((employee) => (
+                  <option key={employee.id} value={employee.id}>
+                    {employee.employeeCode} - {employee.fullName}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
+
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">
               Năm

@@ -28,18 +28,24 @@ import { dependentApi } from "../../employees/api/dependentApi";
 import { onboardingApi } from "../../employees/api/onboardingApi";
 import { contractApi } from "../../employees/api/contractApi";
 import { contractAddendumApi } from "../../employees/api/contractAddendumApi";
+import { attendanceSummaryApi } from "../../attendance/api/attendanceSummaryApi";
 import { overtimeApi } from "../../attendance/api/overtimeApi";
 import { leaveRequestApi } from "../../attendance/api/leaveRequestApi";
 import { accountApi } from "../../system/api/accountApi";
 import { payrollApi } from "../../payroll/api/payrollApi";
-import { formatMoney, formatNumber } from "../../payroll/utils";
+import { formatMoney, formatNumber, getPayrollStatusLabel, normalizePayrollStatus } from "../../payroll/utils";
 import { personnelChangeApi } from "../../personnel-change/api/personnelChangeApi";
 import { performanceApi, type PerformanceEvaluation } from "../../tasks/api/performanceApi";
+import { taskApi, type TaskItem } from "../../tasks/api/taskApi";
+import { trainingApi, type TrainingSummary } from "../../tasks/api/trainingApi";
+import { penaltyApi } from "../../penalties/api/penaltyApi";
+import type { PenaltyRecord } from "../../penalties/types/penalty";
 import type { PendingProfileRequest } from "../../employees/types/profileRequest";
 import type { PendingDependentRequest } from "../../employees/types/dependent";
 import type { PendingOnboardingRequest } from "../../employees/types/onboarding";
 import type { ContractDto } from "../../employees/api/contractApi";
 import type { ContractAddendumDto } from "../../employees/api/contractAddendumApi";
+import type { AttendanceSummary } from "../../attendance/api/attendanceSummaryApi";
 import type { OvertimeRequest } from "../../attendance/api/overtimeApi";
 import type { LeaveRequest } from "../../attendance/api/leaveRequestApi";
 import type {
@@ -157,6 +163,7 @@ const readableDeadlineLabel = (
 };
 
 const includeOvertimeReconcileInApprovalInbox = false;
+const employeeConfirmationRoles = new Set(["Employee", "Intern", "Collaborator"]);
 
 const currentPayrollPeriod = () => {
   const now = new Date();
@@ -265,11 +272,14 @@ export const ApprovalWorkspacePage = () => {
         loadOnboardingApprovals(next),
         loadContractWorkItems(next),
         loadAddendumApprovals(next),
+        loadAttendancePeriodApprovals(next),
         loadOvertimeApprovals(next),
         loadLeaveApprovals(next),
         loadPayrollWorkItems(next),
         loadPersonnelChangeApprovals(next),
         loadPerformanceApprovals(next),
+        loadTaskTrainingApprovals(next),
+        loadPenaltyApprovals(next),
       ]);
 
       setItems(next);
@@ -446,7 +456,7 @@ export const ApprovalWorkspacePage = () => {
           module: "ONBOARDING",
           moduleLabel: "Tiếp nhận hồ sơ",
           source: "ONBOARDING",
-          title: `Thiết lập hồ sơ mới #${item.id}`,
+          title: `Hoàn tất hồ sơ ban đầu #${item.id}`,
           subtitle: [
             `Ứng viên #${item.candidateId}`,
             item.positionName,
@@ -547,7 +557,7 @@ export const ApprovalWorkspacePage = () => {
               run: () =>
                 onboardingApi.reviewRequest(item.id, {
                   isApproved: false,
-                  rejectReason: "HR từ chối hồ sơ onboarding.",
+                  rejectReason: "HR từ chối hồ sơ tiếp nhận.",
                 }),
             },
           ],
@@ -559,6 +569,19 @@ export const ApprovalWorkspacePage = () => {
   };
 
   const loadContractWorkItems = async (target: ApprovalItem[]) => {
+    if (employeeConfirmationRoles.has(role)) {
+      try {
+        const res = await contractApi.getMyContracts();
+        unwrapData<ContractDto>(res)
+          .filter((item) => item.status === "PendingEmployee")
+          .forEach((item) => {
+            target.push(mapEmployeeContractItem(item));
+          });
+      } catch {
+        // Skip when the current employee has no contract confirmation scope.
+      }
+    }
+
     if (["Admin", "Manager"].includes(role)) {
       try {
         const res = await contractApi.getPendingRequests();
@@ -570,7 +593,7 @@ export const ApprovalWorkspacePage = () => {
       }
     }
 
-    if (["Admin", "Director"].includes(role)) {
+    if (["Admin", "HR"].includes(role)) {
       try {
         const res = await contractApi.getDirectorPending();
         unwrapData<ContractDto>(res).forEach((item) => {
@@ -624,6 +647,17 @@ export const ApprovalWorkspacePage = () => {
   };
 
   const loadAddendumApprovals = async (target: ApprovalItem[]) => {
+    if (employeeConfirmationRoles.has(role)) {
+      try {
+        const res = await contractAddendumApi.getMyPendingConfirmation();
+        unwrapData<ContractAddendumDto>(res).forEach((item) =>
+          target.push(mapEmployeeAddendumItem(item)),
+        );
+      } catch {
+        // Skip when the current employee has no addendum confirmation scope.
+      }
+    }
+
     if (["Admin", "Manager"].includes(role)) {
       try {
         const res = await contractAddendumApi.getPendingDept();
@@ -635,12 +669,12 @@ export const ApprovalWorkspacePage = () => {
       }
     }
 
-    if (["Admin", "HR"].includes(role)) {
+    if (false && ["Admin", "HR"].includes(role)) {
       try {
         const res = await contractAddendumApi.getPendingHr();
-        unwrapData<ContractAddendumDto>(res).forEach((item) =>
-          target.push(mapAddendumItem(item, "hr")),
-        );
+        unwrapData<ContractAddendumDto>(res)
+          .filter((item) => item.status === "PendingHR")
+          .forEach((item) => target.push(mapAddendumItem(item, "hr")));
       } catch {
         // Bỏ qua nếu không được phép.
       }
@@ -655,6 +689,21 @@ export const ApprovalWorkspacePage = () => {
       });
     } catch {
       // Bỏ qua nếu không được phép.
+    }
+  };
+
+  const loadAttendancePeriodApprovals = async (target: ApprovalItem[]) => {
+    if (!["Admin", "Director"].includes(role)) return;
+
+    try {
+      const res = await attendanceSummaryApi.getPendingApproval();
+      (res.data ?? [])
+        .filter((item) => (item.summaries ?? []).length > 0)
+        .forEach((item) => {
+          target.push(mapAttendancePeriodItem(item.summaries, item.month, item.year));
+        });
+    } catch {
+      // Bỏ qua nếu tài khoản hiện tại không có quyền xem bảng công tháng.
     }
   };
 
@@ -729,6 +778,17 @@ export const ApprovalWorkspacePage = () => {
       }
     }
 
+    if (["Admin", "HR"].includes(role)) {
+      try {
+        const res = await leaveRequestApi.getPendingHR();
+        unwrapData<LeaveRequest>(res).forEach((item) =>
+          target.push(mapLeaveItem(item, "hr")),
+        );
+      } catch {
+        // Bỏ qua.
+      }
+    }
+
     if (["Admin", "Director"].includes(role)) {
       try {
         const res = await leaveRequestApi.getPendingDirector();
@@ -736,7 +796,7 @@ export const ApprovalWorkspacePage = () => {
           target.push(mapLeaveItem(item, "director")),
         );
       } catch {
-        // Bỏ qua.
+        // Chỉ dùng để xử lý đơn nghỉ phép cũ còn kẹt ở bước Giám đốc.
       }
     }
   };
@@ -801,6 +861,19 @@ export const ApprovalWorkspacePage = () => {
   };
 
   const loadPersonnelChangeApprovals = async (target: ApprovalItem[]) => {
+    if (employeeConfirmationRoles.has(role)) {
+      try {
+        const res = await personnelChangeApi.getMyActionItems();
+        (res.data ?? []).forEach((item) => {
+          target.push(mapPersonnelChangeItem(item));
+        });
+      } catch {
+        // Some employee accounts may not have a linked personnel profile yet.
+      }
+
+      return;
+    }
+
     const statuses = getPersonnelChangeStatusesForRole(role);
     if (statuses.length === 0) return;
 
@@ -823,7 +896,7 @@ export const ApprovalWorkspacePage = () => {
   };
 
   const loadPerformanceApprovals = async (target: ApprovalItem[]) => {
-    if (!["Admin", "Manager", "HR", "Director"].includes(role)) return;
+    if (!["Admin", "Manager"].includes(role)) return;
 
     try {
       const res = await performanceApi.getPending();
@@ -832,6 +905,67 @@ export const ApprovalWorkspacePage = () => {
       });
     } catch {
       // Some roles do not have permission to evaluate KPI.
+    }
+  };
+
+  const loadTaskTrainingApprovals = async (target: ApprovalItem[]) => {
+    if (["Admin", "Manager"].includes(role)) {
+      try {
+        const res = await taskApi.getPendingReview();
+        unwrapData<TaskItem>(res).forEach((item) => {
+          target.push(mapTaskReviewItem(item));
+        });
+      } catch {
+        // Some roles do not have permission to review work tasks.
+      }
+    }
+
+    if (!["Admin", "HR", "Manager"].includes(role)) return;
+
+    try {
+      const res = await trainingApi.getPending();
+      unwrapData<TrainingSummary>(res).forEach((item) => {
+        target.push(mapTrainingEvaluationItem(item));
+      });
+    } catch {
+      // Some roles do not have permission to evaluate training.
+    }
+  };
+
+  const loadPenaltyApprovals = async (target: ApprovalItem[]) => {
+    if (employeeConfirmationRoles.has(role)) {
+      try {
+        const res = await penaltyApi.getMyRecords();
+        (res.data ?? [])
+          .filter((item) => item.status === "PendingEmployeeExplanation")
+          .forEach((item) => {
+            target.push(mapEmployeePenaltyExplanationItem(item));
+          });
+      } catch {
+        // Some accounts may not have a linked employee profile yet.
+      }
+    }
+
+    if (["Admin", "HR"].includes(role)) {
+      try {
+        const res = await penaltyApi.getRecords("PendingHRReview");
+        (res.data ?? []).forEach((item) => {
+          target.push(mapPenaltyRecordItem(item, "hr"));
+        });
+      } catch {
+        // Some roles do not have permission to review penalty records as HR.
+      }
+    }
+
+    if (!["Admin", "Director"].includes(role)) return;
+
+    try {
+      const res = await penaltyApi.getRecords("PendingDirectorApproval");
+      (res.data ?? []).forEach((item) => {
+        target.push(mapPenaltyRecordItem(item, "director"));
+      });
+    } catch {
+      // Some roles do not have permission to review serious penalty records.
     }
   };
 
@@ -1245,6 +1379,67 @@ export const ApprovalWorkspacePage = () => {
     };
   }
 
+  function mapAttendancePeriodItem(
+    summaries: AttendanceSummary[],
+    month: number,
+    year: number,
+  ): ApprovalItem {
+    const period = `${String(month).padStart(2, "0")}/${year}`;
+    const employeeCount = summaries.length;
+    const totalWorkDays = summaries.reduce((total, item) => total + Number(item.workDays || 0), 0);
+    const totalPayableHours = summaries.reduce((total, item) => total + Number(item.payableWorkHours || 0), 0);
+    const totalLateMinutes = summaries.reduce((total, item) => total + Number(item.lateMinutes || 0), 0);
+    const totalEarlyLeaveMinutes = summaries.reduce((total, item) => total + Number(item.earlyLeaveMinutes || 0), 0);
+    const totalOtMinutes = summaries.reduce((total, item) => total + Number(item.actualOtMinutes || 0), 0);
+    const submittedDates = summaries
+      .map((item) => item.submittedAt || item.generatedAt)
+      .filter(Boolean)
+      .sort();
+    const submittedAt = submittedDates.length > 0 ? submittedDates[submittedDates.length - 1] : null;
+
+    return {
+      id: `attendance-period-${year}-${String(month).padStart(2, "0")}`,
+      module: "ATTENDANCE",
+      moduleLabel: "Chấm công",
+      source: "ATTENDANCE_TIMESHEET_APPROVAL",
+      title: `Bảng công tháng ${period}`,
+      subtitle: `${formatNumber(employeeCount)} nhân sự - ${formatNumber(totalPayableHours)} giờ tính lương`,
+      owner: "HR",
+      department: "Toàn công ty",
+      status: "PendingHRReview",
+      statusLabel: "Chờ Giám đốc duyệt",
+      date: submittedAt,
+      details: (
+        <DetailFieldGrid
+          fields={[
+            ["Kỳ công", period],
+            ["Số nhân sự", `${formatNumber(employeeCount)} nhân sự`],
+            ["Tổng ngày công", formatNumber(totalWorkDays)],
+            ["Tổng giờ tính lương", `${formatNumber(totalPayableHours)} giờ`],
+            ["Đi muộn", `${formatNumber(totalLateMinutes)} phút`],
+            ["Về sớm", `${formatNumber(totalEarlyLeaveMinutes)} phút`],
+            ["Làm thêm", `${formatNumber(totalOtMinutes)} phút`],
+            ["Ngày gửi chốt", formatDate(submittedAt)],
+          ]}
+        />
+      ),
+      actions: [
+        {
+          kind: "approve",
+          label: "Duyệt",
+          tone: "primary",
+          run: (note) => attendanceSummaryApi.approveMonthly(month, year, note || ""),
+        },
+        {
+          kind: "open",
+          label: "Mở bảng công",
+          tone: "secondary",
+          run: () => navigate("/attendance-leave/timesheet-summary"),
+        },
+      ],
+    };
+  }
+
   function mapOvertimeBase(item: OvertimeRequest): ApprovalItem {
     return {
       id: `ot-${item.id}`,
@@ -1275,13 +1470,16 @@ export const ApprovalWorkspacePage = () => {
 
   function mapLeaveItem(
     item: LeaveRequest,
-    scope: "dept" | "director",
+    scope: "dept" | "hr" | "director",
   ): ApprovalItem {
+    const isDept = scope === "dept";
+    const isDirectorLegacy = scope === "director";
+
     return {
       id: `leave-${scope}-${item.id}`,
       module: "LEAVE",
       moduleLabel: "Nghỉ phép",
-      source: scope === "dept" ? "LEAVE_DEPT" : "LEAVE_DIRECTOR",
+      source: isDept ? "LEAVE_DEPT" : isDirectorLegacy ? "LEAVE_DIRECTOR_LEGACY" : "LEAVE_HR",
       title: `${item.employeeName} - ${item.leaveTypeName}`,
       subtitle: `${formatDate(item.startDate)} - ${formatDate(item.endDate)} (${item.requestedDays} ngày)`,
       owner: item.employeeName,
@@ -1305,21 +1503,81 @@ export const ApprovalWorkspacePage = () => {
       actions: [
         {
           kind: "approve",
-          label: scope === "dept" ? "Trưởng phòng duyệt" : "Giám đốc duyệt",
+          label: isDept
+            ? "Trưởng phòng duyệt"
+            : isDirectorLegacy
+              ? "Giám đốc duyệt"
+              : "HR ghi nhận",
           tone: "primary",
           run: () =>
-            scope === "dept"
+            isDept
               ? leaveRequestApi.reviewByDept(item.id, true)
-              : leaveRequestApi.finalApprove(item.id, true),
+              : isDirectorLegacy
+                ? leaveRequestApi.finalApprove(item.id, true)
+                : leaveRequestApi.hrConfirm(item.id, true),
         },
         {
           kind: "reject",
           label: "Từ chối",
           tone: "danger",
           run: () =>
-            scope === "dept"
+            isDept
               ? leaveRequestApi.reviewByDept(item.id, false)
-              : leaveRequestApi.finalApprove(item.id, false),
+              : isDirectorLegacy
+                ? leaveRequestApi.finalApprove(item.id, false)
+                : leaveRequestApi.hrConfirm(item.id, false),
+        },
+      ],
+    };
+  }
+
+  function mapEmployeeAddendumItem(item: ContractAddendumDto): ApprovalItem {
+    return {
+      id: `addendum-employee-${item.id}`,
+      module: "ADDENDUM",
+      moduleLabel: "Phụ lục",
+      source: "ADDENDUM_EMPLOYEE",
+      title: `Xác nhận phụ lục: ${item.addendumNumber}`,
+      subtitle: item.content || item.contractNumber,
+      owner: item.employeeName || undefined,
+      status: item.status,
+      statusLabel: statusLabel(item.status),
+      date: item.createdAt,
+      deadline: item.effectiveDate,
+      details: (
+        <DetailFieldGrid
+          fields={[
+            ["Số phụ lục", item.addendumNumber],
+            ["Hợp đồng", item.contractNumber],
+            ["Ngày hiệu lực", formatDate(item.effectiveDate)],
+            ["Nội dung thay đổi", item.changedContentSummary || item.content],
+            ["Điều khoản giữ nguyên", item.unchangedTerms],
+          ]}
+        />
+      ),
+      actions: [
+        {
+          kind: "approve",
+          label: "Đồng ý",
+          tone: "primary",
+          run: () => contractAddendumApi.employeeConfirm(item.id, { isApproved: true }),
+        },
+        {
+          kind: "revision",
+          label: "Yêu cầu chỉnh sửa",
+          tone: "secondary",
+          requiresNote: true,
+          run: (note) =>
+            contractAddendumApi.employeeConfirm(item.id, {
+              isApproved: false,
+              rejectReason: note || "Người lao động yêu cầu chỉnh sửa phụ lục.",
+            }),
+        },
+        {
+          kind: "open",
+          label: "Mở phụ lục",
+          tone: "secondary",
+          run: () => navigate("/employee-contract/contracts"),
         },
       ],
     };
@@ -1389,6 +1647,61 @@ export const ApprovalWorkspacePage = () => {
     };
   }
 
+  function mapEmployeeContractItem(item: ContractDto): ApprovalItem {
+    return {
+      id: `contract-employee-${item.id}`,
+      module: "CONTRACT",
+      moduleLabel: "Hợp đồng",
+      source: "CONTRACT_EMPLOYEE",
+      title: `Xác nhận hợp đồng: ${item.contractNumber || `#${item.id}`}`,
+      subtitle: item.negotiationNote || item.employeePositionSnapshot || item.contractType,
+      owner: item.employeeName || undefined,
+      status: item.status,
+      statusLabel: statusLabel(item.status),
+      date: item.startDate,
+      deadline: item.endDate,
+      details: (
+        <DetailFieldGrid
+          fields={[
+            ["Số hợp đồng", item.contractNumber],
+            ["Loại hợp đồng", item.contractType],
+            ["Ngày bắt đầu", formatDate(item.startDate)],
+            ["Ngày kết thúc", formatDate(item.endDate)],
+            ["Chức danh", item.jobTitle || item.employeePositionSnapshot],
+            ["Phòng ban", item.employeeDepartmentSnapshot],
+            ["Lương cơ bản", formatMoney(item.basicSalary)],
+            ["Lương bảo hiểm", formatMoney(item.insuranceSalary)],
+            ["Ghi chú thương lượng", item.negotiationNote],
+          ]}
+        />
+      ),
+      actions: [
+        {
+          kind: "approve",
+          label: "Đồng ý",
+          tone: "primary",
+          run: () => contractApi.employeeAccept(item.id),
+        },
+        {
+          kind: "revision",
+          label: "Yêu cầu chỉnh sửa",
+          tone: "secondary",
+          requiresNote: true,
+          run: (note) =>
+            contractApi.negotiate(item.id, {
+              negotiationNote: note || "Người lao động yêu cầu chỉnh sửa hợp đồng.",
+            }),
+        },
+        {
+          kind: "open",
+          label: "Mở hợp đồng",
+          tone: "secondary",
+          run: () => navigate("/employee-contract/contracts"),
+        },
+      ],
+    };
+  }
+
   function mapContractItem(
     item: ContractDto,
     scope: "dept" | "director",
@@ -1453,6 +1766,9 @@ export const ApprovalWorkspacePage = () => {
   }
 
   function mapPayrollRunItem(item: PayrollRunSummary): ApprovalItem {
+    const normalizedStatus = normalizePayrollStatus(item.status);
+    const normalizedStatusLabel = item.statusText || getPayrollStatusLabel(item.status);
+
     return {
       id: `payroll-run-${item.month}-${item.year}`,
       module: "PAYROLL",
@@ -1461,8 +1777,8 @@ export const ApprovalWorkspacePage = () => {
       title: `Bảng lương ${item.period}`,
       subtitle: `${formatNumber(item.slipCount)} phiếu - ${formatMoney(item.netSalary)} thực nhận`,
       owner: item.submittedByAccountId ? `Tài khoản #${item.submittedByAccountId}` : "HR/Kế toán",
-      status: item.status,
-      statusLabel: item.statusText || statusLabel(item.status),
+      status: normalizedStatus,
+      statusLabel: normalizedStatusLabel,
       date: item.submittedAt || item.calculatedAt,
       details: (
         <DetailFieldGrid
@@ -1475,7 +1791,7 @@ export const ApprovalWorkspacePage = () => {
             ["Ngày tổng hợp", formatDate(item.calculatedAt)],
             ["Ngày gửi duyệt", formatDate(item.submittedAt)],
             ["Ngày duyệt", formatDate(item.approvedAt)],
-            ["Trạng thái", item.statusText || statusLabel(item.status)],
+            ["Trạng thái", normalizedStatusLabel],
             ["Ghi chú duyệt", item.reviewNote],
           ]}
         />
@@ -1533,6 +1849,9 @@ export const ApprovalWorkspacePage = () => {
   }
 
   function mapPayrollSlipItem(item: SalarySlip, period: string): ApprovalItem {
+    const normalizedStatus = normalizePayrollStatus(item.status);
+    const normalizedStatusLabel = item.statusText || getPayrollStatusLabel(item.status);
+
     return {
       id: `payroll-slip-${item.id}`,
       module: "PAYROLL",
@@ -1542,8 +1861,8 @@ export const ApprovalWorkspacePage = () => {
       subtitle: `${item.employeeCode} - ${formatMoney(item.netSalary)} thực nhận`,
       owner: item.employeeName,
       department: item.departmentName,
-      status: item.status,
-      statusLabel: statusLabel(item.status),
+      status: normalizedStatus,
+      statusLabel: normalizedStatusLabel,
       date: item.calculatedAt,
       details: (
         <DetailFieldGrid
@@ -1554,7 +1873,7 @@ export const ApprovalWorkspacePage = () => {
             ["Chức danh", item.positionName],
             ["Tổng thu nhập", formatMoney(item.grossIncome)],
             ["Thực nhận", formatMoney(item.netSalary)],
-            ["Trạng thái", statusLabel(item.status)],
+            ["Trạng thái", normalizedStatusLabel],
           ]}
         />
       ),
@@ -1889,6 +2208,254 @@ export const ApprovalWorkspacePage = () => {
     };
   }
 
+  function mapPenaltyRecordItem(
+    item: PenaltyRecord,
+    scope: "hr" | "director",
+  ): ApprovalItem {
+    const isHr = scope === "hr";
+
+    return {
+      id: `penalty-${scope}-${item.id}`,
+      module: "PERFORMANCE",
+      moduleLabel: "Hiệu suất",
+      source: isHr ? "PENALTY_HR_REVIEW" : "PENALTY_DIRECTOR_REVIEW",
+      title: `Biên bản vi phạm: ${item.employeeName || `#${item.employeeId}`}`,
+      subtitle: `${item.violationType || "Vi phạm"} - ${item.severity || "Mức độ chưa rõ"}`,
+      owner: item.employeeName,
+      department: item.departmentName,
+      status: item.status,
+      statusLabel: statusLabel(item.status),
+      date: item.occurredAt || item.createdAt,
+      details: (
+        <DetailFieldGrid
+          fields={[
+            ["Nhân sự", item.employeeName || item.employeeCode],
+            ["Phòng ban", item.departmentName],
+            ["Kỳ ghi nhận", item.period],
+            ["Loại vi phạm", item.violationType],
+            ["Mức độ", item.severity],
+            ["Điểm trừ", formatNumber(item.penaltyPoint)],
+            ["Ảnh hưởng công", item.affectsAttendance ? "Có" : "Không"],
+            ["Ảnh hưởng KPI", item.affectsPerformance ? "Có" : "Không"],
+            ["Ảnh hưởng hồ sơ", item.affectsPersonnelDecision ? "Có" : "Không"],
+            ["Giải trình", item.employeeExplanation],
+            ["Ghi chú quản lý", item.managerNote],
+            ["Minh chứng", item.evidenceFilePath],
+            ["Nội dung", item.reason],
+          ]}
+        />
+      ),
+      actions: [
+        {
+          kind: "approve",
+          label: isHr
+            ? item.affectsAttendance
+              ? "Ghi nhận và áp dụng công"
+              : "Ghi nhận hiệu lực biên bản"
+            : "Phê duyệt xử lý",
+          tone: "primary",
+          run: (note) =>
+            isHr
+              ? penaltyApi.hrReview(item.id, { isApproved: true, note: note || "" })
+              : penaltyApi.directorReview(item.id, { isApproved: true, note: note || "" }),
+        },
+        {
+          kind: "reject",
+          label: "Biên bản không hiệu lực",
+          tone: "danger",
+          requiresNote: true,
+          run: (note) =>
+            isHr
+              ? penaltyApi.hrReview(item.id, { isApproved: false, note: note || "" })
+              : penaltyApi.directorReview(item.id, { isApproved: false, note: note || "" }),
+        },
+        {
+          kind: "open",
+          label: "Mở biên bản",
+          tone: "secondary",
+          run: () => navigate("/performance-training/penalties"),
+        },
+      ],
+    };
+  }
+
+  function mapEmployeePenaltyExplanationItem(item: PenaltyRecord): ApprovalItem {
+    return {
+      id: `penalty-employee-${item.id}`,
+      module: "PERFORMANCE",
+      moduleLabel: "Hiệu suất",
+      source: "PENALTY_EMPLOYEE_EXPLANATION",
+      title: `Giải trình biên bản: ${item.violationType || item.ruleCode || `#${item.id}`}`,
+      subtitle: item.reason || `${item.penaltyPoint || 0} điểm trừ`,
+      owner: item.employeeName,
+      department: item.departmentName,
+      status: item.status,
+      statusLabel: "Chờ nhân viên giải trình",
+      date: item.occurredAt || item.createdAt,
+      details: (
+        <DetailFieldGrid
+          fields={[
+            ["Kỳ ghi nhận", item.period],
+            ["Loại vi phạm", item.violationType],
+            ["Mức độ", item.severity],
+            ["Điểm trừ", formatNumber(item.penaltyPoint)],
+            ["Ảnh hưởng công", item.affectsAttendance ? "Có" : "Không"],
+            ["Ảnh hưởng KPI", item.affectsPerformance ? "Có" : "Không"],
+            ["Ảnh hưởng hồ sơ", item.affectsPersonnelDecision ? "Có" : "Không"],
+            ["Minh chứng", item.evidenceFilePath],
+            ["Nội dung", item.reason],
+          ]}
+        />
+      ),
+      actions: [
+        {
+          kind: "approve",
+          label: "Gửi giải trình",
+          tone: "primary",
+          requiresNote: true,
+          run: (note) =>
+            penaltyApi.submitExplanation(item.id, {
+              explanation: note || "",
+            }),
+        },
+        {
+          kind: "open",
+          label: "Mở biên bản",
+          tone: "secondary",
+          run: () => navigate("/performance-training/penalties"),
+        },
+      ],
+    };
+  }
+
+  function mapTaskReviewItem(item: TaskItem): ApprovalItem {
+    return {
+      id: `task-review-${item.id}`,
+      module: "PERFORMANCE",
+      moduleLabel: "Hiệu suất",
+      source: "TASK_REVIEW",
+      title: `Duyệt công việc: ${item.title}`,
+      subtitle: `${item.employeeName || "Nhân sự"} - ${formatNumber(item.progressPercent)}% hoàn thành`,
+      owner: item.employeeName || undefined,
+      department: item.departmentName,
+      status: item.status,
+      statusLabel: statusLabel(item.status),
+      date: item.submittedAt || item.deadline,
+      deadline: item.reviewDeadline || item.deadline,
+      details: (
+        <DetailFieldGrid
+          fields={[
+            ["Công việc", item.title],
+            ["Nhân sự", item.employeeName],
+            ["Phòng ban", item.departmentName],
+            ["Loại công việc", item.taskType],
+            ["Tiến độ", `${formatNumber(item.progressPercent)}%`],
+            ["Hạn hoàn thành", formatDate(item.deadline)],
+            ["Hạn duyệt", formatDate(item.reviewDeadline)],
+            ["Minh chứng", item.evidencePath],
+            ["Mô tả", item.description],
+          ]}
+        />
+      ),
+      actions: [
+        {
+          kind: "approve",
+          label: "Duyệt",
+          tone: "primary",
+          run: () => taskApi.approve(item.id),
+        },
+        {
+          kind: "revision",
+          label: "Yêu cầu cập nhật",
+          tone: "secondary",
+          requiresNote: true,
+          run: (note) =>
+            taskApi.provideFeedback(
+              item.id,
+              note || "Cần cập nhật thêm kết quả hoặc minh chứng công việc.",
+            ),
+        },
+        {
+          kind: "open",
+          label: "Mở công việc",
+          tone: "secondary",
+          run: () => navigate("/performance-training/result-update"),
+        },
+      ],
+    };
+  }
+
+  function mapTrainingEvaluationItem(item: TrainingSummary): ApprovalItem {
+    const tasks = item.tasks ?? [];
+    const completedTasks = tasks.filter((task) =>
+      ["Completed", "AutoApproved", "Approved"].includes(task.status),
+    ).length;
+    const fallbackScore =
+      typeof item.finalScore === "number" && item.finalScore > 0 ? item.finalScore : 100;
+
+    return {
+      id: `training-evaluation-${item.id}`,
+      module: "PERFORMANCE",
+      moduleLabel: "Hiệu suất",
+      source: "TRAINING_EVALUATION",
+      title: `Đánh giá đào tạo: ${item.employeeName}`,
+      subtitle: `${item.courseName || "Chương trình đào tạo"} - ${completedTasks}/${tasks.length} công việc hoàn tất`,
+      owner: item.employeeName,
+      department: item.departmentName,
+      status: item.status,
+      statusLabel: statusLabel(item.status),
+      date: item.evaluationDeadline,
+      deadline: item.evaluationDeadline,
+      details: (
+        <DetailFieldGrid
+          fields={[
+            ["Nhân sự", item.employeeName],
+            ["Phòng ban", item.departmentName],
+            ["Khóa đào tạo", item.courseName],
+            ["Loại đào tạo", item.trainingType],
+            ["Công việc hoàn tất", `${completedTasks}/${tasks.length}`],
+            ["Điểm đánh giá", item.finalScore != null ? formatNumber(item.finalScore) : undefined],
+            ["Hạn đánh giá", formatDate(item.evaluationDeadline)],
+            ["Nhận xét", item.managerEvaluation],
+          ]}
+        />
+      ),
+      actions: [
+        {
+          kind: "approve",
+          label: "Đạt yêu cầu",
+          tone: "primary",
+          run: (note) =>
+            trainingApi.evaluate({
+              trainingId: item.id,
+              isApproved: true,
+              finalScore: fallbackScore,
+              managerEvaluation: note || item.managerEvaluation || "Đạt yêu cầu đào tạo.",
+              createPromotionRequest: false,
+            }),
+        },
+        {
+          kind: "revision",
+          label: "Yêu cầu bổ sung",
+          tone: "secondary",
+          requiresNote: true,
+          run: (note) =>
+            trainingApi.evaluate({
+              trainingId: item.id,
+              isApproved: false,
+              managerEvaluation: note || "Cần bổ sung kết quả đào tạo.",
+            }),
+        },
+        {
+          kind: "open",
+          label: "Mở đào tạo",
+          tone: "secondary",
+          run: () => navigate("/performance-training/development-training"),
+        },
+      ],
+    };
+  }
+
   function mapPerformanceEvaluationItem(item: PerformanceEvaluation): ApprovalItem {
     return {
       id: `performance-${item.id}`,
@@ -2019,6 +2586,27 @@ export const ApprovalWorkspacePage = () => {
           openAction,
         ];
       }
+    }
+
+    if (
+      item.status === PersonnelChangeStatus.PendingEmployeeExplanation &&
+      workflow === "dismissal"
+    ) {
+      return [
+        {
+          kind: "approve",
+          label: "Gửi giải trình",
+          tone: "primary",
+          requiresNote: true,
+          run: (note) =>
+            personnelChangeApi.employeeExplanation(
+              item.id,
+              { explanation: note || "" },
+              workflow,
+            ),
+        },
+        openAction,
+      ];
     }
 
     if (item.status === PersonnelChangeStatus.PendingHRReview && workflow === "promotion") {
@@ -3131,7 +3719,7 @@ const getPersonnelChangeStatusesForRole = (
     statuses.add(PersonnelChangeStatus.PendingDirectorApproval);
   }
 
-  if (["Admin", "Employee"].includes(role)) {
+  if (role === "Admin" || employeeConfirmationRoles.has(role)) {
     statuses.add(PersonnelChangeStatus.PendingEmployeeConsent);
     statuses.add(PersonnelChangeStatus.PendingEmployeeExplanation);
   }

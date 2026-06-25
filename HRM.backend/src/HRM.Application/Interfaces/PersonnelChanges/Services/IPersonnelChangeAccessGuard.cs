@@ -16,6 +16,23 @@ namespace HRM.backend.src.HRM.Application.Interfaces.PersonnelChanges.Services
 
         Task EnsureCanUseManagerAsync(int? managerId, int actorAccountId, CancellationToken ct);
 
+        Task EnsureActorHasRoleAsync(
+            int actorAccountId,
+            CancellationToken ct,
+            params string[] allowedRoles);
+
+        Task EnsureEmployeeAccountCanActAsync(
+            int employeeId,
+            int actorAccountId,
+            string actionName,
+            CancellationToken ct);
+
+        Task EnsureCurrentManagerCanActAsync(
+            int? currentManagerId,
+            int actorAccountId,
+            string actionName,
+            CancellationToken ct);
+
         Task EnsurePerformanceReviewBelongsToEmployeeAsync(
             int? performanceReviewId,
             int employeeId,

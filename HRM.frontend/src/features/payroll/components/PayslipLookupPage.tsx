@@ -36,6 +36,9 @@ export const PayslipLookupPage = () => {
           selectedIds={salarySlips.selectedIds}
           loading={salarySlips.loading}
           onToggle={salarySlips.toggleSelected}
+          onSelectMany={salarySlips.selectSlips}
+          onUnselectMany={salarySlips.unselectSlips}
+          onClearSelected={salarySlips.clearSelected}
           onOpenDetail={salarySlips.openDetail}
           emptyText={`Chưa có phiếu lương cho kỳ ${period}.`}
         />

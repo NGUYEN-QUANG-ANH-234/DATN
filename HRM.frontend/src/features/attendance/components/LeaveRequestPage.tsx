@@ -223,6 +223,9 @@ const LeaveTable = ({
         rowKey={(row) => row.id}
         emptyTitle={emptyText}
         className="border-0 shadow-none"
+        tableClassName="min-w-[960px]"
+        scrollContainerClassName="max-h-[480px] overflow-auto"
+        stickyHeader
       />
     </Card>
   );

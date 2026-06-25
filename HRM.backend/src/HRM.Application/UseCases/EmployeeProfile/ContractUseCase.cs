@@ -108,11 +108,12 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                         IsHr(targetRoleName) ||
                         IsManager(targetRoleName);
 
-                    var managerAccountIds = skipsDepartmentStep
+                    var configuredManagerAccountId = skipsDepartmentStep ? null : emp.Department?.Manager?.AccountId;
+                    var managerAccountIds = skipsDepartmentStep || configuredManagerAccountId.HasValue
                         ? new List<int>()
                         : await _accountRepo.GetAccountIdsByRoleAsync("Manager", innerCt);
 
-                    var managerEmployee = skipsDepartmentStep ? null : (await _employeeRepo.FindAsync(
+                    var managerEmployee = configuredManagerAccountId.HasValue ? emp.Department?.Manager : skipsDepartmentStep ? null : (await _employeeRepo.FindAsync(
                         e => e.DeptId == emp.DeptId.Value &&
                              e.AccountId.HasValue &&
                              managerAccountIds.Contains(e.AccountId.Value), innerCt)).FirstOrDefault();
@@ -156,7 +157,9 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                 if (!contract.EmployeeId.HasValue)
                     throw new InvalidOperationException("Hợp đồng chưa gắn nhân viên.");
 
-                await _approvalConflictGuard.EnsureNotSelfApprovalForEmployeeAsync(contract.EmployeeId.Value, approverAccountId, innerCt);
+                await EnsureCanReviewDepartmentContractAsync(contract, approverAccountId, actorRoleName, innerCt);
+                if (!IsAdmin(actorRoleName))
+                    await _approvalConflictGuard.EnsureNotSelfApprovalForEmployeeAsync(contract.EmployeeId.Value, approverAccountId, innerCt);
 
                 var isContentRevision = contract.Status == ContractStatus.PendingManagerContentReview && !dto.IsApproved;
                 var note = dto.IsApproved
@@ -167,6 +170,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                 if (isContentRevision && string.IsNullOrWhiteSpace(dto.RejectReason))
                     note = "Truong phong yeu cau HR chinh sua noi dung hop dong.";
 
+                await _approvalService.CreateWorkflowAsync("CONTRACT_DEPT", contractId, new List<int> { approverAccountId }, innerCt);
                 await _approvalService.ProcessStepAsync(
                     "CONTRACT_DEPT",
                     contractId,
@@ -396,7 +400,10 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                 if (!contract.EmployeeId.HasValue)
                     throw new InvalidOperationException("Hợp đồng chưa gắn nhân viên.");
 
-                await _approvalConflictGuard.EnsureNotSelfApprovalForEmployeeAsync(contract.EmployeeId.Value, approverAccountId, innerCt);
+                if (!IsDirector(actorRoleName) && !IsAdmin(actorRoleName))
+                    throw new UnauthorizedAccessException("Chi Giam doc hoac Admin duoc duyet hop dong o buoc nay.");
+                if (!IsAdmin(actorRoleName))
+                    await _approvalConflictGuard.EnsureNotSelfApprovalForEmployeeAsync(contract.EmployeeId.Value, approverAccountId, innerCt);
                 if (dto.IsApproved)
                 {
                     ValidateContractReadyForApproval(contract);
@@ -412,6 +419,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                 if (!dto.IsApproved && string.IsNullOrWhiteSpace(dto.RejectReason))
                     note = "Giam doc yeu cau HR chinh sua hop dong.";
 
+                await _approvalService.CreateWorkflowAsync("CONTRACT_DIRECTOR", contractId, new List<int> { approverAccountId }, innerCt);
                 await _approvalService.ProcessStepAsync(
                     "CONTRACT_DIRECTOR",
                     contractId,
@@ -592,10 +600,12 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
             return BuildContractDocumentPreview(updated!);
         }
 
-        public async Task<IEnumerable<ContractResponseDto>> GetPendingDeptAsync(CancellationToken ct)
+        public async Task<IEnumerable<ContractResponseDto>> GetPendingDeptAsync(int actorAccountId, string actorRoleName, CancellationToken ct)
         {
-            var contracts = await _contractRepo.GetByStatusesAsync(
-                new[] { ContractStatus.PendingDept, ContractStatus.PendingManagerContentReview }, ct);
+            var statuses = new[] { ContractStatus.PendingDept, ContractStatus.PendingManagerContentReview };
+            var contracts = IsManager(actorRoleName)
+                ? await _contractRepo.GetByStatusesForDepartmentManagerAsync(statuses, actorAccountId, ct)
+                : await _contractRepo.GetByStatusesAsync(statuses, ct);
             return contracts.Select(c => MapToDto(c));
         }
 
@@ -634,6 +644,14 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
             if (!employee.DeptId.HasValue)
                 return null;
 
+            var configuredManagerAccountId = employee.Department?.Manager?.AccountId;
+            if (configuredManagerAccountId.HasValue &&
+                configuredManagerAccountId.Value != actorAccountId &&
+                employee.Department?.ManagerId != employee.Id)
+            {
+                return configuredManagerAccountId.Value;
+            }
+
             var managerAccountIds = await _accountRepo.GetAccountIdsByRoleAsync("Manager", ct);
             if (managerAccountIds.Count == 0)
                 return null;
@@ -647,6 +665,32 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                 ct)).FirstOrDefault();
 
             return manager?.AccountId;
+        }
+
+        private async Task EnsureCanReviewDepartmentContractAsync(
+            Core.Entities.EmployeeProfile.Contract contract,
+            int actorAccountId,
+            string actorRoleName,
+            CancellationToken ct)
+        {
+            if (IsAdmin(actorRoleName))
+                return;
+
+            if (!IsManager(actorRoleName))
+                throw new UnauthorizedAccessException("Chi Truong phong hoac Admin duoc duyet buoc phong ban cua hop dong.");
+
+            var employeeDeptId = contract.Employee?.DeptId;
+            if (!employeeDeptId.HasValue)
+                throw new InvalidOperationException("Nhan vien cua hop dong chua co phong ban.");
+
+            if (contract.Employee?.Department?.Manager?.AccountId == actorAccountId)
+                return;
+
+            var managedDepartmentIds = await _employeeRepo.GetManagedDepartmentIdsByAccountIdAsync(actorAccountId, ct);
+            if (managedDepartmentIds.Contains(employeeDeptId.Value))
+                return;
+
+            throw new UnauthorizedAccessException("Ban khong phu trach phong ban cua nhan vien trong hop dong nay.");
         }
 
         private async Task EnsureNoActiveContractOverlapAsync(Core.Entities.EmployeeProfile.Contract contract, CancellationToken ct)

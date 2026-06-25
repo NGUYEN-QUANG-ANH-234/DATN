@@ -129,10 +129,13 @@ namespace HRM.backend.src.HRM.Application.Interfaces.System.UseCases
                     innerCt
                 );
 
-                if (user.Id == 0)
-                {
-                    await _unitOfWork.CommitAsync(innerCt);
-                }
+                await _unitOfWork.CommitAsync(innerCt);
+
+                user = await _accountRepo.GetByEmailAsync(googleProfile.Email, innerCt)
+                    ?? throw new InvalidOperationException("Không thể tải tài khoản sau khi đăng nhập Google.");
+
+                if (user.Status != AccountStatus.Active)
+                    throw new UnauthorizedAccessException("Tài khoản của bạn đã bị khóa.");
 
                 if (!user.IsMfaEnabled)
                 {

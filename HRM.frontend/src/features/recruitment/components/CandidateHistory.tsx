@@ -34,7 +34,13 @@ export const CandidateHistory: React.FC = () => {
     setHasSearched(true);
     try {
       const res = await candidateApi.getMyApplications(searchEmail, searchCode);
-      setHistory(res.data || []);
+      const applications = res.data || [];
+      setHistory(applications);
+
+      if (applications[0]?.candidateId) {
+        localStorage.setItem("candidate_email", searchEmail);
+        localStorage.setItem("candidate_trackingCode", searchCode);
+      }
     } catch (error) {
       console.error(error);
       triggerAlert(
@@ -61,6 +67,14 @@ export const CandidateHistory: React.FC = () => {
   };
 
   const getStatusBadge = (status: string) => {
+    if (status === "Offer") {
+      return (
+        <span className="bg-green-100 text-green-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">
+          Chờ hoàn thiện hồ sơ
+        </span>
+      );
+    }
+
     switch (status) {
       case "New":
         return (
@@ -178,7 +192,14 @@ export const CandidateHistory: React.FC = () => {
               </div>
 
               {/* Chỉ cho phép cập nhật khi Status là New */}
-              {item.status === "New" ? (
+              {item.status === "Offer" ? (
+                <a
+                  href={`/employee-contract/profile-setup?trackingCode=${encodeURIComponent(trackingCode)}&email=${encodeURIComponent(email)}`}
+                  className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors font-medium text-sm whitespace-nowrap"
+                >
+                  Thiết lập hồ sơ
+                </a>
+              ) : item.status === "New" ? (
                 <button
                   onClick={() =>
                     setSelectedJobToUpdate({

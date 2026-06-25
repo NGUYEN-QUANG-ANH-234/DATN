@@ -138,7 +138,10 @@ namespace HRM.backend.src.HRM.Infrastructure.Configurations
             services.AddScoped<IJwtService, Infrastructure.ExternalServices.JwtService>(); // Đảm bảo mapping đúng namespace
 
             // HttpClient cho Google OAuth
-            services.AddHttpClient<IGoogleOAuthService, GoogleOAuthService>();
+            services.AddHttpClient<IGoogleOAuthService, GoogleOAuthService>(client =>
+            {
+                client.Timeout = TimeSpan.FromSeconds(15);
+            });
 
             services.Configure<EmailSettings>(configuration.GetSection("EmailSettings"));
             services.AddScoped<IEmailService, EmailService>();

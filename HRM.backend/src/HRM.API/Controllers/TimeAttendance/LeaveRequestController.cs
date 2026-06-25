@@ -84,6 +84,21 @@ namespace HRM.backend.src.HRM.API.Controllers.TimeAttendance
             }
         }
 
+        [HttpGet("pending-hr")]
+        [RequirePermission("LEAVE_HR_CONFIRM", GroupName = SystemModules.TimekeepingLeave, Description = "Xem đơn nghỉ phép chờ HR ghi nhận")]
+        public async Task<IActionResult> GetPendingHR(CancellationToken ct)
+        {
+            try
+            {
+                var data = await _useCase.GetPendingHRAsync(GetRole(), ct);
+                return Ok(new { Success = true, Data = data });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, new { Success = false, Message = ex.Message });
+            }
+        }
+
         [HttpPatch("{id}/dept-approve")]
         [RequirePermission("LEAVE_DEPT_REVIEW", GroupName = SystemModules.TimekeepingLeave, Description = "Thẩm định đơn nghỉ phép cấp Trưởng phòng")]
         public async Task<IActionResult> ReviewByDept(int id, [FromBody] ReviewLeaveRequestDto dto, CancellationToken ct)
@@ -111,6 +126,25 @@ namespace HRM.backend.src.HRM.API.Controllers.TimeAttendance
             {
                 await _useCase.FinalApproveAsync(id, dto, GetAccountId(), GetRole(), ct);
                 return Ok(new { Success = true, Message = "Quy trình nghỉ phép đã hoàn tất." });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, new { Success = false, Message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return UnprocessableEntity(new { Success = false, Message = ex.Message });
+            }
+        }
+
+        [HttpPatch("{id}/hr-confirm")]
+        [RequirePermission("LEAVE_HR_CONFIRM", GroupName = SystemModules.TimekeepingLeave, Description = "HR ghi nhận đơn nghỉ phép")]
+        public async Task<IActionResult> HrConfirm(int id, [FromBody] ReviewLeaveRequestDto dto, CancellationToken ct)
+        {
+            try
+            {
+                await _useCase.HrConfirmAsync(id, dto, GetAccountId(), GetRole(), ct);
+                return Ok(new { Success = true, Message = "Đơn nghỉ phép đã được HR ghi nhận." });
             }
             catch (UnauthorizedAccessException ex)
             {

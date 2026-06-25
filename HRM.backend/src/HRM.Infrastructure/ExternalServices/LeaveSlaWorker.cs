@@ -32,7 +32,7 @@ namespace HRM.backend.src.HRM.Infrastructure.ExternalServices
                     {
                         if (request.Status == LeaveRequestStatus.PendingDept)
                         {
-                            request.Status = LeaveRequestStatus.PendingDirector;
+                            request.Status = LeaveRequestStatus.PendingHR;
                             request.DeadlineAt = DateTime.UtcNow.AddHours(24);
                             await leaveReqRepo.UpdateAsync(request, stoppingToken);
                             continue;

@@ -158,6 +158,7 @@ export type EmployeeType = (typeof EmployeeType)[keyof typeof EmployeeType];
 export type PersonnelChangeListItem = {
   id: number;
   employeeId?: number | null;
+  employeeAccountId?: number | null;
   employeeCode?: string | null;
   employeeName?: string | null;
   changeType: PersonnelChangeType;
@@ -192,6 +193,7 @@ export type PersonnelChangeDetail = PersonnelChangeListItem & {
   currentPositionId?: number | null;
   currentPositionName?: string | null;
   currentManagerId?: number | null;
+  currentManagerAccountId?: number | null;
   currentManagerName?: string | null;
   currentJobLevelId?: number | null;
   currentJobLevelName?: string | null;

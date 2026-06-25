@@ -1,9 +1,11 @@
 import { useState, type ReactNode } from "react";
 import { Card } from "../../../components/ui";
+import { useCurrentUser } from "../../../core/auth/hooks/useCurrentUser";
 import { usePersonnelChanges } from "../hooks/usePersonnelChanges";
 import {
   PersonnelChangeStatus,
   PersonnelChangeType,
+  type PersonnelChangeDetail,
   type PersonnelChangeListItem,
   type PersonnelChangeStatus as PersonnelChangeStatusValue,
   type PersonnelChangeWorkflowKind,
@@ -116,6 +118,7 @@ const pageConfigs: Record<PersonnelChangeWorkflowKind, PageConfig> = {
 export const PersonnelChangePage = ({ kind }: PersonnelChangePageProps) => {
   const config = pageConfigs[kind];
   const controller = usePersonnelChanges(config.changeType);
+  const { user } = useCurrentUser();
   const [detailOpen, setDetailOpen] = useState(false);
 
   const openDetail = async (id: number) => {
@@ -136,7 +139,7 @@ export const PersonnelChangePage = ({ kind }: PersonnelChangePageProps) => {
         </div>
       </Card>
 
-      <CreateSection kind={kind} controller={controller} />
+      <CreateSection kind={kind} controller={controller} role={user?.role || ""} />
 
       <PersonnelChangeList
         records={controller.records}
@@ -148,7 +151,12 @@ export const PersonnelChangePage = ({ kind }: PersonnelChangePageProps) => {
       />
 
       <PersonnelChangeActionPanel kind={kind} request={controller.selected}>
-        <ActionSection kind={kind} controller={controller} />
+        <ActionSection
+          kind={kind}
+          controller={controller}
+          role={user?.role || ""}
+          accountId={user?.accountId}
+        />
       </PersonnelChangeActionPanel>
 
       <PersonnelChangeDetailDrawer
@@ -165,11 +173,16 @@ export const PersonnelChangePage = ({ kind }: PersonnelChangePageProps) => {
 const CreateSection = ({
   kind,
   controller,
+  role,
 }: {
   kind: PersonnelChangeWorkflowKind;
   controller: PersonnelChangeController;
+  role: string;
 }) => {
+  const permissions = getActionPermissions(role);
+
   if (kind === "promotion") {
+    if (!permissions.hr) return null;
     return (
       <div className="grid gap-5 xl:grid-cols-2">
         <PromotionForm saving={controller.saving} onSubmit={controller.createPromotion} />
@@ -179,17 +192,21 @@ const CreateSection = ({
   }
 
   if (kind === "senior-appointment") {
+    if (!permissions.hr) return null;
     return <SeniorAppointmentForm saving={controller.saving} onSubmit={controller.createSeniorAppointment} />;
   }
 
   if (kind === "termination") {
+    if (!permissions.employee && !permissions.hr) return null;
     return <ResignationSubmitForm saving={controller.saving} onSubmit={controller.submitResignation} />;
   }
 
   if (kind === "dismissal") {
+    if (!permissions.hr) return null;
     return <DismissalCreateForm saving={controller.saving} onSubmit={controller.createDismissal} />;
   }
 
+  if (!permissions.hr && !permissions.manager) return null;
   return (
     <InternalTransferDemandForm
       saving={controller.saving}
@@ -201,128 +218,315 @@ const CreateSection = ({
 const ActionSection = ({
   kind,
   controller,
+  role,
+  accountId,
 }: {
   kind: PersonnelChangeWorkflowKind;
   controller: PersonnelChangeController;
+  role: string;
+  accountId?: number;
 }) => {
   if (!controller.selected) return null;
+  const request = controller.selected;
+  const permissions = getActionPermissions(role, request, accountId);
+  const status = request.status;
+  const actionItems: ReactNode[] = [];
 
-  const contentByKind: Record<PersonnelChangeWorkflowKind, ReactNode> = {
-    promotion: (
-      <>
-        <PromotionEligibilityPanel request={controller.selected} summary={controller.riskSummary} />
+  const addAction = (key: string, canShow: boolean, node: ReactNode) => {
+    if (canShow) actionItems.push(<div key={key}>{node}</div>);
+  };
+
+  if (kind === "promotion") {
+    const canHrReview =
+      permissions.hr && status === PersonnelChangeStatus.PendingHRReview;
+    const canDirectorApprove =
+      permissions.director && status === PersonnelChangeStatus.PendingDirectorApproval;
+    const canExecute =
+      permissions.hr &&
+      isStatusOneOf(status, [
+        PersonnelChangeStatus.ApprovedByDirector,
+        PersonnelChangeStatus.ContractAccepted,
+        PersonnelChangeStatus.ReadyToExecute,
+      ]);
+
+    addAction("promotion-eligibility", true, (
+      <PromotionEligibilityPanel request={request} summary={controller.riskSummary} />
+    ));
+    addAction("promotion-approval", canHrReview || canDirectorApprove || canExecute, (
         <PromotionApprovalPanel
-          request={controller.selected}
+          request={request}
           saving={controller.saving}
+          canHrReview={canHrReview}
+          canDirectorApprove={canDirectorApprove}
+          canExecute={canExecute}
           onHrReview={controller.hrReviewPromotion}
           onDirectorApprove={controller.directorApprovePromotion}
           onExecute={controller.executePromotion}
         />
-      </>
-    ),
-    "senior-appointment": (
-      <>
+    ));
+  }
+
+  if (kind === "senior-appointment") {
+    addAction(
+      "appointment-consent",
+      permissions.employee && status === PersonnelChangeStatus.PendingEmployeeConsent,
+      (
         <AppointmentConsentPanel
-          request={controller.selected}
+          request={request}
           saving={controller.saving}
           onSubmit={controller.submitAppointmentConsent}
         />
+      ),
+    );
+    addAction(
+      "appointment-contract-flow",
+      permissions.hr && status === PersonnelChangeStatus.PendingContractFlow,
+      (
         <HrContractFlowPanel
-          request={controller.selected}
+          request={request}
           saving={controller.saving}
           onSubmit={controller.startHrContractFlow}
         />
+      ),
+    );
+    addAction(
+      "appointment-decision",
+      permissions.hr &&
+        isStatusOneOf(status, [
+          PersonnelChangeStatus.ContractAccepted,
+          PersonnelChangeStatus.PendingDecisionIssuance,
+          PersonnelChangeStatus.ReadyToExecute,
+        ]),
+      (
         <IssueAppointmentDecisionPanel
-          request={controller.selected}
+          request={request}
           saving={controller.saving}
           onIssue={controller.issueAppointmentDecision}
           onExecute={controller.executeSeniorAppointment}
         />
-      </>
-    ),
-    termination: (
-      <>
-        <ResignationSettlementPanel request={controller.selected} />
+      ),
+    );
+  }
+
+  if (kind === "termination") {
+    addAction("resignation-settlement", true, <ResignationSettlementPanel request={request} />);
+    addAction(
+      "resignation-manager",
+      permissions.manager && status === PersonnelChangeStatus.PendingManagerReview,
+      (
         <ResignationManagerReviewPanel
-          request={controller.selected}
+          request={request}
           saving={controller.saving}
           onSubmit={controller.managerReviewResignation}
         />
+      ),
+    );
+    addAction(
+      "resignation-hr",
+      permissions.hr && status === PersonnelChangeStatus.PendingHRReview,
+      (
         <ResignationHrReviewPanel
-          request={controller.selected}
+          request={request}
           saving={controller.saving}
           onSubmit={controller.hrReviewResignation}
         />
+      ),
+    );
+
+    const canApprove = permissions.director && status === PersonnelChangeStatus.PendingDirectorApproval;
+    const canExecute =
+      permissions.hr &&
+      isStatusOneOf(status, [PersonnelChangeStatus.ContractAccepted, PersonnelChangeStatus.ReadyToExecute]);
+    addAction(
+      "resignation-director-execute",
+      canApprove || canExecute,
+      (
         <ResignationDirectorApprovalPanel
-          request={controller.selected}
+          request={request}
           saving={controller.saving}
+          canApprove={canApprove}
+          canExecute={canExecute}
           onApprove={controller.directorApproveResignation}
           onExecute={controller.executeResignation}
         />
-      </>
-    ),
-    dismissal: (
-      <>
-        <DismissalEvidencePanel request={controller.selected} />
+      ),
+    );
+  }
+
+  if (kind === "dismissal") {
+    addAction("dismissal-evidence", true, <DismissalEvidencePanel request={request} />);
+    addAction(
+      "dismissal-notify",
+      permissions.hr &&
+        isStatusOneOf(status, [
+          PersonnelChangeStatus.PendingHRReview,
+          PersonnelChangeStatus.PendingEmployeeNotification,
+        ]),
+      (
         <DismissalNotificationPanel
-          request={controller.selected}
+          request={request}
           saving={controller.saving}
           onSubmit={controller.notifyDismissalEmployee}
         />
+      ),
+    );
+    addAction(
+      "dismissal-explanation",
+      permissions.employee && status === PersonnelChangeStatus.PendingEmployeeExplanation,
+      (
         <DismissalExplanationPanel
-          request={controller.selected}
+          request={request}
           saving={controller.saving}
           onSubmit={controller.submitDismissalExplanation}
         />
+      ),
+    );
+    const canApprove = permissions.director && status === PersonnelChangeStatus.PendingDirectorApproval;
+    const canExecute =
+      permissions.hr &&
+      isStatusOneOf(status, [
+        PersonnelChangeStatus.ApprovedByDirector,
+        PersonnelChangeStatus.ContractAccepted,
+        PersonnelChangeStatus.ReadyToExecute,
+      ]);
+    addAction(
+      "dismissal-approve-execute",
+      canApprove || canExecute,
+      (
         <DismissalDirectorApprovalPanel
-          request={controller.selected}
+          request={request}
           saving={controller.saving}
+          canApprove={canApprove}
+          canExecute={canExecute}
           onApprove={controller.directorApproveDismissal}
           onExecute={controller.executeDismissal}
         />
-      </>
-    ),
-    "internal-transfer": (
-      <>
+      ),
+    );
+  }
+
+  if (kind === "internal-transfer") {
+    addAction(
+      "transfer-hr-select",
+      permissions.hr && status === PersonnelChangeStatus.PendingHRReview,
+      (
         <HrSelectEmployeePanel
-          request={controller.selected}
+          request={request}
           saving={controller.saving}
           onSubmit={controller.hrSelectEmployee}
         />
+      ),
+    );
+    addAction(
+      "transfer-manager",
+      permissions.manager && status === PersonnelChangeStatus.PendingCurrentManagerOpinion,
+      (
         <CurrentManagerOpinionPanel
-          request={controller.selected}
+          request={request}
           saving={controller.saving}
           onSubmit={controller.submitCurrentManagerOpinion}
         />
+      ),
+    );
+    addAction(
+      "transfer-employee",
+      permissions.employee && status === PersonnelChangeStatus.PendingEmployeeConsent,
+      (
         <EmployeeConsentPanel
-          request={controller.selected}
+          request={request}
           saving={controller.saving}
           onSubmit={controller.submitEmployeeConsent}
         />
+      ),
+    );
+    addAction(
+      "transfer-director",
+      permissions.director && status === PersonnelChangeStatus.PendingDirectorApproval,
+      (
         <DirectorApprovalPanel
-          request={controller.selected}
+          request={request}
           saving={controller.saving}
           onSubmit={controller.directorApproveTransfer}
         />
+      ),
+    );
+    addAction(
+      "transfer-issue-execute",
+      permissions.hr &&
+        isStatusOneOf(status, [
+          PersonnelChangeStatus.ApprovedByDirector,
+          PersonnelChangeStatus.ContractAccepted,
+          PersonnelChangeStatus.PendingDecisionIssuance,
+          PersonnelChangeStatus.ReadyToExecute,
+        ]),
+      (
         <IssueTransferDecisionPanel
-          request={controller.selected}
+          request={request}
           saving={controller.saving}
           onIssue={controller.issueTransferDecision}
           onExecute={controller.executeInternalTransfer}
         />
-      </>
-    ),
-  };
+      ),
+    );
+  }
 
   return (
     <div className="grid gap-5 xl:grid-cols-2">
-      {controller.selected.requiresContractFlow ? (
-        <ContractFlowLinkPanel request={controller.selected} />
+      {request.requiresContractFlow ? (
+        <ContractFlowLinkPanel request={request} />
       ) : null}
-      {contentByKind[kind]}
+      {actionItems.length > 0 ? actionItems : <NoAvailableAction />}
     </div>
   );
 };
+
+const getActionPermissions = (
+  role: string,
+  request?: PersonnelChangeDetail | null,
+  accountId?: number,
+) => {
+  const normalized = role.trim().toLowerCase();
+  const admin = normalized === "admin";
+  const isHr = normalized === "hr";
+  const isManagerRole = normalized === "manager";
+  const isDirector = normalized === "director";
+  const isEmployeeRole =
+    normalized === "employee" ||
+    normalized === "intern" ||
+    normalized === "collaborator";
+  const hasAccount = typeof accountId === "number" && Number.isFinite(accountId);
+  const isSelectedEmployee =
+    hasAccount && request?.employeeAccountId === accountId;
+  const isCurrentManager =
+    hasAccount && request?.currentManagerAccountId === accountId;
+
+  return {
+    hr: admin || isHr,
+    manager: admin || (request ? isCurrentManager : isManagerRole),
+    director: admin || isDirector,
+    employee:
+      admin ||
+      isSelectedEmployee ||
+      (!request && isEmployeeRole) ||
+      (isEmployeeRole && !request?.employeeAccountId),
+  };
+};
+
+const NoAvailableAction = () => (
+  <Card
+    title="Không có thao tác phù hợp"
+    description="Hồ sơ hiện chưa đến bước xử lý của vai trò đang đăng nhập."
+  >
+    <p className="text-sm text-[var(--hicas-text-secondary)]">
+      Bạn vẫn có thể theo dõi chi tiết, lịch sử và thông tin tham chiếu của hồ sơ nếu có quyền xem.
+    </p>
+  </Card>
+);
+
+const isStatusOneOf = (
+  status: PersonnelChangeStatusValue,
+  allowed: PersonnelChangeStatusValue[],
+) => allowed.includes(status);
 
 const Metric = ({ label, value }: { label: string; value: number }) => (
   <div className="rounded-[var(--radius-md)] border border-[var(--hicas-border)] bg-white p-4">

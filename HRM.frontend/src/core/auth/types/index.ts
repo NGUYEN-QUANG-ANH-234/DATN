@@ -46,6 +46,7 @@ export interface JwtPayload {
 
 // Định nghĩa kiểu dữ liệu User để hiển thị trên UI
 export interface UserState {
+  accountId?: number;
   name: string;
   role: string;
   avatar: string;

@@ -2,6 +2,7 @@
 using HRM.backend.src.HRM.Application.DTOs.Events;
 using HRM.backend.src.HRM.Application.Interfaces;
 using HRM.backend.src.HRM.Application.Interfaces.EmployeeProfile.Usecases;
+using HRM.backend.src.HRM.Application.Interfaces.System.Services;
 using HRM.backend.src.HRM.Core.Entities.EmployeeProfile;
 using HRM.backend.src.HRM.Core.Entities.Recruitment;
 using HRM.backend.src.HRM.Core.Entities.System;
@@ -30,6 +31,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMediator _mediator;
         private readonly ILockService _lockService;
+        private readonly IEmailService _emailService;
 
         public OnboardingUseCase(
             IBaseRepository<OnboardingRequest> onboardingRepo,
@@ -43,7 +45,8 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
             IAuditLogRepository auditLogRepo,
             IUnitOfWork unitOfWork,
             IMediator mediator,
-            ILockService lockService)
+            ILockService lockService,
+            IEmailService emailService)
         {
             _onboardingRepo = onboardingRepo;
             _employeeRepo = employeeRepo;
@@ -57,14 +60,61 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
             _unitOfWork = unitOfWork;
             _mediator = mediator;
             _lockService = lockService;
+            _emailService = emailService;
+        }
+
+        public async Task<OnboardingCandidateLookupDto> ResolveCandidateAsync(ResolveOnboardingCandidateDto dto, CancellationToken ct = default)
+        {
+            var candidate = await ResolveCandidateForProfileSetupAsync(dto.Email, dto.TrackingCode, ct);
+            var recruitmentRequest = candidate.RecruitmentRequest;
+
+            return new OnboardingCandidateLookupDto
+            {
+                CandidateId = candidate.Id,
+                TrackingCode = candidate.TrackingCode ?? string.Empty,
+                Email = candidate.Email ?? dto.Email.Trim(),
+                FullName = candidate.FullName,
+                Status = candidate.Status.ToString(),
+                RecruitmentRequestId = candidate.RecruitmentRequestId,
+                DepartmentId = recruitmentRequest?.DeptId,
+                DepartmentName = recruitmentRequest?.Department?.DeptName,
+                PositionId = recruitmentRequest?.PositionId,
+                PositionName = recruitmentRequest?.Position?.Title
+            };
         }
 
         public async Task SubmitProfileAsync(SubmitOnboardingDto dto, CancellationToken ct = default)
         {
-            await _lockService.GetWithLockAsync($"onboarding_submit_{dto.CandidateId}_{dto.Email.Trim().ToLowerInvariant()}", async (innerCt) =>
+            var normalizedEmail = NormalizeEmail(dto.Email);
+            var normalizedTrackingCode = NormalizeTrackingCode(dto.TrackingCode);
+
+            await _lockService.GetWithLockAsync($"onboarding_submit_{normalizedTrackingCode}_{normalizedEmail}", async (innerCt) =>
             {
                 await _unitOfWork.ExecuteTransactionAsync(async () =>
                 {
+                    var candidate = await ResolveCandidateForProfileSetupAsync(dto.Email, dto.TrackingCode, innerCt);
+                    if (dto.CandidateId > 0 && dto.CandidateId != candidate.Id)
+                        throw new InvalidOperationException("Thông tin hồ sơ không khớp với mã tra cứu.");
+
+                    var existingOnboarding = (await _onboardingRepo.FindAsync(
+                            r => r.CandidateId == candidate.Id,
+                            innerCt))
+                        .OrderByDescending(r => r.CreatedAt)
+                        .FirstOrDefault();
+
+                    if (existingOnboarding?.Status == OnboardingStatus.Pending_HR ||
+                        existingOnboarding?.Status == OnboardingStatus.Completed)
+                    {
+                        throw new InvalidOperationException(
+                            existingOnboarding.Status == OnboardingStatus.Completed
+                                ? "Hồ sơ tiếp nhận này đã được HR kích hoạt."
+                                : "Hồ sơ tiếp nhận đã được gửi và đang chờ HR xác minh.");
+                    }
+
+                    var accountEmail = !string.IsNullOrWhiteSpace(candidate.Email)
+                        ? candidate.Email.Trim()
+                        : dto.Email.Trim();
+
                     string idFront = await _storageService.UploadFileAsync(dto.IdentityFrontFile, "evidences", innerCt);
                     string idBack = await _storageService.UploadFileAsync(dto.IdentityBackFile, "evidences", innerCt);
                     string? cert = dto.CertificateFile != null ? await _storageService.UploadFileAsync(dto.CertificateFile, "evidences", innerCt) : null;
@@ -72,7 +122,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                     var data = new Dictionary<string, object>
                     {
                         { "FullName", dto.FullName },
-                        { "Email", dto.Email },
+                        { "Email", accountEmail },
                         { "PhoneNumber", dto.PhoneNumber },
                         { "PersonalEmail", dto.PersonalEmail },
                         { "CurrentAddress", dto.CurrentAddress },
@@ -86,20 +136,28 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                         { "CertificateUrl", cert ?? "" },
                         { "Gender", dto.Gender ?? "" },
                         { "BirthDate", dto.BirthDate?.ToString("yyyy-MM-dd") ?? "" },
+                        { "Nationality", dto.Nationality ?? "" },
+                        { "Ethnicity", dto.Ethnicity ?? "" },
                         { "TaxCode", dto.TaxCode ?? "" },
                         { "SocialInsCode", dto.SocialInsCode ?? "" },
                         { "BankAccount", dto.BankAccount ?? "" },
                         { "BankName", dto.BankName ?? "" },
                     };
 
-                    var request = new OnboardingRequest
+                    var request = existingOnboarding ?? new OnboardingRequest
                     {
-                        CandidateId = dto.CandidateId,
-                        RequestedDataJson = JsonSerializer.Serialize(data),
-                        Status = OnboardingStatus.Pending_HR
+                        CandidateId = candidate.Id,
+                        RequestedDataJson = "{}",
+                        Status = OnboardingStatus.PendingCandidateProfile
                     };
 
-                    await _onboardingRepo.AddAsync(request, innerCt);
+                    request.RequestedDataJson = JsonSerializer.Serialize(data);
+                    request.Status = OnboardingStatus.Pending_HR;
+
+                    if (existingOnboarding == null)
+                        await _onboardingRepo.AddAsync(request, innerCt);
+                    else
+                        await _onboardingRepo.UpdateAsync(request, innerCt);
                     await _unitOfWork.CommitAsync(innerCt);
                     await _slaTrackingService.CreateTaskAsync(SlaModuleType.Onboarding, request.Id, innerCt);
                     await _unitOfWork.CommitAsync(innerCt);
@@ -152,19 +210,55 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
 
                     if (data == null) throw new InvalidOperationException("Dữ liệu hồ sơ bị lỗi.");
 
-                    string email = data["Email"].GetString()!;
-                    string fullName = data["FullName"].GetString()!;
+                    string email = GetStringValue(data, "Email")
+                        ?? GetStringValue(data, "PersonalEmail")
+                        ?? candidate!.Email
+                        ?? throw new InvalidOperationException("Hồ sơ chưa có email tài khoản để kích hoạt nhân viên.");
+                    email = email.Trim();
+                    string fullName = GetStringValue(data, "FullName")
+                        ?? candidate!.FullName
+                        ?? throw new InvalidOperationException("Hồ sơ chưa có họ tên để kích hoạt nhân viên.");
                     string empCode = $"NV{DateTime.Now.Year}{new Random().Next(1000, 9999)}";
 
-                    // 1. Tìm Account gốc (Role mặc định ban đầu là 8 - Ứng viên)
-                    var existingAccount = (await _accountRepo.FindAsync(a => a.Email == email, innerCt)).FirstOrDefault();
-                    if (existingAccount == null)
-                        throw new InvalidOperationException("Không tìm thấy tài khoản liên kết với Email này.");
+                    // 1. Tìm hoặc tạo Account. Ứng viên ngoài hệ thống có thể chưa có tài khoản nội bộ.
+                    var normalizedEmail = email.ToLowerInvariant();
+                    var existingAccount = (await _accountRepo.FindAsync(
+                        a => a.Email.ToLower() == normalizedEmail,
+                        innerCt)).FirstOrDefault();
+                    var temporaryPassword = existingAccount == null ? GenerateSecurePassword() : null;
 
-                    // 🔥 CẬP NHẬT ĐỘNG: Gán RoleId theo lựa chọn thực tế của HR
-                    existingAccount.RoleId = dto.RoleId.Value;
-                    await _accountRepo.UpdateAsync(existingAccount, innerCt);
+                    if (existingAccount is null)
+                    {
+                        existingAccount = new Account
+                        {
+                            Email = email,
+                            FullName = fullName,
+                            RoleId = dto.RoleId.Value,
+                            PasswordHash = BCrypt.Net.BCrypt.HashPassword(temporaryPassword),
+                            Status = AccountStatus.Active,
+                            IsMfaEnabled = false,
+                            CreatedAt = DateTime.UtcNow
+                        };
+                        await _accountRepo.AddAsync(existingAccount, innerCt);
+                    }
+                    else
+                    {
+                        // Gán RoleId theo lựa chọn thực tế của HR
+                        existingAccount.RoleId = dto.RoleId.Value;
+                        existingAccount.FullName = fullName;
+                        existingAccount.Status = AccountStatus.Active;
+                        await _accountRepo.UpdateAsync(existingAccount, innerCt);
+                    }
                     await _unitOfWork.CommitAsync(innerCt);
+
+                    if (!string.IsNullOrWhiteSpace(temporaryPassword))
+                    {
+                        await _emailService.SendEmailAsync(
+                            email,
+                            "Tài khoản HICAS của bạn",
+                            $"Tài khoản: {email}\nMật khẩu tạm thời: {temporaryPassword}\nVui lòng đăng nhập và đổi mật khẩu sau khi truy cập hệ thống.");
+                        await _unitOfWork.CommitAsync(innerCt);
+                    }
 
                     // Tự động map EmployeeType tương ứng với RoleId để đồng bộ dữ liệu hồ sơ
                     EmployeeType empType = dto.RoleId.Value switch
@@ -181,18 +275,20 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                         CandidateId = request.CandidateId,
                         EmployeeCode = empCode,
                         FullName = fullName,
-                        PersonalEmail = email,
-                        PhoneNumber = data.ContainsKey("PhoneNumber") ? data["PhoneNumber"].GetString() : null,
-                        CurrentAddress = data.ContainsKey("CurrentAddress") ? data["CurrentAddress"].GetString() : null,
-                        PermanentAddress = data.ContainsKey("PermanentAddress") ? data["PermanentAddress"].GetString() : null,
-                        IdentityNumber = data.ContainsKey("IdentityNumber") ? data["IdentityNumber"].GetString() : null,
-                        EmergencyContactName = data.ContainsKey("EmergencyContactName") ? data["EmergencyContactName"].GetString() : null,
-                        EmergencyPhone = data.ContainsKey("EmergencyPhone") ? data["EmergencyPhone"].GetString() : null,
-                        EmergencyRelation = data.ContainsKey("EmergencyRelation") ? data["EmergencyRelation"].GetString() : null,
+                        PersonalEmail = GetStringValue(data, "PersonalEmail") ?? email,
+                        Nationality = GetStringValue(data, "Nationality"),
+                        Ethnicity = GetStringValue(data, "Ethnicity"),
+                        PhoneNumber = GetStringValue(data, "PhoneNumber"),
+                        CurrentAddress = GetStringValue(data, "CurrentAddress"),
+                        PermanentAddress = GetStringValue(data, "PermanentAddress"),
+                        IdentityNumber = GetStringValue(data, "IdentityNumber"),
+                        EmergencyContactName = GetStringValue(data, "EmergencyContactName"),
+                        EmergencyPhone = GetStringValue(data, "EmergencyPhone"),
+                        EmergencyRelation = GetStringValue(data, "EmergencyRelation"),
 
-                        IdentityFrontUrl = data.ContainsKey("IdentityFrontUrl") ? data["IdentityFrontUrl"].GetString() : null,
-                        IdentityBackUrl = data.ContainsKey("IdentityBackUrl") ? data["IdentityBackUrl"].GetString() : null,
-                        CertificateUrl = data.ContainsKey("CertificateUrl") ? data["CertificateUrl"].GetString() : null,
+                        IdentityFrontUrl = GetStringValue(data, "IdentityFrontUrl"),
+                        IdentityBackUrl = GetStringValue(data, "IdentityBackUrl"),
+                        CertificateUrl = GetStringValue(data, "CertificateUrl"),
 
                         Type = empType, // Đồng bộ loại hình nhân sự
                         Status = EmployeeStatus.Probation,
@@ -200,12 +296,12 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
                         PositionId = resolvedPositionId.Value,
                         JoinedDate = DateTime.UtcNow.Date,
 
-                        Gender = data.ContainsKey("Gender") && int.TryParse(data["Gender"].GetString(), out int g) ? (Gender)g : null,
-                        BirthDate = data.ContainsKey("BirthDate") && DateTime.TryParse(data["BirthDate"].GetString(), out DateTime dob) ? dob : null,
-                        TaxCode = data.ContainsKey("TaxCode") ? data["TaxCode"].GetString() : null,
-                        SocialInsCode = data.ContainsKey("SocialInsCode") ? data["SocialInsCode"].GetString() : null,
-                        BankAccount = data.ContainsKey("BankAccount") ? data["BankAccount"].GetString() : null,
-                        BankName = data.ContainsKey("BankName") ? data["BankName"].GetString() : null,
+                        Gender = int.TryParse(GetStringValue(data, "Gender"), out int g) ? (Gender)g : null,
+                        BirthDate = DateTime.TryParse(GetStringValue(data, "BirthDate"), out DateTime dob) ? dob : null,
+                        TaxCode = GetStringValue(data, "TaxCode"),
+                        SocialInsCode = GetStringValue(data, "SocialInsCode"),
+                        BankAccount = GetStringValue(data, "BankAccount"),
+                        BankName = GetStringValue(data, "BankName"),
                     };
                     await _employeeRepo.AddAsync(employee, innerCt);
 
@@ -286,6 +382,66 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
             var position = await _positionRepo.GetByIdAsync(positionId, ct);
             if (position == null || !position.IsActive)
                 throw new ArgumentException("Vị trí/chức danh được chọn không tồn tại hoặc đã ngừng sử dụng.");
+        }
+
+        private async Task<Candidate> ResolveCandidateForProfileSetupAsync(string email, string trackingCode, CancellationToken ct)
+        {
+            var normalizedEmail = NormalizeEmail(email);
+            var normalizedTrackingCode = NormalizeTrackingCode(trackingCode);
+
+            var matched = (await _candidateRepo.FindAsync(
+                    c => c.Email != null &&
+                         c.Email.ToLower() == normalizedEmail &&
+                         c.TrackingCode != null &&
+                         c.TrackingCode.ToUpper() == normalizedTrackingCode,
+                    ct))
+                .OrderByDescending(c => c.AppliedDate)
+                .FirstOrDefault();
+
+            if (matched == null)
+                throw new InvalidOperationException("Không tìm thấy hồ sơ ứng tuyển khớp với email và mã tra cứu.");
+
+            var candidate = (await _candidateRepo.GetCandidatesWithDetailsAsync(new List<int> { matched.Id }, ct))
+                .FirstOrDefault()
+                ?? throw new InvalidOperationException("Không tìm thấy hồ sơ ứng tuyển.");
+
+            if (candidate.Status != CandidateStatus.Offer)
+            {
+                throw new InvalidOperationException(candidate.Status == CandidateStatus.Hired
+                    ? "Hồ sơ này đã được HR kích hoạt."
+                    : "Hồ sơ chưa ở trạng thái sẵn sàng tiếp nhận. Vui lòng chờ HR xác nhận kết quả tuyển dụng.");
+            }
+
+            return candidate;
+        }
+
+        private static string NormalizeEmail(string email)
+        {
+            if (string.IsNullOrWhiteSpace(email))
+                throw new ArgumentException("Vui lòng nhập email ứng tuyển.");
+
+            return email.Trim().ToLowerInvariant();
+        }
+
+        private static string NormalizeTrackingCode(string trackingCode)
+        {
+            if (string.IsNullOrWhiteSpace(trackingCode))
+                throw new ArgumentException("Vui lòng nhập mã tra cứu hồ sơ.");
+
+            return trackingCode.Trim().ToUpperInvariant();
+        }
+
+        private static string? GetStringValue(Dictionary<string, JsonElement> data, string key)
+        {
+            if (!data.TryGetValue(key, out var value) || value.ValueKind == JsonValueKind.Null)
+                return null;
+
+            return value.GetString();
+        }
+
+        private static string GenerateSecurePassword()
+        {
+            return Guid.NewGuid().ToString("N")[..8] + "@Hicas!";
         }
     }
 }

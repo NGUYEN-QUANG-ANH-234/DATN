@@ -33,7 +33,7 @@ namespace HRM.backend.src.HRM.API.Middlewares
                 }
 
                 var accountRepo = context.RequestServices.GetRequiredService<IAccountRepository>();
-                var account = await accountRepo.GetByIdAsync(accountId, context.RequestAborted);
+                var account = await accountRepo.GetByIdWithRoleAsync(accountId, context.RequestAborted);
                 if (account == null || account.Status != AccountStatus.Active)
                 {
                     context.Response.ContentType = "application/json";
@@ -46,7 +46,13 @@ namespace HRM.backend.src.HRM.API.Middlewares
                     return;
                 }
 
-                if (roleId != 1)
+                var roleName = account.Role?.RoleName
+                    ?? context.User.FindFirst("role")?.Value
+                    ?? context.User.FindFirst(ClaimTypes.Role)?.Value
+                    ?? string.Empty;
+                var isAdmin = string.Equals(roleName, "Admin", StringComparison.OrdinalIgnoreCase);
+
+                if (!isAdmin)
                 {
                     var rbacUseCase = context.RequestServices.GetRequiredService<IRbacUseCase>();
                     var matrix = await rbacUseCase.GetAllRolesAndPermissionsAsync();

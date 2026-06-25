@@ -141,6 +141,16 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.System
             _dbSet.Update(config);
         }
 
+        public async Task DeleteMappingAsync(string code, CancellationToken ct = default)
+        {
+            var key = $"SALARY_VAR_{code.Trim().ToUpperInvariant()}";
+            var config = await _dbSet.FirstOrDefaultAsync(c => c.ConfigGroup == "SALARY_VARIABLE" && c.ParamKey == key, ct);
+            if (config == null)
+                throw new ArgumentException("Không tìm thấy biến lương cần xóa.");
+
+            _dbSet.Remove(config);
+        }
+
         // ==========================================
         // 2. SYSTEM CONFIG (SLA & Attendance)
         // ==========================================

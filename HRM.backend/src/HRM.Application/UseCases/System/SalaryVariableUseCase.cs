@@ -110,6 +110,29 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
             }, cancellationToken: ct);
         }
 
+        public async Task<bool> DeleteVariableAsync(string code, int adminId, CancellationToken ct = default)
+        {
+            if (string.IsNullOrWhiteSpace(code))
+                throw new ArgumentException("Mã biến lương không được để trống.");
+
+            var normalizedCode = code.Trim().ToUpperInvariant();
+
+            return await _lockService.GetWithLockAsync($"salary_variable_{normalizedCode.ToLowerInvariant()}", async (innerCt) =>
+            {
+                var systemCodes = (await _sourceRegistry.GetSourcesAsync(innerCt))
+                    .Select(source => ToVariableCode(source.Code))
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+                if (systemCodes.Contains(normalizedCode))
+                    throw new InvalidOperationException("Biến lương hệ thống chỉ được tạm tắt, không xóa hẳn.");
+
+                await _configRepo.DeleteMappingAsync(normalizedCode, innerCt);
+                await _unitOfWork.CommitAsync(innerCt);
+                await _cache.RemoveAsync(CACHE_KEY, innerCt);
+                return true;
+            }, cancellationToken: ct);
+        }
+
         private async Task<IReadOnlyCollection<PayrollSourceDefinition>> SyncSystemPayrollSourcesAsync(CancellationToken ct)
         {
             var sources = await _sourceRegistry.GetSourcesAsync(ct);

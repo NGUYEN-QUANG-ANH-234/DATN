@@ -46,6 +46,7 @@ public class Program
             app.UseCustomPipeline();
 
             await HicasDepartmentSeeder.AutoSyncAsync(app.Services);
+            await DemoScreenshotSeeder.AutoSyncAsync(app.Services, app.Configuration);
             await PermissionSeederExtension.AutoSyncPermissionsAsync(app.Services);
 
             Log.Information(" HRM HICAS System is running...");

@@ -44,8 +44,10 @@ namespace HRM.backend.src.HRM.Application.UseCases.EmployeeProfile
 
         public async Task<List<DependentDto>> GetMyDependentsAsync(int accountId, CancellationToken ct = default)
         {
-            var employee = await _employeeRepo.GetByAccountIdAsync(accountId, ct)
-                ?? throw new ArgumentException("Tài khoản chưa liên kết hồ sơ.");
+            var employee = await _employeeRepo.GetByAccountIdAsync(accountId, ct);
+            if (employee == null)
+                return new List<DependentDto>();
+
             var dependents = await _dependentRepo.GetByEmployeeIdAsync(employee.Id, true, ct);
             return dependents.Select(MapToDto).ToList();
         }

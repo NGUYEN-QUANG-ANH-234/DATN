@@ -9,6 +9,8 @@ namespace HRM.backend.src.HRM.Application.DTOs.EmployeeProfile
         public string FullName { get; set; } = string.Empty;
         public string Gender { get; set; } = string.Empty;
         public string? BirthDate { get; set; }
+        public string? Nationality { get; set; }
+        public string? Ethnicity { get; set; }
 
         // --- Thông tin liên hệ ---
         public string? PhoneNumber { get; set; }
@@ -46,6 +48,8 @@ namespace HRM.backend.src.HRM.Application.DTOs.EmployeeProfile
         [StringLength(100)] public string? FullName { get; set; }
         public Gender? Gender { get; set; }
         public DateTime? BirthDate { get; set; }
+        [StringLength(80)] public string? Nationality { get; set; }
+        [StringLength(80)] public string? Ethnicity { get; set; }
 
         // --- Thông tin liên hệ ---
         [StringLength(20)] public string? PhoneNumber { get; set; }

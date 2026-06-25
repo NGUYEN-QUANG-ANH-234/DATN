@@ -568,7 +568,7 @@ export const CompanyCalendarManager = () => {
               </p>
             )}
 
-            <div className="overflow-x-auto">
+            <div className="max-h-[540px] overflow-auto pr-1">
               <table className="min-w-full text-left text-sm">
                 <thead className="bg-slate-50 text-xs uppercase text-[var(--hicas-text-secondary)]">
                   <tr>

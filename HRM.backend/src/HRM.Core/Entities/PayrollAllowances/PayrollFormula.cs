@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using HRM.backend.src.HRM.Core.Entities.System;
 using HRM.backend.src.HRM.Core.Enums;
 
 namespace HRM.backend.src.HRM.Core.Entities.PayrollAllowances
@@ -32,13 +33,18 @@ namespace HRM.backend.src.HRM.Core.Entities.PayrollAllowances
         public FormulaStatus Status { get; set; } = FormulaStatus.Pending;
         public DateTime? DeadlineAt { get; set; }
         public int? CreatedByAccountId { get; set; }
+        [ForeignKey(nameof(CreatedByAccountId))] public virtual Account? CreatedByAccount { get; set; }
         public int? SubmittedByAccountId { get; set; }
+        [ForeignKey(nameof(SubmittedByAccountId))] public virtual Account? SubmittedByAccount { get; set; }
         public DateTime? SubmittedAt { get; set; }
         public int? ApprovedByAccountId { get; set; }
+        [ForeignKey(nameof(ApprovedByAccountId))] public virtual Account? ApprovedByAccount { get; set; }
         public DateTime? ApprovedAt { get; set; }
         public int? ActivatedByAccountId { get; set; }
+        [ForeignKey(nameof(ActivatedByAccountId))] public virtual Account? ActivatedByAccount { get; set; }
         public DateTime? ActivatedAt { get; set; }
         public int? ArchivedByAccountId { get; set; }
+        [ForeignKey(nameof(ArchivedByAccountId))] public virtual Account? ArchivedByAccount { get; set; }
         public DateTime? ArchivedAt { get; set; }
         [StringLength(1000)] public string? RejectReason { get; set; }
         [StringLength(1000)] public string? ReviewNote { get; set; }

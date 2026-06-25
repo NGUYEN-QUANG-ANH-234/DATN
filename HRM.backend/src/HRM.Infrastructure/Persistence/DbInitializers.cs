@@ -9,7 +9,7 @@ using HRM.backend.src.HRM.Core.Entities.EmployeeProfile;
 using HRM.backend.src.HRM.Core.Entities.TimeAttendance;
 using HRM.backend.src.HRM.Core.Entities.PayrollAllowances;
 using HRM.backend.src.HRM.Core.Entities.TasksTraining;
-using HRM.backend.src.HRM.Core.Entities.RequestHandover;
+using HRM.backend.src.HRM.Core.Entities.WorkflowRequests;
 using TaskStatus = HRM.backend.src.HRM.Core.Enums.TaskStatus;
 
 public static class DbInitializer
@@ -356,6 +356,7 @@ public static class DbInitializer
                 new PayrollFormulaLine { ComponentCode = "LEGACY_INSURANCE_ALLOWANCE", Expression = "legacy_insurance_allowance", CalculationOrder = 50, IsGrossComponent = true, IsTaxable = true, IsInsuranceBased = true, IsDeduction = false, IsSnapshotRequired = true },
                 new PayrollFormulaLine { ComponentCode = "LEGACY_TAXABLE_ALLOWANCE", Expression = "legacy_taxable_allowance", CalculationOrder = 60, IsGrossComponent = true, IsTaxable = true, IsInsuranceBased = false, IsDeduction = false, IsSnapshotRequired = true },
                 new PayrollFormulaLine { ComponentCode = "LEGACY_NONTAXABLE_ALLOWANCE", Expression = "legacy_nontaxable_allowance", CalculationOrder = 70, IsGrossComponent = true, IsTaxable = false, IsInsuranceBased = false, IsDeduction = false, IsSnapshotRequired = true },
+                new PayrollFormulaLine { ComponentCode = "INTERN_ALLOWANCE", Expression = "intern_allowance_amount", CalculationOrder = 75, IsGrossComponent = true, IsTaxable = true, IsInsuranceBased = false, IsDeduction = false, IsSnapshotRequired = true },
                 new PayrollFormulaLine { ComponentCode = "KPI_BONUS", Expression = "kpi_bonus_amount", CalculationOrder = 80, IsGrossComponent = true, IsTaxable = true, IsInsuranceBased = false, IsDeduction = false, IsSnapshotRequired = true },
                 new PayrollFormulaLine { ComponentCode = "PROJECT_BONUS", Expression = "project_bonus_amount", CalculationOrder = 87, IsGrossComponent = true, IsTaxable = true, IsInsuranceBased = false, IsDeduction = false, IsSnapshotRequired = true },
                 new PayrollFormulaLine { ComponentCode = "OT_BASE", Expression = "overtime_base_amount", CalculationOrder = 90, IsGrossComponent = true, IsTaxable = true, IsInsuranceBased = false, IsDeduction = false, IsSnapshotRequired = true },
@@ -390,6 +391,7 @@ public static class DbInitializer
                 new PayrollFormulaLine { ComponentCode = "LEGACY_INSURANCE_ALLOWANCE", Expression = "legacy_insurance_allowance", CalculationOrder = 50, IsGrossComponent = true, IsTaxable = true, IsInsuranceBased = true, IsDeduction = false, IsSnapshotRequired = true },
                 new PayrollFormulaLine { ComponentCode = "LEGACY_TAXABLE_ALLOWANCE", Expression = "legacy_taxable_allowance", CalculationOrder = 60, IsGrossComponent = true, IsTaxable = true, IsInsuranceBased = false, IsDeduction = false, IsSnapshotRequired = true },
                 new PayrollFormulaLine { ComponentCode = "LEGACY_NONTAXABLE_ALLOWANCE", Expression = "legacy_nontaxable_allowance", CalculationOrder = 70, IsGrossComponent = true, IsTaxable = false, IsInsuranceBased = false, IsDeduction = false, IsSnapshotRequired = true },
+                new PayrollFormulaLine { ComponentCode = "INTERN_ALLOWANCE", Expression = "intern_allowance_amount", CalculationOrder = 75, IsGrossComponent = true, IsTaxable = true, IsInsuranceBased = false, IsDeduction = false, IsSnapshotRequired = true },
                 new PayrollFormulaLine { ComponentCode = "KPI_BONUS", Expression = "kpi_bonus_amount * kpi_score / 100", CalculationOrder = 80, IsGrossComponent = true, IsTaxable = true, IsInsuranceBased = false, IsDeduction = false, IsSnapshotRequired = true, Note = "Khoản thưởng KPI thực nhận = mức thưởng KPI tối đa * điểm KPI / 100." },
                 new PayrollFormulaLine { ComponentCode = "PROJECT_BONUS", Expression = "project_bonus_amount", CalculationOrder = 87, IsGrossComponent = true, IsTaxable = true, IsInsuranceBased = false, IsDeduction = false, IsSnapshotRequired = true },
                 new PayrollFormulaLine { ComponentCode = "OT_BASE", Expression = "overtime_base_amount", CalculationOrder = 90, IsGrossComponent = true, IsTaxable = true, IsInsuranceBased = false, IsDeduction = false, IsSnapshotRequired = true },

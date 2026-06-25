@@ -50,7 +50,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
                     .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
                 var catalog = await _repository.GetByIdAsync(id, innerCt);
-                if (catalog == null || !allowedPaths.Contains(catalog.SourcePath))
+                if (catalog == null || catalog.IsDeleted || !allowedPaths.Contains(catalog.SourcePath))
                     throw new ArgumentException("Nguồn hệ thống không tồn tại hoặc không thuộc registry hiện tại.");
 
                 catalog.IsActive = isActive;
@@ -58,6 +58,25 @@ namespace HRM.backend.src.HRM.Application.UseCases.System
                 await _unitOfWork.CommitAsync(innerCt);
 
                 return ToDto(catalog);
+            }, cancellationToken: ct);
+        }
+
+        public async Task<bool> DeleteSourceCatalogAsync(int id, int actorId, CancellationToken ct = default)
+        {
+            return await _lockService.GetWithLockAsync($"source_catalog_delete_{id}", async (innerCt) =>
+            {
+                var catalog = await _repository.GetByIdAsync(id, innerCt);
+                if (catalog == null || catalog.IsDeleted)
+                    throw new ArgumentException("Nguồn dữ liệu không tồn tại.");
+
+                if (catalog.IsActive)
+                    throw new InvalidOperationException("Vui lòng tạm tắt nguồn dữ liệu trước khi xóa hẳn.");
+
+                catalog.IsDeleted = true;
+                catalog.IsActive = false;
+                _repository.Update(catalog);
+                await _unitOfWork.CommitAsync(innerCt);
+                return true;
             }, cancellationToken: ct);
         }
 

@@ -58,6 +58,10 @@ namespace HRM.backend.src.HRM.Application.Services.System
 
             // Google trả về cục JSON chứa cả access_token và id_token
             var tokenData = await response.Content.ReadFromJsonAsync<GoogleTokenResponse>();
+            if (string.IsNullOrWhiteSpace(tokenData?.IdToken))
+            {
+                throw new UnauthorizedAccessException("Google OAuth không trả về id_token hợp lệ.");
+            }
 
             // --- BƯỚC 2: XÁC THỰC VÀ GIẢI MÃ ID TOKEN (OIDC Flow) ---
             // Thay vì gọi API /userinfo, ta giải mã trực tiếp id_token nội bộ để tiết kiệm 1 request mạng.
@@ -74,7 +78,7 @@ namespace HRM.backend.src.HRM.Application.Services.System
             // 1. Tải Public Key từ Google để kiểm tra chữ ký điện tử.
             // 2. Kiểm tra 'exp' (hết hạn), 'iss' (issuer) và 'aud' (audience).
             // 3. Ném lỗi InvalidJwtException nếu Token bị can thiệp.
-            var payload = await GoogleJsonWebSignature.ValidateAsync(tokenData!.IdToken, settings);
+            var payload = await GoogleJsonWebSignature.ValidateAsync(tokenData.IdToken, settings);
 
             // Bổ sung lớp bảo mật: Đảm bảo email này đã được Google xác minh thật sự (chống email ảo)
             if (!payload.EmailVerified)

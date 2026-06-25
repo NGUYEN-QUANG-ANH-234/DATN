@@ -50,7 +50,9 @@ namespace HRM.backend.src.HRM.Core.Entities.System
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public int? CreatedByAccountId { get; set; }
+        [ForeignKey(nameof(CreatedByAccountId))] public virtual Account? CreatedByAccount { get; set; }
         public DateTime? UpdatedAt { get; set; }
         public int? UpdatedByAccountId { get; set; }
+        [ForeignKey(nameof(UpdatedByAccountId))] public virtual Account? UpdatedByAccount { get; set; }
     }
 }

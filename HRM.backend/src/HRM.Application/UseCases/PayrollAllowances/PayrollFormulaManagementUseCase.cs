@@ -5,6 +5,7 @@ using HRM.backend.src.HRM.Application.Interfaces.PayrollAllowances.Usecases;
 using HRM.backend.src.HRM.Application.Interfaces.System.UseCases;
 using HRM.backend.src.HRM.Application.Services.System;
 using HRM.backend.src.HRM.Core.Entities.PayrollAllowances;
+using HRM.backend.src.HRM.Core.Entities.System;
 using HRM.backend.src.HRM.Core.Enums;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.PayrollAllowances;
@@ -579,13 +580,18 @@ namespace HRM.backend.src.HRM.Application.UseCases.PayrollAllowances
                 StatusText = ResolveStatusText(formula.Status),
                 DeadlineAt = formula.DeadlineAt,
                 CreatedByAccountId = formula.CreatedByAccountId,
+                CreatedByName = AccountDisplayName(formula.CreatedByAccount),
                 SubmittedByAccountId = formula.SubmittedByAccountId,
+                SubmittedByName = AccountDisplayName(formula.SubmittedByAccount),
                 SubmittedAt = formula.SubmittedAt,
                 ApprovedByAccountId = formula.ApprovedByAccountId,
+                ApprovedByName = AccountDisplayName(formula.ApprovedByAccount),
                 ApprovedAt = formula.ApprovedAt,
                 ActivatedByAccountId = formula.ActivatedByAccountId,
+                ActivatedByName = AccountDisplayName(formula.ActivatedByAccount),
                 ActivatedAt = formula.ActivatedAt,
                 ArchivedByAccountId = formula.ArchivedByAccountId,
+                ArchivedByName = AccountDisplayName(formula.ArchivedByAccount),
                 ArchivedAt = formula.ArchivedAt,
                 RejectReason = formula.RejectReason,
                 ReviewNote = formula.ReviewNote,
@@ -597,6 +603,12 @@ namespace HRM.backend.src.HRM.Application.UseCases.PayrollAllowances
                     .Select(MapLine)
                     .ToList()
             };
+        }
+
+        private static string? AccountDisplayName(Account? account)
+        {
+            if (account == null) return null;
+            return string.IsNullOrWhiteSpace(account.FullName) ? account.Email : account.FullName;
         }
 
         private static PayrollFormulaLineDto MapLine(PayrollFormulaLine line)

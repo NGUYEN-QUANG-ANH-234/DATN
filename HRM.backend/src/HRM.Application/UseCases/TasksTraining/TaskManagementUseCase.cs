@@ -49,16 +49,19 @@ namespace HRM.backend.src.HRM.Application.UseCases.TasksTraining
 
         public async Task<List<TaskResponseDto>> GetPendingReviewAsync(int actorAccountId, string role, CancellationToken ct = default)
         {
-            var manager = await _employeeRepo.GetByAccountIdAsync(actorAccountId, ct)
-                ?? throw new UnauthorizedAccessException("Account is not linked to an employee profile.");
-            if (!IsManager(role) && !IsHrOrAdmin(role))
-                throw new UnauthorizedAccessException("Only Manager, HR or Admin can review tasks.");
-            if (manager.DeptId == null && IsManager(role))
-                throw new UnauthorizedAccessException("Manager account has no department.");
+            if (IsAdmin(role))
+            {
+                var allTasks = await _taskRepo.GetByStatusAsync(TaskStatus.PendingReview, ct);
+                return allTasks.Select(MapTask).ToList();
+            }
 
-            var tasks = IsManager(role)
-                ? await _taskRepo.GetPendingReviewByDeptAsync(manager.DeptId!.Value, ct)
-                : await _taskRepo.GetByStatusAsync(TaskStatus.PendingReview, ct);
+            if (!IsManager(role))
+                throw new UnauthorizedAccessException("Only Manager or Admin can review tasks.");
+
+            var managedDeptIds = await GetManagedDepartmentIdsAsync(actorAccountId, ct);
+            var tasks = (await _taskRepo.GetByStatusAsync(TaskStatus.PendingReview, ct))
+                .Where(t => t.DeptId.HasValue && managedDeptIds.Contains(t.DeptId.Value))
+                .ToList();
             return tasks.Select(MapTask).ToList();
         }
 
@@ -125,21 +128,26 @@ namespace HRM.backend.src.HRM.Application.UseCases.TasksTraining
 
         private async Task ReviewTaskAsync(int id, int actorAccountId, string role, bool approved, string? note, CancellationToken ct)
         {
-            var reviewer = await _employeeRepo.GetByAccountIdAsync(actorAccountId, ct)
-                ?? throw new UnauthorizedAccessException("Account is not linked to an employee profile.");
+            var reviewer = IsAdmin(role)
+                ? null
+                : await _employeeRepo.GetByAccountIdAsync(actorAccountId, ct)
+                    ?? throw new UnauthorizedAccessException("Account is not linked to an employee profile.");
+            var managedDeptIds = !IsAdmin(role) && IsManager(role)
+                ? await GetManagedDepartmentIdsAsync(actorAccountId, ct)
+                : new HashSet<int>();
 
             await _lockService.GetWithLockAsync($"task_review_{id}", async innerCt =>
             {
                 var task = await _taskRepo.GetByIdAsync(id, innerCt)
                     ?? throw new InvalidOperationException("Task not found.");
-                EnsureReviewer(task, reviewer, role);
+                EnsureReviewer(task, reviewer, role, managedDeptIds);
 
                 var latestProgress = await _progressRepo.GetLatestByTaskAsync(task.Id, innerCt);
                 await _feedbackRepo.AddAsync(new TaskFeedback
                 {
                     TaskId = task.Id,
                     ProgressId = latestProgress?.Id,
-                    ReviewerId = reviewer.Id,
+                    ReviewerId = reviewer?.Id,
                     FeedbackType = approved ? TaskFeedbackType.Approved : TaskFeedbackType.ReworkRequest,
                     Content = note,
                     CreatedAt = DateTime.UtcNow
@@ -160,22 +168,36 @@ namespace HRM.backend.src.HRM.Application.UseCases.TasksTraining
 
         private async Task EnsureCanViewOrReviewAsync(WorkTask task, int actorAccountId, string role, CancellationToken ct)
         {
+            if (IsAdmin(role))
+                return;
+
             var employee = await _employeeRepo.GetByAccountIdAsync(actorAccountId, ct)
                 ?? throw new UnauthorizedAccessException("Account is not linked to an employee profile.");
             if (task.AssignedTo == employee.Id)
                 return;
-            EnsureReviewer(task, employee, role);
+            var managedDeptIds = IsManager(role)
+                ? await GetManagedDepartmentIdsAsync(actorAccountId, ct)
+                : new HashSet<int>();
+            EnsureReviewer(task, employee, role, managedDeptIds);
         }
 
-        private static void EnsureReviewer(WorkTask task, Employee reviewer, string role)
+        private static void EnsureReviewer(WorkTask task, Employee? reviewer, string role, HashSet<int> managedDeptIds)
         {
-            if (IsHrOrAdmin(role))
+            if (IsAdmin(role))
                 return;
             if (!IsManager(role))
-                throw new UnauthorizedAccessException("Only Manager, HR or Admin can review tasks.");
-            if (task.DeptId.HasValue && reviewer.DeptId == task.DeptId)
+                throw new UnauthorizedAccessException("Only Manager or Admin can review tasks.");
+            if (task.DeptId.HasValue && managedDeptIds.Contains(task.DeptId.Value))
                 return;
             throw new UnauthorizedAccessException("Manager can only review tasks in their department.");
+        }
+
+        private async Task<HashSet<int>> GetManagedDepartmentIdsAsync(int actorAccountId, CancellationToken ct)
+        {
+            var deptIds = await _employeeRepo.GetManagedDepartmentIdsByAccountIdAsync(actorAccountId, ct);
+            if (deptIds.Count == 0)
+                throw new UnauthorizedAccessException("Manager account has no managed department.");
+            return deptIds.ToHashSet();
         }
 
         private static TaskResponseDto MapTask(WorkTask task)
@@ -219,8 +241,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.TasksTraining
             role.Equals("Manager", StringComparison.OrdinalIgnoreCase) ||
             role.Equals("Truong phong", StringComparison.OrdinalIgnoreCase);
 
-        private static bool IsHrOrAdmin(string role) =>
-            role.Equals("HR", StringComparison.OrdinalIgnoreCase) ||
+        private static bool IsAdmin(string role) =>
             role.Equals("Admin", StringComparison.OrdinalIgnoreCase);
     }
 }

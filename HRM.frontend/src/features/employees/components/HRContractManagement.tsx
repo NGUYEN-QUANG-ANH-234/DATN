@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Check, Download, Eye, FilePenLine, FileText, RefreshCw, Send, X } from "lucide-react";
+import { Check, Download, Eye, FilePenLine, FileText, FilterX, RefreshCw, Search, Send, X } from "lucide-react";
 import { contractApi } from "../api/contractApi";
 import type { ContractDocumentPreviewDto, ContractDto, ReviewContractPayload, CreateDraftPayload } from "../api/contractApi";
 import { useNotification } from "../../../core/context/NotificationContext";
@@ -13,6 +13,8 @@ import {
   secondaryButtonClass,
   textareaClass,
 } from "../../../core/components/FeatureShell";
+import { useCurrentUser } from "../../../core/auth/hooks/useCurrentUser";
+import { normalizeRole, type AppRole } from "../../../core/auth/roleAccess";
 
 const CONTRACT_TYPES = ["Probation", "FixedTerm", "Indefinite", "PartTime"];
 
@@ -40,6 +42,12 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 type TabKey = "pending-dept" | "pending-hr" | "all";
+type TabConfig = { key: TabKey; label: string };
+type ContractFilters = {
+  keyword: string;
+  status: string;
+  contractType: string;
+};
 
 type DraftForm = {
   contractType: string;
@@ -159,11 +167,18 @@ const defaultDraft: DraftForm = {
   issuedAt: "",
 };
 
-const tabs: { key: TabKey; label: string }[] = [
+const WORKFLOW_TABS: TabConfig[] = [
   { key: "pending-dept", label: "Chờ Trưởng phòng" },
   { key: "pending-hr", label: "Chờ HR soạn thảo" },
   { key: "all", label: "Tất cả hợp đồng" },
 ];
+
+const getVisibleTabs = (role?: AppRole): TabConfig[] => {
+  if (role === "Admin") return WORKFLOW_TABS;
+  if (role === "Manager") return WORKFLOW_TABS.filter((item) => item.key === "pending-dept");
+  if (role === "HR") return WORKFLOW_TABS.filter((item) => item.key === "pending-hr" || item.key === "all");
+  return [];
+};
 
 const fmt = (v: number) =>
   new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(v || 0);
@@ -185,6 +200,9 @@ const optional = (value: string) => {
   const trimmed = value.trim();
   return trimmed ? trimmed : undefined;
 };
+
+const normalizeSearchText = (value?: string | number | null) =>
+  String(value ?? "").toLocaleLowerCase("vi-VN").trim();
 
 const saveBlob = (blob: Blob, fileName: string) => {
   const url = window.URL.createObjectURL(blob);
@@ -210,6 +228,15 @@ export const HRContractManagement = () => {
   const [documentPreview, setDocumentPreview] = useState<ContractDocumentPreviewDto | null>(null);
   const [documentTarget, setDocumentTarget] = useState<ContractDto | null>(null);
   const [documentLoading, setDocumentLoading] = useState(false);
+  const [filters, setFilters] = useState<ContractFilters>({
+    keyword: "",
+    status: "all",
+    contractType: "all",
+  });
+
+  const { user } = useCurrentUser();
+  const currentRole = normalizeRole(user?.role);
+  const visibleTabs = useMemo(() => getVisibleTabs(currentRole), [currentRole]);
 
   const { triggerAlert } = useNotification();
   const alertRef = useRef(triggerAlert);
@@ -218,7 +245,18 @@ export const HRContractManagement = () => {
     alertRef.current = triggerAlert;
   }, [triggerAlert]);
 
+  useEffect(() => {
+    if (visibleTabs.length > 0 && !visibleTabs.some((item) => item.key === tab)) {
+      setTab(visibleTabs[0].key);
+    }
+  }, [tab, visibleTabs]);
+
   const fetchContracts = useCallback(async () => {
+    if (!visibleTabs.some((item) => item.key === tab)) {
+      setContracts([]);
+      return;
+    }
+
     setLoading(true);
     try {
       const res =
@@ -236,7 +274,7 @@ export const HRContractManagement = () => {
     } finally {
       setLoading(false);
     }
-  }, [tab]);
+  }, [tab, visibleTabs]);
 
   useEffect(() => {
     fetchContracts();
@@ -250,6 +288,52 @@ export const HRContractManagement = () => {
     }),
     [contracts],
   );
+
+  const statusOptions = useMemo(
+    () => Array.from(new Set(contracts.map(contract => contract.status).filter(Boolean))).sort(),
+    [contracts],
+  );
+
+  const contractTypeOptions = useMemo(
+    () => Array.from(new Set(contracts.map(contract => contract.contractType).filter(Boolean))).sort(),
+    [contracts],
+  );
+
+  const filteredContracts = useMemo(() => {
+    const keyword = normalizeSearchText(filters.keyword);
+
+    return contracts.filter(contract => {
+      if (filters.status !== "all" && contract.status !== filters.status) return false;
+      if (filters.contractType !== "all" && contract.contractType !== filters.contractType) return false;
+      if (!keyword) return true;
+
+      return [
+        contract.id,
+        contract.contractNumber,
+        contract.legalDocumentNumber,
+        contract.employeeName,
+        contract.employeeFullNameSnapshot,
+        contract.employeeDepartmentSnapshot,
+        contract.employeePositionSnapshot,
+        contract.contractType,
+        STATUS_LABELS[contract.status],
+      ]
+        .some(value => normalizeSearchText(value).includes(keyword));
+    });
+  }, [contracts, filters]);
+
+  const hasActiveFilters =
+    filters.keyword.trim() !== "" ||
+    filters.status !== "all" ||
+    filters.contractType !== "all";
+
+  const resetFilters = () => {
+    setFilters({
+      keyword: "",
+      status: "all",
+      contractType: "all",
+    });
+  };
 
   const buildDraftForm = (source: ContractDto): DraftForm => ({
     ...defaultDraft,
@@ -656,7 +740,7 @@ export const HRContractManagement = () => {
     >
       <FeatureCard>
         <div className="flex flex-wrap gap-2">
-          {tabs.map(item => {
+          {visibleTabs.map(item => {
             const active = tab === item.key;
             const badge =
               item.key === "pending-dept"
@@ -683,6 +767,65 @@ export const HRContractManagement = () => {
             );
           })}
         </div>
+
+        <div className="mt-5 grid gap-3 border-t border-gray-100 pt-5 lg:grid-cols-[minmax(260px,1fr)_220px_220px_auto]">
+          <label>
+            <span className="mb-1 block text-sm font-semibold text-gray-700">Tìm hợp đồng</span>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+              <input
+                className={`${fieldClass} !pl-11`}
+                value={filters.keyword}
+                onChange={event => setFilters(prev => ({ ...prev, keyword: event.target.value }))}
+                placeholder="Tên nhân sự, số hợp đồng, phòng ban..."
+              />
+            </div>
+          </label>
+
+          <label>
+            <span className="mb-1 block text-sm font-semibold text-gray-700">Trạng thái</span>
+            <select
+              className={fieldClass}
+              value={filters.status}
+              onChange={event => setFilters(prev => ({ ...prev, status: event.target.value }))}
+            >
+              <option value="all">Tất cả trạng thái</option>
+              {statusOptions.map(status => (
+                <option key={status} value={status}>
+                  {STATUS_LABELS[status] ?? status}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            <span className="mb-1 block text-sm font-semibold text-gray-700">Loại hợp đồng</span>
+            <select
+              className={fieldClass}
+              value={filters.contractType}
+              onChange={event => setFilters(prev => ({ ...prev, contractType: event.target.value }))}
+            >
+              <option value="all">Tất cả loại</option>
+              {contractTypeOptions.map(type => (
+                <option key={type} value={type}>
+                  {CONTRACT_TYPE_LABELS[type] ?? type}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <div className="flex items-end gap-2">
+            <button className={secondaryButtonClass} onClick={resetFilters} disabled={!hasActiveFilters}>
+              <FilterX size={16} />
+              Xóa lọc
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-3 text-sm font-medium text-gray-500">
+          Hiển thị <span className="font-semibold text-gray-900">{filteredContracts.length}</span> trong tổng số{" "}
+          <span className="font-semibold text-gray-900">{contracts.length}</span> hợp đồng của tab hiện tại.
+        </div>
       </FeatureCard>
 
       {loading ? (
@@ -693,9 +836,13 @@ export const HRContractManagement = () => {
         <FeatureCard>
           <EmptyState title="Chưa có hợp đồng cần xử lý" description="Các mục mới sẽ xuất hiện tại đây khi có yêu cầu phù hợp." />
         </FeatureCard>
+      ) : filteredContracts.length === 0 ? (
+        <FeatureCard>
+          <EmptyState title="Không tìm thấy hợp đồng phù hợp" description="Thử đổi từ khóa, trạng thái hoặc loại hợp đồng để mở rộng kết quả." />
+        </FeatureCard>
       ) : (
-        <div className="space-y-3">
-          {contracts.map(contract => (
+        <div className="max-h-[calc(100vh-330px)] min-h-[320px] space-y-3 overflow-y-auto pr-2">
+          {filteredContracts.map(contract => (
             <FeatureCard key={contract.id} className="p-4">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="min-w-0">
@@ -801,9 +948,9 @@ export const HRContractManagement = () => {
       )}
 
       {draftTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-lg bg-white p-6 shadow-2xl">
-            <div className="mb-5 flex items-start justify-between gap-4 border-b border-gray-100 pb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-4">
+          <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-gray-100 p-6">
               <div>
                 <h2 className="text-lg font-semibold text-gray-900">
                   {draftTarget.status === "Negotiating" || draftTarget.status === "PendingHRRevision"
@@ -817,7 +964,8 @@ export const HRContractManagement = () => {
               <FileText className="text-blue-600" size={22} />
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="flex-1 overflow-y-auto px-6 py-5">
+              <div className="grid gap-4 sm:grid-cols-2">
               <label className="sm:col-span-2">
                 <span className="mb-1 block text-sm font-medium text-gray-700">Loại hợp đồng</span>
                 <select
@@ -957,9 +1105,10 @@ export const HRContractManagement = () => {
               {textField("legalDocumentNumber", "Số hợp đồng")}
               {textField("documentTemplateCode", "Mẫu biểu")}
               {textField("issuedAt", "Ngày phát hành", "date")}
+              </div>
             </div>
 
-            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <div className="flex flex-col-reverse gap-3 border-t border-gray-100 bg-white p-4 sm:flex-row sm:justify-end">
               <button
                 className={secondaryButtonClass}
                 onClick={() => {

@@ -13,6 +13,8 @@ namespace HRM.backend.src.HRM.Infrastructure.Persistence.Repositories.Recruitmen
             return await _context.Candidates
                 .Include(c => c.RecruitmentRequest)
                     .ThenInclude(r => r.Department)
+                        .ThenInclude(d => d!.Manager)
+                            .ThenInclude(m => m!.Account)
                 .Include(c => c.RecruitmentRequest)
                     .ThenInclude(r => r.Position)
                 .Where(c => ids.Contains(c.Id))

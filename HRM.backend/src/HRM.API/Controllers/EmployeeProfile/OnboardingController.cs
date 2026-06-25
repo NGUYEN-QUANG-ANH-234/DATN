@@ -20,6 +20,21 @@ namespace HRM.backend.src.HRM.API.Controllers.EmployeeProfile
             _useCase = useCase;
         }
 
+        [HttpPost("resolve")]
+        [AllowAnonymous]
+        public async Task<IActionResult> ResolveCandidate([FromBody] ResolveOnboardingCandidateDto dto, CancellationToken ct)
+        {
+            try
+            {
+                var data = await _useCase.ResolveCandidateAsync(dto, ct);
+                return Ok(new { Success = true, Data = data });
+            }
+            catch (Exception ex)
+            {
+                return UnprocessableEntity(new { Success = false, Message = ex.Message });
+            }
+        }
+
         [HttpPost]
         [Consumes("multipart/form-data")]
         [AllowAnonymous]

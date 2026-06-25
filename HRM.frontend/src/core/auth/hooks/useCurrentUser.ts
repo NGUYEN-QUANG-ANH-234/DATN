@@ -24,9 +24,14 @@ export const useCurrentUser = () => {
         "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name";
       const emailClaim =
         "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress";
+      const accountIdClaim =
+        "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier";
       const role = normalizeRole(decoded.role) || String(decoded.role || "");
+      const rawAccountId = decoded.sub || decoded[accountIdClaim];
+      const accountId = Number(rawAccountId);
 
       return {
+        accountId: Number.isFinite(accountId) ? accountId : undefined,
         name:
           decoded.name ||
           decoded[nameClaim] ||

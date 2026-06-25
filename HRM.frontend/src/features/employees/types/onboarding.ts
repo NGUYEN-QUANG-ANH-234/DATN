@@ -1,11 +1,6 @@
 export interface SubmitOnboardingFormState {
-  socialInsCode: string | number | readonly string[] | undefined;
-  taxCode: string | number | readonly string[] | undefined;
-  bankAccount: string | number | readonly string[] | undefined;
-  bankName: string | number | readonly string[] | undefined;
-  birthDate: string | number | readonly string[] | undefined;
-  gender: string | number | readonly string[] | undefined;
-  candidateId: number; // Thường lấy từ URL Params hoặc Context sau khi trúng tuyển
+  candidateId: number;
+  trackingCode: string;
   fullName: string;
   email: string;
   phoneNumber: string;
@@ -13,12 +8,33 @@ export interface SubmitOnboardingFormState {
   currentAddress: string;
   permanentAddress: string;
   identityNumber: string;
+  nationality: string;
+  ethnicity: string;
   emergencyContactName: string;
   emergencyPhone: string;
   emergencyRelation: string;
+  gender: string;
+  birthDate: string;
+  taxCode: string;
+  socialInsCode: string;
+  bankAccount: string;
+  bankName: string;
   identityFrontFile: File | null;
   identityBackFile: File | null;
   certificateFile: File | null;
+}
+
+export interface OnboardingCandidateLookup {
+  candidateId: number;
+  trackingCode: string;
+  email: string;
+  fullName: string;
+  status: string;
+  recruitmentRequestId?: number;
+  departmentId?: number;
+  departmentName?: string;
+  positionId?: number;
+  positionName?: string;
 }
 
 export interface PendingOnboardingRequest {
@@ -29,8 +45,8 @@ export interface PendingOnboardingRequest {
   departmentName?: string;
   positionId?: number;
   positionName?: string;
-  requestedDataJson: string; // Chứa dữ liệu cá nhân dạng JSON
-  status: string; // Pending_HR, Completed, Rejected
+  requestedDataJson: string;
+  status: string;
   createdAt: string;
 }
 

@@ -9,7 +9,7 @@ export const useDepartments = () => {
   const fetchTree = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await departmentApi.getTree();
+      const res = await departmentApi.getTree(true);
       setTreeData(res.data || []);
     } catch (error) {
       console.error("Lỗi tải sơ đồ tổ chức:", error);
@@ -36,6 +36,28 @@ export const useDepartments = () => {
       return true;
     } catch (error) {
       console.error("Lỗi giải thể phòng ban:", error);
+      return false;
+    }
+  };
+
+  const handleActivate = async (id: number): Promise<boolean> => {
+    try {
+      await departmentApi.activate(id);
+      await fetchTree();
+      return true;
+    } catch (error) {
+      console.error("Không thể bật lại phòng ban:", error);
+      return false;
+    }
+  };
+
+  const handleDelete = async (id: number): Promise<boolean> => {
+    try {
+      await departmentApi.delete(id);
+      await fetchTree();
+      return true;
+    } catch (error) {
+      console.error("Không thể xóa hẳn phòng ban:", error);
       return false;
     }
   };
@@ -79,6 +101,8 @@ export const useDepartments = () => {
     handleUpdateParent,
     handleUpdateDepartment,
     handleDeactivate,
+    handleActivate,
+    handleDelete,
     handleCreate,
   };
 };

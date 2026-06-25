@@ -494,7 +494,7 @@ export const ScheduleConfiguration = () => {
                 />
               </label>
               <label className="block">
-                <span className="mb-2 block text-sm font-semibold">Lịch nghỉ công ty</span>
+                <span className="mb-2 block text-sm font-semibold">Lịch công ty áp dụng</span>
                 <select
                   className="hicas-select w-full"
                   value={formData.companyCalendarId}
@@ -502,7 +502,7 @@ export const ScheduleConfiguration = () => {
                     setFormData({ ...formData, companyCalendarId: event.target.value })
                   }
                 >
-                  <option value="">Dùng lịch active theo năm</option>
+                  <option value="">Dùng lịch đang áp dụng theo năm</option>
                   {companyCalendars.map((calendar) => (
                     <option key={calendar.id} value={calendar.id}>
                       {calendar.versionCode}
@@ -510,15 +510,15 @@ export const ScheduleConfiguration = () => {
                   ))}
                 </select>
               </label>
-            <div className="rounded-2xl border border-[var(--hicas-border)] bg-[var(--hicas-orange-lighter)] p-4 text-sm text-[var(--hicas-text-secondary)]">
-                Ngày công = phút làm thực tế / giờ chuẩn, tối đa 1 công/ngày. Phần vượt giờ
-                chuẩn được xử lý riêng ở phần làm thêm.
+              <div className="rounded-2xl border border-[var(--hicas-border)] bg-[var(--hicas-orange-lighter)] p-4 text-sm text-[var(--hicas-text-secondary)]">
+                Lịch công ty là mặc định cho ngày nghỉ, ngày lễ và ngày làm bù. Ngoại lệ bên
+                dưới chỉ dùng khi phòng ban có ngày nghỉ riêng trong kỳ.
               </div>
             </div>
 
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               <label className="block">
-                <span className="mb-2 block text-sm font-semibold">Giờ bắt đầu làm ngày lễ</span>
+                <span className="mb-2 block text-sm font-semibold">Giờ bắt đầu ngày đặc biệt</span>
                 <input
                   type="time"
                   className="hicas-input w-full"
@@ -529,7 +529,7 @@ export const ScheduleConfiguration = () => {
                 />
               </label>
               <label className="block">
-                <span className="mb-2 block text-sm font-semibold">Giờ kết thúc làm ngày lễ</span>
+                <span className="mb-2 block text-sm font-semibold">Giờ kết thúc ngày đặc biệt</span>
                 <input
                   type="time"
                   className="hicas-input w-full"
@@ -543,7 +543,9 @@ export const ScheduleConfiguration = () => {
 
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               <div>
-                <span className="mb-2 block text-sm font-semibold">Ngày nghỉ lễ trong kỳ</span>
+                <span className="mb-2 block text-sm font-semibold">
+                  Ngoại lệ nghỉ riêng của phòng ban
+                </span>
                 <div className="flex gap-2">
                   <input
                     type="date"
@@ -558,7 +560,7 @@ export const ScheduleConfiguration = () => {
                 <div className="mt-3 flex min-h-10 flex-wrap gap-2">
                   {holidayDates.length === 0 ? (
                     <span className="text-sm text-[var(--hicas-text-muted)]">
-                      Chưa có ngày nghỉ lễ trong kỳ.
+                      Chưa có ngoại lệ nghỉ riêng trong kỳ.
                     </span>
                   ) : (
                     holidayDates.map((date) => (
@@ -662,6 +664,7 @@ export const ScheduleConfiguration = () => {
         </form>
       </Card>
 
+      <div className="max-h-[560px] overflow-y-auto pr-1">
       <DataTable
         columns={scheduleColumns}
         data={configuredSchedules}
@@ -670,12 +673,14 @@ export const ScheduleConfiguration = () => {
         emptyTitle="Chưa có cấu hình lịch trình"
         emptyDescription="Hãy thiết lập ca làm việc và kỳ công cho phòng ban đầu tiên."
       />
+      </div>
 
       <Card
         title="Lịch sử thay đổi"
         description="Các biến động cấu hình ca, kỳ công và quỹ phép gần đây."
         actions={<History size={20} className="text-[var(--hicas-orange)]" />}
       >
+        <div className="max-h-[420px] overflow-y-auto pr-1">
         <DataTable
           columns={historyColumns}
           data={history}
@@ -683,6 +688,7 @@ export const ScheduleConfiguration = () => {
           className="border-0 shadow-none"
           emptyTitle="Chưa có lịch sử thay đổi"
         />
+        </div>
       </Card>
     </div>
   );

@@ -88,5 +88,30 @@ namespace HRM.backend.src.HRM.API.Controllers.System
                 return BadRequest(new { success = false, message = ex.Message });
             }
         }
+
+        [HttpDelete("salary-variables/{code}")]
+        [RequirePermission("SALARY_VARIABLE_CREATE", GroupName = SystemModules.SalaryBonus, Description = "Xóa hẳn biến cấu hình tính lương")]
+        public async Task<IActionResult> DeleteVariable(string code, CancellationToken ct)
+        {
+            try
+            {
+                var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (!int.TryParse(userIdClaim, out int adminOrHrId))
+                {
+                    return Unauthorized(new { success = false, message = "Không xác định được danh tính người dùng." });
+                }
+
+                await _useCase.DeleteVariableAsync(code, adminOrHrId, ct);
+                return Ok(new { success = true, message = "Đã xóa biến lương." });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Conflict(new { success = false, message = ex.Message });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+        }
     }
 }

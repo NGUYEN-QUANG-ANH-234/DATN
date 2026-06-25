@@ -4,7 +4,7 @@ using HRM.backend.src.HRM.Application.Interfaces.PersonnelChanges.Services;
 using HRM.backend.src.HRM.Application.Interfaces.PersonnelChanges.UseCases;
 using HRM.backend.src.HRM.Core.Entities.EmployeeProfile;
 using HRM.backend.src.HRM.Core.Entities.PersonnelChanges;
-using HRM.backend.src.HRM.Core.Entities.RequestHandover;
+using HRM.backend.src.HRM.Core.Entities.WorkflowRequests;
 using HRM.backend.src.HRM.Core.Enums;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories;
 using HRM.backend.src.HRM.Core.Interfaces.Repositories.EmployeeProfile;
@@ -51,6 +51,8 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
             int actorAccountId,
             CancellationToken ct)
         {
+            await _accessGuard.EnsureActorHasRoleAsync(actorAccountId, ct, "HR", "Manager", "Admin");
+
             if (dto.RequestedDepartmentId <= 0)
                 throw new ArgumentException("Requested department is required.");
 
@@ -110,6 +112,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
 
             return MutateInternalTransferAsync(id, actorAccountId, async (request, innerCt) =>
             {
+                await _accessGuard.EnsureActorHasRoleAsync(actorAccountId, innerCt, "HR", "Admin");
                 EnsureStatus(request, PersonnelChangeStatus.PendingHRReview);
 
                 var employee = await _accessGuard.EnsureCanAccessEmployeeAsync(dto.EmployeeId, actorAccountId, innerCt);
@@ -157,7 +160,11 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
             return MutateInternalTransferAsync(id, actorAccountId, async (request, innerCt) =>
             {
                 EnsureStatus(request, PersonnelChangeStatus.PendingCurrentManagerOpinion);
-                await EnsureCurrentManagerCanReviewAsync(request, actorAccountId, innerCt);
+                await _accessGuard.EnsureCurrentManagerCanActAsync(
+                    request.CurrentManagerId,
+                    actorAccountId,
+                    "submit this opinion",
+                    innerCt);
 
                 var oldStatus = request.Status;
                 request.Status = dto.IsApproved
@@ -180,7 +187,13 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
             return MutateInternalTransferAsync(id, actorAccountId, async (request, innerCt) =>
             {
                 EnsureStatus(request, PersonnelChangeStatus.PendingEmployeeConsent);
-                await EnsureSelectedEmployeeCanConsentAsync(request, actorAccountId, innerCt);
+                if (!request.EmployeeId.HasValue)
+                    throw new InvalidOperationException("Internal transfer has no selected employee.");
+                await _accessGuard.EnsureEmployeeAccountCanActAsync(
+                    request.EmployeeId.Value,
+                    actorAccountId,
+                    "submit consent",
+                    innerCt);
 
                 var oldStatus = request.Status;
                 request.EmployeeConsentAt = DateTime.UtcNow;
@@ -207,6 +220,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
         {
             return MutateInternalTransferAsync(id, actorAccountId, async (request, innerCt) =>
             {
+                await _accessGuard.EnsureActorHasRoleAsync(actorAccountId, innerCt, "Director", "Admin");
                 EnsureStatus(request, PersonnelChangeStatus.PendingDirectorApproval);
 
                 var oldStatus = request.Status;
@@ -242,6 +256,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
 
             return MutateInternalTransferAsync(id, actorAccountId, async (request, innerCt) =>
             {
+                await _accessGuard.EnsureActorHasRoleAsync(actorAccountId, innerCt, "HR", "Admin");
                 EnsureStatus(
                     request,
                     PersonnelChangeStatus.ApprovedByDirector,
@@ -267,6 +282,7 @@ namespace HRM.backend.src.HRM.Application.UseCases.PersonnelChanges
         {
             return MutateInternalTransferAsync(id, actorAccountId, async (request, innerCt) =>
             {
+                await _accessGuard.EnsureActorHasRoleAsync(actorAccountId, innerCt, "HR", "Admin");
                 EnsureStatus(request, PersonnelChangeStatus.ReadyToExecute);
                 _contractFlowService.EnsureCanExecute(request);
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Check, RotateCcw, Upload } from "lucide-react";
+import { BarChart3, BriefcaseBusiness, Check, RotateCcw, Upload } from "lucide-react";
 import {
   FeatureCard,
   FeaturePage,
@@ -8,6 +8,8 @@ import {
   secondaryButtonClass,
   textareaClass,
 } from "../../../core/components/FeatureShell";
+import { useCurrentUser } from "../../../core/auth/hooks/useCurrentUser";
+import { normalizeRole } from "../../../core/auth/roleAccess";
 import { useNotification } from "../../../core/context/NotificationContext";
 import { performanceApi, type PerformanceEvaluation } from "../api/performanceApi";
 import { taskApi, type TaskItem } from "../api/taskApi";
@@ -70,17 +72,41 @@ const statusLabel = (status?: string | null) => {
   return status ? map[status] || status : "-";
 };
 
+const taskStatusLabel = (status?: string | null) => {
+  const map: Record<string, string> = {
+    Assigned: "Đã giao",
+    InProgress: "Đang thực hiện",
+    PendingReview: "Chờ duyệt",
+    ReworkRequired: "Cần cập nhật lại",
+    Completed: "Hoàn thành",
+    Cancelled: "Đã hủy",
+  };
+  return status ? map[status] || status : "-";
+};
+
 const canUpdateKpi = (review: PerformanceEvaluation) =>
   review.status === "PendingEmployeeUpdate" || review.status === "ReworkRequired";
 
+const canUpdateTask = (task: TaskItem) =>
+  task.status === "Assigned" ||
+  task.status === "InProgress" ||
+  task.status === "ReworkRequired";
+
 const kpiActionLabel = (review: PerformanceEvaluation) => {
-  if (review.status === "PendingEvaluation") return "Đã gửi";
-  if (canUpdateKpi(review)) return "Cập nhật";
-  return "Xem";
+  if (review.status === "PendingEvaluation") return "Đã gửi chấm điểm";
+  if (canUpdateKpi(review)) return "Cập nhật KPI";
+  return "Xem chi tiết";
+};
+
+const canReviewWorkItems = (role?: string | null) => {
+  const normalized = normalizeRole(role);
+  return normalized === "Admin" || normalized === "Manager";
 };
 
 export const TaskWorkspacePage = () => {
   const { triggerAlert } = useNotification();
+  const { user } = useCurrentUser();
+  const canReviewTasks = canReviewWorkItems(user?.role);
   const [myKpis, setMyKpis] = useState<PerformanceEvaluation[]>([]);
   const [myTasks, setMyTasks] = useState<TaskItem[]>([]);
   const [pending, setPending] = useState<TaskItem[]>([]);
@@ -92,14 +118,23 @@ export const TaskWorkspacePage = () => {
   const [file, setFile] = useState<File | null>(null);
 
   const loadData = async () => {
-    const [kpis, mine, reviews] = await Promise.allSettled([
+    const [kpis, mine] = await Promise.allSettled([
       performanceApi.getMy(),
       taskApi.getMy(),
-      taskApi.getPendingReview(),
     ]);
-    if (kpis.status === "fulfilled") setMyKpis(kpis.value.data || []);
-    if (mine.status === "fulfilled") setMyTasks(mine.value.data || []);
-    if (reviews.status === "fulfilled") setPending(reviews.value.data || []);
+
+    setMyKpis(kpis.status === "fulfilled" ? kpis.value.data || [] : []);
+    setMyTasks(mine.status === "fulfilled" ? mine.value.data || [] : []);
+
+    if (!canReviewTasks) {
+      setPending([]);
+      return;
+    }
+
+    const reviews = await taskApi
+      .getPendingReview()
+      .catch(() => ({ success: false, data: [] as TaskItem[] }));
+    setPending(reviews.data || []);
   };
 
   useEffect(() => {
@@ -107,7 +142,7 @@ export const TaskWorkspacePage = () => {
       void loadData();
     }, 0);
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [canReviewTasks]);
 
   const submitProgress = async () => {
     if (!selectedTaskId) return;
@@ -115,7 +150,7 @@ export const TaskWorkspacePage = () => {
     triggerAlert(
       "success",
       "Đã cập nhật tiến độ",
-      "Công việc đã được gửi cho trưởng phòng duyệt.",
+      "Công việc đã được gửi cho quản lý duyệt.",
     );
     setSelectedTaskId(null);
     setNote("");
@@ -190,10 +225,39 @@ export const TaskWorkspacePage = () => {
 
   return (
     <FeaturePage
-      title="Công việc và KPI"
-      description="Cập nhật kết quả thực tế, tự đánh giá KPI và xử lý công việc cần duyệt."
+      title="KPI và công việc"
+      description="Cập nhật kết quả KPI theo kỳ và theo dõi các công việc được giao."
       width="wide"
     >
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="rounded-[var(--radius-md)] border border-[var(--hicas-border)] bg-white p-4 shadow-sm">
+          <div className="flex items-start gap-3">
+            <span className="rounded-xl bg-[var(--hicas-orange-lighter)] p-2 text-[var(--hicas-orange-dark)]">
+              <BarChart3 size={20} />
+            </span>
+            <div>
+              <h2 className="text-lg font-bold text-[var(--hicas-text-main)]">KPI của tôi</h2>
+              <p className="mt-1 text-sm text-[var(--hicas-text-secondary)]">
+                Chỉ tiêu theo kỳ đánh giá. Bạn nhập kết quả thực tế và tự đánh giá, trưởng phòng chốt điểm chính thức.
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="rounded-[var(--radius-md)] border border-[var(--hicas-border)] bg-white p-4 shadow-sm">
+          <div className="flex items-start gap-3">
+            <span className="rounded-xl bg-slate-100 p-2 text-slate-700">
+              <BriefcaseBusiness size={20} />
+            </span>
+            <div>
+              <h2 className="text-lg font-bold text-[var(--hicas-text-main)]">Công việc của tôi</h2>
+              <p className="mt-1 text-sm text-[var(--hicas-text-secondary)]">
+                Nhiệm vụ hằng ngày hoặc theo dự án. Bạn cập nhật tiến độ và minh chứng để quản lý duyệt.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <FeatureCard title="KPI của tôi" description="Chọn kỳ cần cập nhật kết quả thực tế và tự đánh giá.">
         {myKpis.length === 0 ? (
           <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--hicas-border)] bg-white px-4 py-8 text-center text-sm text-[var(--hicas-text-secondary)]">
@@ -389,7 +453,7 @@ export const TaskWorkspacePage = () => {
         </FeatureCard>
       )}
 
-      <FeatureCard title="Công việc của tôi">
+      <FeatureCard title="Công việc của tôi" description="Theo dõi nhiệm vụ được giao và gửi tiến độ khi có cập nhật.">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[760px] text-left text-sm">
             <thead className="border-b bg-gray-50 text-xs uppercase text-gray-500">
@@ -402,19 +466,31 @@ export const TaskWorkspacePage = () => {
               </tr>
             </thead>
             <tbody>
-              {myTasks.map((task) => (
-                <tr key={task.id} className="border-b">
-                  <td className="px-3 py-2 font-medium">{task.title}</td>
-                  <td className="px-3 py-2">{task.progressPercent}%</td>
-                  <td className="px-3 py-2">{task.status}</td>
-                  <td className="px-3 py-2">{task.deadline?.slice(0, 10) || "-"}</td>
-                  <td className="px-3 py-2 text-right">
-                    <button className={secondaryButtonClass} onClick={() => setSelectedTaskId(task.id)}>
-                      <Upload size={16} /> Cập nhật
-                    </button>
+              {myTasks.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-3 py-8 text-center text-[var(--hicas-text-secondary)]">
+                    Chưa có công việc nào được giao.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                myTasks.map((task) => (
+                  <tr key={task.id} className="border-b">
+                    <td className="px-3 py-2 font-medium">{task.title}</td>
+                    <td className="px-3 py-2">{task.progressPercent}%</td>
+                    <td className="px-3 py-2">{taskStatusLabel(task.status)}</td>
+                    <td className="px-3 py-2">{task.deadline?.slice(0, 10) || "-"}</td>
+                    <td className="px-3 py-2 text-right">
+                      <button
+                        className={secondaryButtonClass}
+                        disabled={!canUpdateTask(task)}
+                        onClick={() => setSelectedTaskId(task.id)}
+                      >
+                        <Upload size={16} /> {canUpdateTask(task) ? "Cập nhật" : "Đã gửi"}
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -447,41 +523,51 @@ export const TaskWorkspacePage = () => {
         </FeatureCard>
       )}
 
-      <FeatureCard title="Chờ trưởng phòng duyệt">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-left text-sm">
-            <thead className="border-b bg-gray-50 text-xs uppercase text-gray-500">
-              <tr>
-                <th className="px-3 py-2">Nhân viên</th>
-                <th className="px-3 py-2">Công việc</th>
-                <th className="px-3 py-2">Tiến độ</th>
-                <th className="px-3 py-2">Hạn duyệt</th>
-                <th className="px-3 py-2"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {pending.map((task) => (
-                <tr key={task.id} className="border-b">
-                  <td className="px-3 py-2">{task.employeeName || "-"}</td>
-                  <td className="px-3 py-2 font-medium">{task.title}</td>
-                  <td className="px-3 py-2">{task.progressPercent}%</td>
-                  <td className="px-3 py-2">{task.reviewDeadline?.slice(0, 10) || "-"}</td>
-                  <td className="px-3 py-2">
-                    <div className="flex justify-end gap-2">
-                      <button className={secondaryButtonClass} onClick={() => feedback(task.id)}>
-                        <RotateCcw size={16} /> Sửa
-                      </button>
-                      <button className={primaryButtonClass} onClick={() => approve(task.id)}>
-                        <Check size={16} /> Duyệt
-                      </button>
-                    </div>
-                  </td>
+      {canReviewTasks && (
+        <FeatureCard title="Công việc chờ duyệt" description="Chỉ hiển thị với quản lý phụ trách hoặc quản trị hệ thống.">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[760px] text-left text-sm">
+              <thead className="border-b bg-gray-50 text-xs uppercase text-gray-500">
+                <tr>
+                  <th className="px-3 py-2">Nhân viên</th>
+                  <th className="px-3 py-2">Công việc</th>
+                  <th className="px-3 py-2">Tiến độ</th>
+                  <th className="px-3 py-2">Hạn duyệt</th>
+                  <th className="px-3 py-2"></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </FeatureCard>
+              </thead>
+              <tbody>
+                {pending.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-3 py-8 text-center text-[var(--hicas-text-secondary)]">
+                      Không có công việc đang chờ duyệt.
+                    </td>
+                  </tr>
+                ) : (
+                  pending.map((task) => (
+                    <tr key={task.id} className="border-b">
+                      <td className="px-3 py-2">{task.employeeName || "-"}</td>
+                      <td className="px-3 py-2 font-medium">{task.title}</td>
+                      <td className="px-3 py-2">{task.progressPercent}%</td>
+                      <td className="px-3 py-2">{task.reviewDeadline?.slice(0, 10) || "-"}</td>
+                      <td className="px-3 py-2">
+                        <div className="flex justify-end gap-2">
+                          <button className={secondaryButtonClass} onClick={() => feedback(task.id)}>
+                            <RotateCcw size={16} /> Yêu cầu sửa
+                          </button>
+                          <button className={primaryButtonClass} onClick={() => approve(task.id)}>
+                            <Check size={16} /> Duyệt
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </FeatureCard>
+      )}
     </FeaturePage>
   );
 };
